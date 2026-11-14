@@ -45,7 +45,7 @@ export function MissionHeader({ crewRisks, mission = "MTV-1 · Mars transit" }: 
           <path d="M7 19h6l2-5 3 9 2.5-6H29" fill="none" stroke="#FFFFFF" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
         <div>
-          <h1 className="text-[15px] font-bold tracking-[0.06em]">AAHMS</h1>
+          <h1 className="text-[15px] font-bold tracking-[0.06em]">AstroMed</h1>
           <p className="text-[11px] text-mc-label">{mission}</p>
         </div>
       </div>

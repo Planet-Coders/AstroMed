@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { WarpScene } from "@/components/login/WarpScene";
 import { LoadingScreen } from "@/components/LoadingScreen";
-import { AahmsMark } from "@/components/AahmsMark";
+import { AstroMedMark } from "@/components/AstroMedMark";
 import { LOGIN_IMAGES, toImage, type NasaImage } from "@/lib/nasaImages";
 
 const MISSION_EPOCH = Date.UTC(2026, 0, 15);
@@ -201,9 +201,9 @@ export default function LoginPage() {
         }`}
       >
         <div className="flex items-center gap-3">
-          <AahmsMark className="h-11 w-11" />
+          <AstroMedMark className="h-11 w-11" />
           <span className="hidden font-mono text-[10px] uppercase tracking-[0.25em] text-white/70 sm:inline">
-            AAHMS · Edge AI
+            AstroMed · Edge AI
           </span>
         </div>
         <div className="flex items-center gap-6 font-mono text-[10px] uppercase tracking-[0.2em] text-white/70">
@@ -276,7 +276,7 @@ export default function LoginPage() {
             </h1>
             <div className="hero-in mt-6 flex w-full max-w-5xl flex-col items-center justify-between gap-6 text-left [animation-delay:380ms] md:flex-row md:items-end">
               <p className="max-w-md text-[13px] leading-relaxed text-white/75">
-                Twenty light-minutes from Earth, there is no ground surgeon on call. AAHMS watches every heartbeat,
+                Twenty light-minutes from Earth, there is no ground surgeon on call. AstroMed watches every heartbeat,
                 breath and dose on board, and an on-device AI co-pilot answers the crew even when the link to Earth is down.
               </p>
               <button
