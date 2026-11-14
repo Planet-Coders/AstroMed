@@ -20,7 +20,7 @@ On the ground, a **super admin** sets up mission groups and crew accounts, and *
 | Astronauts assess their own health                                            | Each crew member signs in to their own console, takes a guided **Daily self-check**, and sees their own vitals                                               |
 | Indicators: blood pressure, heart rate, blood sugar, temperature, sleep, mood | All six, plus HRV, SpO₂, radiation dose, cabin CO₂, exercise and a reaction-time test                                                                        |
 | Guidance on treatment and improvement                                         | Advice on every reading, plus an **AI co-pilot** with ISS-style protocols, crew baselines and the medicine kit                                               |
-| When to involve crew or flight surgeons                                       | Red results prompt **Alert CMO + send to ground surgeon**, and the **Crew oversight** dashboard shows flight surgeons every alert in their groups            |
+| When to involve crew or flight surgeons                                       | Daily Check shows follow-up guidance on flagged readings, and **Crew oversight** shows synced monitoring alerts for assigned groups            |
 | Managing many crews                                                           | A **Super admin console** creates mission groups and astronaut accounts, and decides which groups each oversight user can see                                |
 | NASA HRP's five hazards                                                       | **RIDGE strip** (Radiation, Isolation, Distance, Gravity, hostile Environment), linked to the body systems each one affects                                  |
 | Clickable human figure                                                        | **Body map**: brain, eyes, heart, lungs, blood, bones & muscles and reproductive health, each with status, what it does, how space affects it and what to do |
@@ -39,11 +39,11 @@ Six guided steps:
 - **Blood pressure** (mmHg)
 - **Blood sugar** (mg/dL, fasting or after a meal)
 - **Body temperature** (°C)
-- **Mood** (5 faces + a private note)
+- **Mood** (5 faces)
 - **Sleep** (pre-filled from the sleep log)
-- **Hydration** (fluid drunk in 24 h, mL, plus urine colour on an 8-shade chart)
+- **Hydration** (fluid in the last 24 hours in mL and the most recent urine colour on an 8-shade chart)
 
-Results turn green, amber or red as they're typed, with advice, and readings a device couldn't show are caught as typos. The results screen offers **Ask the co-pilot about my results**. When anything is red, it also offers **Alert CMO + send to ground surgeon**.
+Results turn green, amber or red as they're typed, with follow-up guidance. Open **My monitoring** from flagged results to follow synced alerts. On a **Low fluid intake** alert, use **Log water** to add 250 mL, 500 mL or a custom amount after the last check. A fresh 24-hour reading replaces the prior total.
 
 ### Body map + five hazards
 
@@ -123,13 +123,13 @@ Every admin and oversight API checks the role on the server, from the database. 
   - **Health logs:** every self-check, exercise and sleep day, body-map injury report (with photos) and period day
   - **AI conversations:** the full co-pilot transcript in time order, searchable, with each reply marked on-device AI or basic mode
 
-### Health monitoring (5 metrics, time series, alerts)
+### Health monitoring
 
 Full detail, thresholds and NASA sources: **[docs/METRICS.md](docs/METRICS.md)**.
 
-- **Metrics:** sleep, exercise, pulse trend, hydration (self-report) and radiation dose in the mission's space-weather context. Each has a definition, an expected data cadence and a rationale citing NASA NTRS evidence reports and OSDR studies, shown in the app under **Why we monitor this**.
+- **Metrics:** all Daily Check readings, exercise, pulse trend and radiation dose. Blood pressure shows both numbers, and blood sugar keeps fasting context. Each metric has a definition, expected cadence and rationale under **Why we monitor this**.
 - **Dashboard:** 7 / 14 / 30-day daily charts per metric with the amber and red lines, a **missing-data badge** per metric (On time / Late / Missing / No data yet, from the expected cadence) and a **trend summary** with % change against the previous period. Oversight sees it per astronaut (**Monitoring** tab); crew see their own under **My monitoring**.
-- **Alerts:** rules stored in the database (threshold, trend and missing-data kinds) that the super admin edits in `/admin` → **Alert rules** (amber, red, window, on/off). Alerts go **open → acknowledged → resolved** with a note thread; crew can note and acknowledge their own, oversight of their group can also resolve. Each alert has a **Why this alerted** panel (rule, measured value, threshold crossed, rationale, source). Escalation from amber to red re-opens an alert; values back in range resolve it automatically. All actions are in the audit log.
+- **Alerts:** super admins can edit thresholds, windows and enabled status in **Alert rules**. Daily Check rules use the latest applicable value, including the latest daily fluid total. Alerts go **open → acknowledged → resolved** with a note thread. Crew can note and acknowledge their own alerts, and oversight can also resolve alerts. The app resolves an alert when a follow-up value clears its rule.
 - **Synthetic crew:** `npm run db:synthetic` seeds group **SIM-1** with six SYNTHETIC astronauts (normal, missing data, sleep debt, rising heart rate, dehydration, solar particle event), 14–30 days each, seedable.
 
 ### Demo scenarios
@@ -196,7 +196,7 @@ For the full AI co-pilot, use Chrome or Edge 113+ on a computer with a WebGPU-ca
 ## Five-minute demo script
 
 1. Sign in as `john@aahms.demo`.
-2. **My vitals:** follow the "Morning self-check due" banner and do the check. Try BP `165/102` to see a red result and the CMO alert.
+2. **My vitals:** follow the "Morning self-check due" banner and do the check. Try BP `118/102` to see a red diastolic result, then open **My monitoring** to see the alert.
 3. **Body map:** click the regions, then pick **G** (Gravity) in the hazards strip to see which systems it affects.
 4. **Missions:** use the **Go** buttons to finish the exercise plan (log 46 min), sleep (22:30 → 06:00) and **Beacon Lock**. The ring hits 4/4 and the patches unlock.
 5. Switch **Demo → Solar particle event** and watch radiation, the body map and the assessment react.

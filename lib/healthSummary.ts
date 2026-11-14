@@ -33,9 +33,11 @@ export const LEVEL_TEXT: Record<RiskLevel, string> = { GREEN: "text-mc-green", Y
 export const LEVEL_DOT: Record<RiskLevel, string> = { GREEN: "bg-mc-green", YELLOW: "bg-mc-amber", RED: "bg-mc-red" };
 
 function latest(reports: HealthReportRow[], kind: HealthReportRow["kind"]) {
+  const time = (r: HealthReportRow) =>
+    r.kind === "SELF_CHECK" && /^\d{13}$/.test(r.key) ? Number(r.key) : Date.parse(r.recordedAt);
   return reports
     .filter((r) => r.kind === kind)
-    .sort((a, b) => Date.parse(b.recordedAt) - Date.parse(a.recordedAt))[0];
+    .sort((a, b) => time(b) - time(a))[0];
 }
 
 function sleepHoursOf(day: DayLog & { sleepHours?: number }) {

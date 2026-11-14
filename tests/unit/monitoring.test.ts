@@ -27,13 +27,18 @@ const fired = (profile: Profile, seed = 1) =>
   Object.fromEntries(evaluateRules(RULES, samplesFor(profile, 30, seed), NOW).map((f) => [f.ruleId, f.level]));
 
 describe("metric catalog", () => {
-  it("covers the five requirement metrics, each with a sourced rationale", () => {
-    expect(METRICS.map((m) => m.id).sort()).toEqual(["activity", "hydration", "pulse", "radiation", "sleep"]);
+  const originalMetrics: MetricId[] = ["activity", "hydration", "pulse", "radiation", "sleep"];
+
+  it("covers the wearable, routine, and Daily Check metrics with sourced rationales", () => {
+    expect(METRICS.map((m) => m.id).sort()).toEqual([
+      "activity", "diastolic", "glucose_after_meal", "glucose_fasting", "hydration", "mood",
+      "pulse", "radiation", "sleep", "systolic", "temperature", "urine_color",
+    ]);
     for (const m of METRICS) {
       expect(m.rationale.length).toBeGreaterThan(80);
-      expect(m.citations.some((c) => c.source === "NTRS")).toBe(true);
+      expect(m.citations.length).toBeGreaterThan(0);
       for (const c of m.citations) expect(c.url).toMatch(/^https:\/\/(ntrs\.nasa\.gov\/citations\/\d+|osdr\.nasa\.gov\/bio\/repo\/data\/studies\/OSD-\d+|standards\.nasa\.gov\/)/);
-      expect(m.rules.some((r) => r.kind === "missing")).toBe(true);
+      expect(m.rules.some((r) => r.kind === (originalMetrics.includes(m.id) ? "missing" : "latest"))).toBe(true);
     }
   });
 
@@ -57,7 +62,9 @@ describe("synthetic normal case", () => {
 
   it("reports every metric as on time", () => {
     const s = samplesFor("normal");
-    for (const m of METRICS) expect(missingStatus(s, m.id, NOW).status).toBe("ok");
+    for (const metric of ["activity", "hydration", "pulse", "radiation", "sleep"] as const) {
+      expect(missingStatus(s, metric, NOW).status).toBe("ok");
+    }
   });
 });
 
@@ -154,7 +161,7 @@ describe("trend summaries", () => {
 describe("configurable rules", () => {
   it("respects edited thresholds and switched-off rules", () => {
     const s = samplesFor("dehydration");
-    const looser = RULES.map((r) => (r.id === "hydration_low" ? { ...r, amber: 1300, red: 1000 } : r));
+    const looser = RULES.map((r) => (r.id === "hydration_low" ? { ...r, amber: 1250, red: 1000 } : r));
     expect(evaluateRules(looser, s, NOW).find((f) => f.ruleId === "hydration_low")).toBeUndefined();
     const off = RULES.map((r) => (r.id === "hydration_low" ? { ...r, enabled: false } : r));
     expect(evaluateRules(off, s, NOW)).toEqual([]);

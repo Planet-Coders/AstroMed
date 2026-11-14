@@ -929,8 +929,8 @@ function RulesTab({ run }: { run: Run }) {
   return (
     <Card title="Alert rules · monitoring thresholds">
       <p className="mb-4 max-w-3xl text-xs leading-relaxed text-mc-muted">
-        Each rule is checked whenever a crew member&apos;s monitoring is viewed. Threshold rules compare the average over the window;
-        trend rules compare the window with the window before it (%); missing-data rules count hours since the last value.
+        Rules are checked when a crew member&apos;s monitoring is viewed. Threshold rules use the average over the window.
+        Latest-reading rules use the most recent value in the window. Trend rules compare two windows, and missing-data rules count hours since the last value.
         Changes apply at once and are written to the audit log. Defaults and their NASA sources are listed under each metric&apos;s
         &ldquo;Why we monitor this&rdquo;.
       </p>

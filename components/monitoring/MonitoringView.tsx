@@ -15,7 +15,7 @@ export function MonitoringView({ url, show, canResolve }: { url: string; show: "
       {show !== "series" && (
         <section className="flex flex-col gap-2">
           {show === "both" && <h3 className="mc-label">Health alerts</h3>}
-          <AlertsPanel alerts={data.alerts} rules={data.rules} canResolve={canResolve} onChanged={reload} />
+          <AlertsPanel alerts={data.alerts} rules={data.rules} canResolve={canResolve} canLogWater={url === "/api/monitoring/me"} onChanged={reload} />
         </section>
       )}
       {show !== "alerts" && (
