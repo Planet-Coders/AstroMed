@@ -95,6 +95,7 @@ export function SyncProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!isOnline) return;
+    void flushOutbox();
     const id = setInterval(() => {
       void syncNow();
     }, 30_000);

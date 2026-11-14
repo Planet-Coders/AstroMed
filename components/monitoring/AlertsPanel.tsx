@@ -68,7 +68,7 @@ export function AlertsPanel({
         ))}
       </div>
       {list.length === 0 && (
-        <p className="text-sm text-mc-label">{show === "active" ? "No active alerts. Everything monitored is within its rules." : "No alerts resolved in the last 30 days."}</p>
+        <p className="text-sm text-mc-label">{show === "active" ? "No active alerts." : "No alerts resolved in the last 30 days."}</p>
       )}
       {list.map((a) => (
         <AlertCard key={a.id} alert={a} rule={rules.find((r) => r.id === a.ruleId)} canResolve={canResolve} onChanged={onChanged} />

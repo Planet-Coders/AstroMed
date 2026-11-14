@@ -157,7 +157,7 @@ model MetricSample {
 model AlertRule {
   id         String   @id
   metric     String
-  /// "threshold" (window average), "trend" (% change vs the previous window) or "missing" (hours since last value).
+  /// "threshold" (window average), "latest" (most recent reading), "trend" (% change) or "missing" (hours since last value).
   kind       String
   /// "above" or "below".
   comparator String

@@ -1,11 +1,8 @@
-/**
- * The five monitored metrics: what each measures, how often a value is expected, the
- * default alert thresholds, and why NASA watches it. Every citation below was checked to
- * resolve (NTRS record, OSDR study page or NASA standards PDF) on 2026-11-04.
- * Thresholds are demo defaults chosen from these sources; a super admin can tune them.
- */
+import { CHECK_LIMITS } from "../selfCheckThresholds";
 
-export type MetricId = "sleep" | "activity" | "pulse" | "hydration" | "radiation";
+export type MetricId =
+  | "sleep" | "activity" | "pulse" | "hydration" | "radiation"
+  | "systolic" | "diastolic" | "glucose_fasting" | "glucose_after_meal" | "temperature" | "mood" | "urine_color";
 
 export type Citation = {
   source: "NTRS" | "OSDR" | "NASA standard";
@@ -19,7 +16,7 @@ export type Citation = {
 
 export type RuleDefault = {
   id: string;
-  kind: "threshold" | "trend" | "missing";
+  kind: "threshold" | "latest" | "trend" | "missing";
   comparator: "above" | "below";
   amber: number;
   red: number;
@@ -74,6 +71,23 @@ const missing = (metric: MetricId, label: string, amber: number, red: number): R
   label: `${label}: no data`,
 });
 
+const latest = (
+  id: string, label: string, comparator: RuleDefault["comparator"], limits: { amber: number; red: number },
+): RuleDefault => ({ id, label, kind: "latest", comparator, ...limits, windowDays: 2 });
+
+function selfCheckMetric(
+  id: MetricId, label: string, unit: string, decimals: number, definition: string, rules: RuleDefault[], rationale: string, citations: Citation[],
+): MetricDef {
+  return {
+    id, label, unit, decimals, definition, rules, rationale, citations,
+    daily: "last", source: "Daily self-check", cadenceHours: 24, lateAfterHours: 30, missingAfterHours: 48,
+  };
+}
+
+const cardiacEvidence = ntrs("20170005625", "Risk of Cardiac Rhythm Problems During Spaceflight", 2017, "Cardiovascular changes in flight.");
+const glucoseEvidence = osdr("OSD-575", "SpaceX Inspiration4 Blood Serum Metabolic Panel and Immune/Cardiac Cytokine Arrays", 2024, "Inspiration4 crew glucose measurements.");
+const stoneEvidence = ntrs("20240012429", "Evidence Report: Risk of Renal Stone Formation (2024 update)", 2024, "Dehydration as a driver of kidney-stone risk.");
+
 export const METRICS: MetricDef[] = [
   {
     id: "sleep",
@@ -81,8 +95,8 @@ export const METRICS: MetricDef[] = [
     unit: "h",
     daily: "last",
     decimals: 1,
-    definition: "Hours of sleep in the main sleep period, from the wearable or the crew sleep log.",
-    source: "Habitat & routine sleep log (one value per night)",
+    definition: "Hours of sleep in the main sleep period. The latest Daily Check entry for the night takes precedence over the routine log.",
+    source: "Daily self-check and Habitat & routine sleep log",
     cadenceHours: 24,
     lateAfterHours: 30,
     missingAfterHours: 48,
@@ -90,6 +104,7 @@ export const METRICS: MetricDef[] = [
       "Astronauts sleep less in flight than on the ground, and sleep loss, circadian misalignment and work overload degrade performance and raise error risk. Continuous actigraphy on long-duration missions captures sleep changes that occasional checks miss, so sleep is tracked every night and a multi-day average flags building sleep debt.",
     rules: [
       { id: "sleep_low", kind: "threshold", comparator: "below", amber: 6, red: 5, windowDays: 3, label: "Sleep debt" },
+      latest("self_check_sleep_low", "Short sleep in Daily Check", "below", CHECK_LIMITS.sleepLow),
       missing("sleep", "Sleep", 30, 48),
     ],
     citations: [
@@ -178,7 +193,7 @@ export const METRICS: MetricDef[] = [
     unit: "mL",
     daily: "last",
     decimals: 0,
-    definition: "Self-reported fluid intake over the last 24 hours (mL), with urine colour on a 1–8 chart.",
+    definition: "Total newly logged fluid intake for each UTC day. Earlier 24-hour reports are shown as snapshots.",
     source: "Daily self-check, hydration step (self-report)",
     cadenceHours: 24,
     lateAfterHours: 30,
@@ -186,7 +201,7 @@ export const METRICS: MetricDef[] = [
     rationale:
       "Relative dehydration, together with calcium released from bone, raises urine supersaturation and kidney-stone risk in flight. A NASA study found long-duration crew producing more than 2.5 L of urine a day appeared to minimise stone risk, while lower volumes raised it, so a daily intake target near 2–2.5 L is tracked.",
     rules: [
-      { id: "hydration_low", kind: "threshold", comparator: "below", amber: 2000, red: 1500, windowDays: 2, label: "Low fluid intake" },
+      latest("hydration_low", "Low fluid intake", "below", CHECK_LIMITS.hydrationLow),
       missing("hydration", "Hydration", 30, 48),
     ],
     citations: [
@@ -246,6 +261,36 @@ export const METRICS: MetricDef[] = [
       },
     ],
   },
+  selfCheckMetric("systolic", "Systolic blood pressure", "mmHg", 0, "Top number from the latest blood pressure reading each day.", [
+    latest("systolic_high", "High systolic pressure", "above", CHECK_LIMITS.systolicHigh),
+    latest("systolic_low", "Low systolic pressure", "below", CHECK_LIMITS.systolicLow),
+  ], "Fluid shifts in microgravity change cardiovascular workload. Tracking systolic readings helps the crew identify changes in pressure.", [cardiacEvidence]),
+  selfCheckMetric("diastolic", "Diastolic blood pressure", "mmHg", 0, "Bottom number from the latest blood pressure reading each day.", [
+    latest("diastolic_high", "High diastolic pressure", "above", CHECK_LIMITS.diastolicHigh),
+    latest("diastolic_low", "Low diastolic pressure", "below", CHECK_LIMITS.diastolicLow),
+  ], "Fluid shifts in microgravity change cardiovascular workload. Diastolic pressure describes pressure between beats.", [cardiacEvidence]),
+  selfCheckMetric("glucose_fasting", "Fasting blood sugar", "mg/dL", 0, "Latest daily blood sugar reading after at least 8 hours without food.", [
+    latest("glucose_fasting_high", "High fasting blood sugar", "above", CHECK_LIMITS.glucoseFastingHigh),
+    latest("glucose_fasting_low", "Low fasting blood sugar", "below", CHECK_LIMITS.glucoseLow),
+  ], "Fasting values have their own reference range. Spaceflight, reduced muscle loading and disrupted sleep can affect glucose regulation.", [glucoseEvidence]),
+  selfCheckMetric("glucose_after_meal", "Non-fasting blood sugar", "mg/dL", 0, "Latest daily blood sugar reading taken without an 8-hour fast.", [
+    latest("glucose_after_meal_high", "High non-fasting blood sugar", "above", CHECK_LIMITS.glucoseAfterMealHigh),
+    latest("glucose_after_meal_low", "Low non-fasting blood sugar", "below", CHECK_LIMITS.glucoseLow),
+  ], "Food changes blood sugar. Keeping meal context with a reading lets the console apply the matching thresholds.", [glucoseEvidence]),
+  selfCheckMetric("temperature", "Body temperature", "°C", 1, "Latest body temperature measured in Daily Check each day.", [
+    latest("temperature_high", "High body temperature", "above", CHECK_LIMITS.temperatureHigh),
+    latest("temperature_low", "Low body temperature", "below", CHECK_LIMITS.temperatureLow),
+  ], "Body temperature can shift during spaceflight and after exercise. Follow-up measurements help the crew track an abnormal reading.", [
+    ntrs("20000104233", "Temperature Regulation in Crewmembers After a 115-Day Space Flight", 1995, "Altered thermoregulation during exercise after spaceflight."),
+  ]),
+  selfCheckMetric("mood", "Mood", "/5", 0, "Latest self-reported mood score each day, from 1 (very low) to 5 (great).", [
+    latest("mood_low", "Low mood", "below", CHECK_LIMITS.moodLow),
+  ], "Isolation, confinement and workload can affect mood. A simple daily check gives the crew a way to report changes.", [
+    ntrs("20160004365", "Risk of Adverse Cognitive or Behavioral Conditions and Psychiatric Disorders", 2015, "Behavioral health risks during spaceflight."),
+  ]),
+  selfCheckMetric("urine_color", "Urine colour", "/8", 0, "Latest reported shade on the Daily Check chart each day, from pale to dark.", [
+    latest("urine_color_dark", "Dark urine colour", "above", CHECK_LIMITS.urineDark),
+  ], "Urine colour gives the crew another self-reported observation to track alongside fluid intake.", [stoneEvidence]),
 ];
 
 export const METRIC = Object.fromEntries(METRICS.map((m) => [m.id, m])) as Record<MetricId, MetricDef>;
@@ -254,5 +299,5 @@ export const DEFAULT_RULES = METRICS.flatMap((m) => m.rules.map((r) => ({ ...r, 
 
 export function formatValue(metric: MetricId, v: number) {
   const m = METRIC[metric];
-  return `${v.toFixed(m.decimals)} ${m.unit}`;
+  return `${v.toFixed(m.decimals)}${m.unit.startsWith("/") ? "" : " "}${m.unit}`;
 }

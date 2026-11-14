@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { Card } from "./ui/Card";
 import { useMissionTelemetry } from "@/components/MissionTelemetryProvider";
 import { useCopilot } from "./CopilotProvider";
@@ -10,13 +10,13 @@ import {
   STEPS,
   URINE_COLORS,
   assessAll,
+  getLoggedFluid,
   overallLevel,
   saveLatestCheck,
-  stepLevel,
   type Mood,
   type SelfCheckValues,
-  type StepId,
 } from "@/lib/selfCheck";
+import { reading, READING_RANGES as RANGE } from "@/lib/selfCheckThresholds";
 
 const TONE: Record<RiskLevel, { text: string; border: string; bg: string; dot: string }> = {
   GREEN: { text: "text-mc-green", border: "border-mc-green/40", bg: "bg-mc-green/10", dot: "bg-mc-green" },
@@ -28,58 +28,66 @@ const inputCls =
   "w-full rounded-md border border-mc-line-strong bg-mc-inset px-3 py-2.5 font-mono text-xl text-foreground focus:border-mc-select focus:outline-none";
 
 /** Parse a typed reading; values outside what a device can show count as typos. */
-function num(s: string, lo: number, hi: number): number | null {
-  if (s.trim() === "") return null;
-  const n = Number(s);
-  return Number.isFinite(n) && n >= lo && n <= hi ? n : null;
+function num(s: string, range: readonly [number, number]): number | null {
+  return s.trim() === "" ? null : reading(Number(s), range);
 }
-
-const LIMITS = { sys: [50, 260], dia: [30, 160], glucose: [20, 600], temp: [30, 45], sleep: [0, 24], fluid: [0, 8000] } as const;
 
 /**
  * Guided morning check: one indicator per step with how-to instructions, why it matters
  * in space, the normal range, and an instant colour as the value is entered. Ends with a
  * summary, advice per item, and a route to the CMO / ground surgeon when anything is red.
  */
-export function DailySelfCheck({ userId, userName, onDone }: { userId: string; userName: string; onDone?: () => void }) {
+export function DailySelfCheck({ userId, userName, onDone, onReviewAlerts }: {
+  userId: string;
+  userName: string;
+  onDone?: () => void;
+  onReviewAlerts?: () => void;
+}) {
   const { sleepHours } = useMissionTelemetry();
   const { setChatOpen, setInput } = useCopilot();
   const [step, setStep] = useState(-1); // -1 intro, 0..n-1 steps, n summary
   const [raw, setRaw] = useState({ sys: "", dia: "", glucose: "", temp: "" });
   const [fasting, setFasting] = useState(true);
   const [mood, setMood] = useState<Mood | null>(null);
-  const [moodNote, setMoodNote] = useState("");
   const [sleep, setSleep] = useState(sleepHours.toFixed(1));
   const [fluid, setFluid] = useState("");
   const [urine, setUrine] = useState<number | null>(null);
-  const [escalated, setEscalated] = useState(false);
-
-  const values: SelfCheckValues = useMemo(
-    () => ({
-      systolic: num(raw.sys, ...LIMITS.sys),
-      diastolic: num(raw.dia, ...LIMITS.dia),
-      glucose: num(raw.glucose, ...LIMITS.glucose),
-      temperature: num(raw.temp, ...LIMITS.temp),
-      mood,
-      moodNote,
-      sleepHours: num(sleep, ...LIMITS.sleep),
-      fasting,
-      fluidMl: num(fluid, ...LIMITS.fluid),
-      urineColor: urine,
-    }),
-    [raw, mood, moodNote, sleep, fasting, fluid, urine]
-  );
-  const results = useMemo(() => assessAll(values), [values]);
+  const [savedResults, setSavedResults] = useState<ReturnType<typeof assessAll>>([]);
+  const [loggedFluid, setLoggedFluid] = useState<number | null>(null);
+  const fluidAddedMl = num(fluid, RANGE.fluidMl);
+  const values: SelfCheckValues = {
+    systolic: num(raw.sys, RANGE.systolic),
+    diastolic: num(raw.dia, RANGE.diastolic),
+    glucose: num(raw.glucose, RANGE.glucose),
+    temperature: num(raw.temp, RANGE.temperature),
+    mood,
+    sleepHours: num(sleep, RANGE.sleepHours),
+    fasting,
+    fluidMl: fluidAddedMl == null ? null : (loggedFluid ?? 0) + fluidAddedMl,
+    urineColor: urine,
+  };
+  const results = step === STEPS.length ? savedResults : assessAll(values);
   const overall = overallLevel(results);
   const n = STEPS.length;
 
-  const finish = () => {
-    saveLatestCheck({
-      userId,
-      at: Date.now(),
-      items: results,
-      values: { fluidMl: values.fluidMl, urineColor: values.urineColor, sleepHours: values.sleepHours },
-    });
+  const goToStep = (next: number) => {
+    if (STEPS[next]?.id === "hydration") setLoggedFluid(getLoggedFluid(userId, Date.now()));
+    setStep(next);
+  };
+
+  const finish = (skipHydration = false) => {
+    const at = Date.now();
+    const added = skipHydration ? null : fluidAddedMl;
+    const completed = {
+      ...values,
+      fluidMl: added == null ? null : (getLoggedFluid(userId, at) ?? 0) + added,
+      urineColor: skipHydration ? null : urine,
+    };
+    const items = assessAll(completed);
+    if (Object.values(completed).some((value) => typeof value === "number")) {
+      saveLatestCheck({ userId, at, items, values: { ...completed, fluidAddedMl: added } });
+    }
+    setSavedResults(items);
     setStep(n);
   };
 
@@ -88,7 +96,7 @@ export function DailySelfCheck({ userId, userName, onDone }: { userId: string; u
     setInput(
       flagged.length
         ? `My self-check today: ${flagged.map((r) => `${r.label} ${r.display}`).join(", ")}. What should I do?`
-        : "My self-check today is all normal. Anything I should keep an eye on?"
+        : "Can you help me review the readings I entered in today's self-check?"
     );
     setChatOpen(true);
   };
@@ -98,7 +106,7 @@ export function DailySelfCheck({ userId, userName, onDone }: { userId: string; u
       <Card title="Daily self-check">
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div>
-            <p className="text-xl font-semibold">Good morning, {userName}.</p>
+            <p className="text-xl font-semibold">Hello, {userName}.</p>
             <p className="mt-1 max-w-xl text-sm leading-relaxed text-mc-muted">
               Six quick measurements, about 2 minutes. Each step shows how to measure and why it matters up here.
               Results are coloured as you type: green is fine, amber means watch it, red means act now.
@@ -113,7 +121,15 @@ export function DailySelfCheck({ userId, userName, onDone }: { userId: string; u
           </div>
           <button
             type="button"
-            onClick={() => setStep(0)}
+            onClick={() => {
+              setRaw({ sys: "", dia: "", glucose: "", temp: "" });
+              setFasting(true);
+              setMood(null);
+              setSleep(sleepHours.toFixed(1));
+              setFluid("");
+              setUrine(null);
+              setStep(0);
+            }}
             className="min-h-12 shrink-0 rounded-md border border-mc-nasa-edge bg-mc-nasa px-6 text-sm font-semibold text-white"
           >
             Start check
@@ -129,13 +145,17 @@ export function DailySelfCheck({ userId, userName, onDone }: { userId: string; u
       <Card title="Daily self-check · results">
         <div className={`rounded-lg border p-4 ${tone.border} ${tone.bg}`}>
           <p className="mc-label">Overall</p>
-          <p className={`text-2xl font-semibold ${tone.text}`}>{riskLabel(overall)}</p>
+          <p className={`text-2xl font-semibold ${results.length ? tone.text : "text-mc-muted"}`}>
+            {results.length ? riskLabel(overall) : "No measurements entered"}
+          </p>
           <p className="mt-1 text-sm text-mc-soft">
-            {overall === "GREEN"
-              ? "Everything is in range. Nice work, see you tomorrow."
+            {results.length === 0
+              ? "Start another check to log a reading."
+              : overall === "GREEN"
+              ? "The assessed readings are in range."
               : overall === "YELLOW"
-                ? "A few things to watch. Follow the tips below and recheck tomorrow."
-                : "Something needs attention now. Follow the steps below and contact the CMO."}
+                ? "Follow the guidance below and recheck as needed."
+                : "Review the flagged readings and follow the guidance below."}
           </p>
         </div>
         <ul className="mt-4 divide-y divide-mc-line">
@@ -153,26 +173,26 @@ export function DailySelfCheck({ userId, userName, onDone }: { userId: string; u
               </div>
             </li>
           ))}
-          {results.length === 0 && <li className="py-3 text-sm text-mc-label">No measurements entered.</li>}
         </ul>
         <div className="mt-4 flex flex-wrap gap-2">
-          {overall === "RED" && (
+          {overall !== "GREEN" && onReviewAlerts && (
             <button
               type="button"
-              onClick={() => setEscalated(true)}
-              disabled={escalated}
-              className="min-h-11 rounded-md border border-mc-red bg-mc-red/15 px-4 text-sm font-semibold text-mc-red disabled:opacity-70"
+              onClick={onReviewAlerts}
+              className="min-h-11 rounded-md border border-mc-line-strong px-4 text-sm text-mc-soft"
             >
-              {escalated ? "✓ CMO alerted · report queued for ground" : "Alert CMO + send to ground surgeon"}
+              Review in My monitoring
             </button>
           )}
-          <button
-            type="button"
-            onClick={askCopilot}
-            className="min-h-11 rounded-md border border-mc-nasa-edge bg-mc-nasa px-4 text-sm font-semibold text-white"
-          >
-            Ask the co-pilot about my results
-          </button>
+          {results.length > 0 && (
+            <button
+              type="button"
+              onClick={askCopilot}
+              className="min-h-11 rounded-md border border-mc-nasa-edge bg-mc-nasa px-4 text-sm font-semibold text-white"
+            >
+              Ask the co-pilot about my results
+            </button>
+          )}
           <button
             type="button"
             onClick={() => {
@@ -184,24 +204,29 @@ export function DailySelfCheck({ userId, userName, onDone }: { userId: string; u
             Done
           </button>
         </div>
-        {escalated && (
-          <p className="mt-2 text-xs text-mc-label">
-            Earth is 20 minutes away one way. The report will reach the ground surgeon on the next sync; the CMO on board has been notified now.
-          </p>
-        )}
       </Card>
     );
   }
 
   const info = STEPS[step];
-  const level = info.id === "mood" ? (mood ? stepLevel("mood", values) : null) : stepLevel(info.id as StepId, values);
   const result = results.find((r) => r.id === info.id);
+  const level = result?.level;
   const typo =
     (info.id === "bp" && ((raw.sys && values.systolic == null) || (raw.dia && values.diastolic == null))) ||
     (info.id === "glucose" && raw.glucose && values.glucose == null) ||
     (info.id === "temperature" && raw.temp && values.temperature == null) ||
     (info.id === "sleep" && sleep && values.sleepHours == null) ||
-    (info.id === "hydration" && fluid && values.fluidMl == null);
+    (info.id === "hydration" && fluid && fluidAddedMl == null);
+
+  function skipStep() {
+    if (info.id === "hydration") return finish(true);
+    if (info.id === "bp") setRaw({ ...raw, sys: "", dia: "" });
+    if (info.id === "glucose") setRaw({ ...raw, glucose: "" });
+    if (info.id === "temperature") setRaw({ ...raw, temp: "" });
+    if (info.id === "mood") setMood(null);
+    if (info.id === "sleep") setSleep("");
+    goToStep(step + 1);
+  }
 
   return (
     <Card
@@ -291,18 +316,17 @@ export function DailySelfCheck({ userId, userName, onDone }: { userId: string; u
                   </button>
                 ))}
               </div>
-              <label className="mc-label">
-                Anything on your mind? (optional, private)
-                <input value={moodNote} onChange={(e) => setMoodNote(e.target.value)} className="mt-1.5 w-full rounded-md border border-mc-line-strong bg-mc-inset px-3 py-2 text-sm normal-case tracking-normal text-foreground" />
-              </label>
             </>
           )}
           {info.id === "hydration" && (
             <>
               <label className="mc-label">
-                Fluid in the last 24 h (mL)
+                New fluid to log (mL)
                 <input inputMode="numeric" value={fluid} onChange={(e) => setFluid(e.target.value)} placeholder="2400" className={`${inputCls} mt-1.5`} autoFocus />
               </label>
+              <p className="text-xs text-mc-label">
+                {(loggedFluid ?? 0).toLocaleString()} mL logged on this device today (UTC).
+              </p>
               <div className="flex flex-wrap gap-2">
                 {[250, 500].map((ml) => (
                   <button
@@ -316,7 +340,7 @@ export function DailySelfCheck({ userId, userName, onDone }: { userId: string; u
                 ))}
               </div>
               <div>
-                <p className="mc-label">Urine colour (first of the day)</p>
+                <p className="mc-label">Most recent urine colour</p>
                 <div className="mt-1.5 grid grid-cols-8 gap-1.5" role="radiogroup" aria-label="Urine colour">
                   {URINE_COLORS.map((c, i) => (
                     <button
@@ -364,21 +388,22 @@ export function DailySelfCheck({ userId, userName, onDone }: { userId: string; u
           </div>
 
           <div className="mt-auto flex items-center justify-between gap-2 pt-2">
-            <button type="button" onClick={() => setStep(step - 1)} className="min-h-11 rounded-md px-3 text-sm text-mc-muted hover:text-white">
+            <button type="button" onClick={() => goToStep(step - 1)} className="min-h-11 rounded-md px-3 text-sm text-mc-muted hover:text-white">
               ← Back
             </button>
             <div className="flex gap-2">
               <button
                 type="button"
-                onClick={() => (step === n - 1 ? finish() : setStep(step + 1))}
+                onClick={skipStep}
                 className="min-h-11 rounded-md px-3 text-sm text-mc-label hover:text-white"
               >
                 Skip
               </button>
               <button
                 type="button"
-                onClick={() => (step === n - 1 ? finish() : setStep(step + 1))}
-                className="min-h-11 rounded-md border border-mc-nasa-edge bg-mc-nasa px-5 text-sm font-semibold text-white"
+                onClick={() => (step === n - 1 ? finish() : goToStep(step + 1))}
+                disabled={Boolean(typo)}
+                className="min-h-11 rounded-md border border-mc-nasa-edge bg-mc-nasa px-5 text-sm font-semibold text-white disabled:opacity-50"
               >
                 {step === n - 1 ? "See results" : "Next →"}
               </button>

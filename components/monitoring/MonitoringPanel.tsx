@@ -32,7 +32,9 @@ export function ruleText(r: Rule) {
   const m = METRIC[r.metric];
   if (r.kind === "missing") return `amber after ${r.amber} h without data, red after ${r.red} h`;
   if (r.kind === "trend") return `amber if the ${r.windowDays}-day average rises ${r.amber}%+ vs the previous ${r.windowDays} days, red at ${r.red}%+`;
-  const span = r.windowDays === 1 ? "today's average" : `${r.windowDays}-day average`;
+  const span = r.kind === "latest"
+    ? `latest reading within ${r.windowDays} ${r.windowDays === 1 ? "day" : "days"}`
+    : r.windowDays === 1 ? "today's average" : `${r.windowDays}-day average`;
   return `amber ${r.comparator} ${r.amber} ${m.unit}, red ${r.comparator} ${r.red} ${m.unit} (${span})`;
 }
 
@@ -84,7 +86,7 @@ export function WhyWeMonitor({ metricId, rules }: { metricId: MonitoringData["me
   );
 }
 
-/** Time-series cards for the five monitored metrics, with missing-data badges and trends. */
+/** Time-series cards with missing-data badges and trends. */
 export function MonitoringPanel({ data, onDays, loading }: { data: MonitoringData; onDays: (d: 7 | 14 | 30) => void; loading?: boolean }) {
   return (
     <div className="flex flex-col gap-4">
@@ -112,7 +114,9 @@ export function MonitoringPanel({ data, onDays, loading }: { data: MonitoringDat
           const mm = data.metrics.find((x) => x.id === def.id);
           if (!mm) return null;
           const latest = [...mm.series].reverse().find((p) => p.value != null);
-          const rule = data.rules.find((r) => r.metric === def.id && r.kind === "threshold");
+          const rules = data.rules.filter((r) => r.metric === def.id && r.enabled && (r.kind === "threshold" || r.kind === "latest"));
+          // When a metric has a direct reading rule, colour the chart against that rule.
+          const chartRules = rules.some((r) => r.kind === "latest") ? rules.filter((r) => r.kind === "latest") : rules;
           return (
             <section key={def.id} data-metric={def.id} className="flex flex-col gap-3 rounded-lg border border-mc-line bg-mc-panel px-4 py-3.5">
               <header className="flex items-start gap-2">
@@ -125,7 +129,7 @@ export function MonitoringPanel({ data, onDays, loading }: { data: MonitoringDat
                 </div>
                 <MissingBadge status={mm.missing} />
               </header>
-              <MetricChart metric={def.id} series={mm.series} rule={rule} />
+              <MetricChart metric={def.id} series={mm.series} rules={chartRules} />
               <p className="text-xs text-mc-soft" data-testid={`trend-${def.id}`}>
                 {describeTrend(def.id, mm.trend)}
               </p>

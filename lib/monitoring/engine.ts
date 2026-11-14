@@ -1,4 +1,5 @@
-import { METRIC, formatValue, type MetricId } from "./catalog";
+import { METRIC, formatValue, type MetricId, type RuleDefault } from "./catalog";
+import { dayKey } from "./days";
 
 /**
  * Pure monitoring logic shared by the server, the dashboards and the unit tests: daily
@@ -6,27 +7,15 @@ import { METRIC, formatValue, type MetricId } from "./catalog";
  * Nothing here touches the database or the clock; `now` is always passed in.
  */
 
-export type Sample = { metric: MetricId; value: number; at: number };
-
-export type Rule = {
-  id: string;
-  metric: MetricId;
-  kind: "threshold" | "trend" | "missing";
-  comparator: "above" | "below";
-  amber: number;
-  red: number;
-  windowDays: number;
-  enabled: boolean;
-  label: string;
-};
+export type Sample = { metric: MetricId; value: number; at: number; fromSelfCheck?: boolean };
+export type Rule = RuleDefault & { metric: MetricId; enabled: boolean };
 
 export type Level = "YELLOW" | "RED";
 
 const DAY = 86_400_000;
 const HOUR = 3_600_000;
 
-/** UTC calendar day, "YYYY-MM-DD". */
-export const dayKey = (ms: number) => new Date(ms).toISOString().slice(0, 10);
+export { dayKey } from "./days";
 
 export type DailyPoint = { date: string; value: number | null; count: number };
 
@@ -35,7 +24,7 @@ export function dailySeries(samples: Sample[], metric: MetricId, days: number, n
   const how = METRIC[metric].daily;
   const byDay = new Map<string, Sample[]>();
   for (const s of samples) {
-    if (s.metric !== metric) continue;
+    if (s.metric !== metric || s.at > now) continue;
     const k = dayKey(s.at);
     const list = byDay.get(k);
     if (list) list.push(s);
@@ -71,7 +60,7 @@ export type MissingStatus = {
 /** Is data arriving as often as the metric expects? */
 export function missingStatus(samples: Sample[], metric: MetricId, now: number, late = METRIC[metric].lateAfterHours, gone = METRIC[metric].missingAfterHours): MissingStatus {
   let lastAt: number | null = null;
-  for (const s of samples) if (s.metric === metric && (lastAt == null || s.at > lastAt)) lastAt = s.at;
+  for (const s of samples) if (s.metric === metric && s.at <= now && (lastAt == null || s.at > lastAt)) lastAt = s.at;
   if (lastAt == null) return { status: "never", lastAt: null, hoursSince: null };
   const hoursSince = Math.max(0, (now - lastAt) / HOUR);
   return { status: hoursSince >= gone ? "missing" : hoursSince >= late ? "late" : "ok", lastAt, hoursSince };
@@ -115,7 +104,7 @@ export type Firing = {
   explanation: string;
 };
 
-function crosses(value: number, rule: Rule): Level | null {
+export function crosses(value: number, rule: Rule): Level | null {
   const past = (t: number) => (rule.comparator === "above" ? value >= t : value < t);
   if (past(rule.red)) return "RED";
   if (past(rule.amber)) return "YELLOW";
@@ -123,6 +112,21 @@ function crosses(value: number, rule: Rule): Level | null {
 }
 
 const word = (r: Rule) => (r.comparator === "above" ? "above" : "below");
+
+function latestReading(rule: Rule, samples: Sample[], now: number) {
+  let latest: Sample | undefined;
+  for (const sample of samples) {
+    if (sample.metric !== rule.metric || sample.at > now || sample.at <= now - rule.windowDays * DAY) continue;
+    if (rule.id === "self_check_sleep_low" && !sample.fromSelfCheck) continue;
+    if (!latest || sample.at > latest.at) latest = sample;
+  }
+  return latest;
+}
+
+/** An expired reading alone cannot resolve an alert that calls for a follow-up. */
+export function awaitingReading(rules: Rule[], samples: Sample[], now: number): Set<string> {
+  return new Set(rules.filter((r) => r.enabled && r.kind === "latest" && !latestReading(r, samples, now)).map((r) => r.id));
+}
 
 /** Which enabled rules fire for these samples right now, with a plain-language reason. */
 export function evaluateRules(rules: Rule[], samples: Sample[], now: number): Firing[] {
@@ -170,9 +174,11 @@ export function evaluateRules(rules: Rule[], samples: Sample[], now: number): Fi
       continue;
     }
 
-    const avg = meanOf(dailySeries(samples, rule.metric, rule.windowDays, now));
-    if (avg == null) continue;
-    const level = crosses(avg, rule);
+    const value = rule.kind === "latest"
+      ? latestReading(rule, samples, now)?.value
+      : meanOf(dailySeries(samples, rule.metric, rule.windowDays, now));
+    if (value == null) continue;
+    const level = crosses(value, rule);
     if (level) {
       const t = level === "RED" ? rule.red : rule.amber;
       const span = rule.windowDays === 1 ? "today" : `over the last ${rule.windowDays} days`;
@@ -180,9 +186,9 @@ export function evaluateRules(rules: Rule[], samples: Sample[], now: number): Fi
         ruleId: rule.id,
         metric: rule.metric,
         level,
-        value: Math.round(avg * 100) / 100,
+        value: Math.round(value * 100) / 100,
         threshold: t,
-        explanation: `Average ${m.label.toLowerCase()} ${span} was ${formatValue(rule.metric, avg)}, ${word(rule)} the ${level === "RED" ? "red" : "amber"} threshold of ${formatValue(rule.metric, t)}.`,
+        explanation: `${rule.kind === "latest" ? `Latest ${m.label.toLowerCase()}` : `Average ${m.label.toLowerCase()} ${span}`} was ${formatValue(rule.metric, value)}, ${word(rule)} the ${level === "RED" ? "red" : "amber"} threshold of ${formatValue(rule.metric, t)}.`,
       });
     }
   }
@@ -207,7 +213,7 @@ export const RESOLVE_COOLDOWN_HOURS = 24;
  * Rules that are switched off resolve their alerts too. `quiet` lists rules resolved by a
  * person within the cool-down, which don't open a new alert yet.
  */
-export function planAlertChanges(active: ActiveAlert[], firings: Firing[], quiet: string[] = []): AlertChange[] {
+export function planAlertChanges(active: ActiveAlert[], firings: Firing[], quiet: string[] = [], awaiting = new Set<string>()): AlertChange[] {
   const changes: AlertChange[] = [];
   const byRule = new Map(active.map((a) => [a.ruleId, a]));
   for (const f of firings) {
@@ -218,6 +224,8 @@ export function planAlertChanges(active: ActiveAlert[], firings: Firing[], quiet
     else changes.push({ type: "update", alertId: a.id, firing: f, escalated: a.level === "YELLOW" && f.level === "RED" });
   }
   const firingRules = new Set(firings.map((f) => f.ruleId));
-  for (const a of active) if (!firingRules.has(a.ruleId)) changes.push({ type: "resolve", alertId: a.id, ruleId: a.ruleId });
+  for (const a of active) {
+    if (!firingRules.has(a.ruleId) && !awaiting.has(a.ruleId)) changes.push({ type: "resolve", alertId: a.id, ruleId: a.ruleId });
+  }
   return changes;
 }

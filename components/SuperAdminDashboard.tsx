@@ -288,7 +288,12 @@ export function SuperAdminDashboard({ user }: { user: SessionUser }) {
           {tab === "missions" && <HealthMissions userId={user.userId} onGo={setTab} />}
 
           {tab === "check" && (
-            <DailySelfCheck userId={user.userId} userName={user.name} onDone={() => setTab("telemetry")} />
+            <DailySelfCheck
+              userId={user.userId}
+              userName={user.name}
+              onDone={() => setTab("telemetry")}
+              onReviewAlerts={user.role === "ASTRONAUT" ? () => setTab("monitoring") : undefined}
+            />
           )}
 
           {tab === "habitat" && (
