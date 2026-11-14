@@ -852,8 +852,7 @@ export function BodyMap3D({ figure, regions, activeId, dimmed, onPick, placing, 
             className={`absolute left-0 top-0 flex w-[min(31%,180px)] items-center gap-2 rounded-lg border px-2 py-1.5 text-left backdrop-blur-sm transition-[background-color,border-color,opacity] ${
               SIDES[r.id] === "right" ? "flex-row-reverse text-right" : ""
             } ${on ? "border-white/70 bg-white/10" : "bg-[#06121f]/70 hover:brightness-125"} ${dimmed(r.id) ? "!opacity-25" : ""}`}
-            style={{ borderColor: on ? undefined : LEVEL_CSS[r.level] }}
-            style={{ visibility: "hidden" }}
+            style={{ borderColor: on ? undefined : LEVEL_CSS[r.level], visibility: "hidden" }}
           >
             <span
               className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border-2"
