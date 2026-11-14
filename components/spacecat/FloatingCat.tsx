@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useSyncExternalStore } from "react";
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { EMPTY_CAT, growthStage, isHungry, loadCat, subscribeCat, type CatState } from "@/lib/spaceCat";
 import {
   getAutoEvery,
@@ -50,6 +50,9 @@ export function FloatingCat({ userId, hidden, onOpen }: { userId: string; hidden
     };
   }, [autoEvery, exerciseDone]);
 
+  // "×" hides the cat until the next reminder.
+  const [dismissed, setDismissed] = useState(false);
+
   // Say reminders while visible; the Space cat screen speaks them itself when it is open.
   const hiddenRef = useRef(hidden);
   useEffect(() => {
@@ -58,7 +61,10 @@ export function FloatingCat({ userId, hidden, onOpen }: { userId: string; hidden
   useEffect(
     () =>
       subscribeCatSay((t) => {
-        if (!hiddenRef.current && getAutoEvery() > 0) say(t);
+        if (!hiddenRef.current && getAutoEvery() > 0) {
+          setDismissed(false); // a new reminder brings a hidden cat back
+          say(t);
+        }
       }),
     [say]
   );
@@ -74,35 +80,45 @@ export function FloatingCat({ userId, hidden, onOpen }: { userId: string; hidden
     prevAuto.current = autoEvery;
   }, [autoEvery, say]);
 
-  if (!autoEvery || hidden || chatOpen) return null;
+  if (!autoEvery || hidden || chatOpen || dismissed) return null;
 
   return (
-    <div className="pointer-events-none fixed bottom-20 right-4 z-40 flex max-w-[calc(100vw-2rem)] items-end gap-2 sm:right-6">
+    <div className="pointer-events-none fixed bottom-[72px] right-2 z-40 flex max-w-[calc(100vw-1rem)] items-end gap-1 sm:bottom-20 sm:right-4">
       {bubble && (
         <p
-          className="spacecat-bubble pointer-events-auto mb-6 max-w-[min(260px,calc(100vw-7rem))] rounded-2xl rounded-br-sm border border-mc-line-strong bg-mc-panel px-3 py-2 text-xs leading-snug shadow-lg"
+          className="spacecat-bubble pointer-events-auto mb-16 max-w-[min(240px,calc(100vw-9.5rem))] rounded-2xl rounded-br-sm border border-mc-line-strong bg-mc-panel px-3 py-2 text-xs leading-snug shadow-lg sm:mb-24"
           role="status"
         >
           {bubble}
         </p>
       )}
-      <button
-        type="button"
-        onClick={onOpen}
-        className="spacecat-float spacecat-glow-ring pointer-events-auto relative flex h-[76px] w-[76px] shrink-0 items-center justify-center overflow-hidden rounded-full bg-gradient-to-b from-[#1b2a3d] to-[#0d1730] hover:scale-105"
-        aria-label="Space cat voice reminder. Open the Space cat"
-        title="Space cat"
-      >
-        <CatModel
-          stage={growthStage(cat.feeds)}
-          mood={isHungry(cat) ? "hungry" : "happy"}
-          talking={talking}
-          compact
-          className="pointer-events-none h-full w-full"
-          fallbackClassName="w-[74px] max-w-none"
-        />
-        {talking && <span className="absolute right-1 top-1 h-2.5 w-2.5 animate-ping rounded-full bg-mc-green" aria-hidden />}
-      </button>
+      <div className="relative shrink-0">
+        <button
+          type="button"
+          onClick={onOpen}
+          className="pointer-events-auto block h-[130px] w-[110px] cursor-pointer sm:h-[210px] sm:w-[180px]"
+          aria-label="Space cat voice reminder. Open the Space cat"
+          title="Open Space cat"
+        >
+          {/* same full-body 3D cat as the Space cat page; the canvas ignores clicks so the button gets them */}
+          <CatModel
+            stage={growthStage(cat.feeds)}
+            mood={isHungry(cat) ? "hungry" : "happy"}
+            talking={talking}
+            className="pointer-events-none h-full w-full"
+            fallbackClassName="h-full w-full"
+          />
+        </button>
+        <button
+          type="button"
+          onClick={() => setDismissed(true)}
+          className="pointer-events-auto absolute right-0 top-0 flex h-6 w-6 items-center justify-center rounded-full border border-mc-line-strong bg-mc-panel text-xs text-mc-muted shadow hover:bg-mc-raised hover:text-foreground"
+          aria-label="Hide the space cat until the next reminder"
+          title="Hide until the next reminder"
+        >
+          ×
+        </button>
+      </div>
     </div>
   );
 }

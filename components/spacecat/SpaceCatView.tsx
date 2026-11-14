@@ -30,7 +30,7 @@ import { FlameCoin } from "./FlameCoin";
 const POKE_LINES = ["Hee hee, that tickles!", "Meow! Boop!", "Hey, I'm floating here!", "Again! Again!", "Mrrrow?"];
 const FACE_LINES = ["Hee hee! *wink*", "Boop on the helmet!", "You found my cute side!", "Peekaboo!"];
 const TAIL_LINES = ["Hey, that's my tail!", "Wiggle wiggle!", "My tail has a mind of its own!", "Tail power, activate!"];
-const PURR_LINES = ["Purrrr…", "Mmm, purrrr. That's nice.", "Prrrrt!"];
+const PURR_LINES = ["Purrrr…", "Mmm, that's nice.", "So cosy…"];
 
 export function SpaceCatView({
   userId,
@@ -152,7 +152,8 @@ export function SpaceCatView({
       strokeDist.current = 0;
       lastPurr.current = Date.now();
       runAction("purr", 2200);
-      say(PURR_LINES[Math.floor(Math.random() * PURR_LINES.length)]);
+      // Purring is silent: eyes close and a bubble shows, no sound.
+      say(PURR_LINES[Math.floor(Math.random() * PURR_LINES.length)], { voice: false });
     }
   };
 

@@ -291,6 +291,8 @@ export function buildCat({ compact = false }: { compact?: boolean } = {}) {
   let eyeL = 1;
   let eyeR = 1;
   let wagAmp = 0;
+  let phaseZ = 0;
+  let phaseX = 0;
 
   function update(dt: number, s: CatFrameState) {
     const m = s.motion;
@@ -361,14 +363,20 @@ export function buildCat({ compact = false }: { compact?: boolean } = {}) {
     armL.rotation.z = -0.32 + Math.sin(t * 1.6) * 0.04;
 
     // tail: travelling sine wave down the chain
-    wagAmp += ((s.wagging ? 1 : 0) - wagAmp) * Math.min(1, dt * 6);
-    const speed = 2.2 + wagAmp * 14;
-    const amp = 0.16 + wagAmp * 0.16;
-    for (let i = 0; i < tailSegs.length; i++) {
+    // Ease into the wag quickly (~0.25 s) and out gently (~0.8 s); the phase keeps accumulating,
+    // so changing speed never makes the tail jump.
+    const target = s.wagging ? 1 : 0;
+    const k = target > wagAmp ? 12 : 3.5;
+    wagAmp += (target - wagAmp) * (1 - Math.exp(-k * dt));
+    const ease = wagAmp * wagAmp * (3 - 2 * wagAmp); // smoothstep
+    const speed = 2.2 + ease * 8;
+    const amp = 0.16 + ease * 0.08;
+    phaseZ += dt * m * speed;
+    phaseX += dt * m * speed * 0.6;
+    for (let i = 1; i < tailSegs.length; i++) {
       const seg = tailSegs[i];
-      if (i === 0) continue;
-      seg.rotation.x = 0.13 + Math.sin(t * speed * 0.6 - i * 0.55) * amp * 0.6;
-      seg.rotation.z = Math.sin(t * speed - i * 0.5) * amp;
+      seg.rotation.x = 0.13 + Math.sin(phaseX - i * 0.55) * amp * 0.6;
+      seg.rotation.z = Math.sin(phaseZ - i * 0.5) * amp;
     }
 
     // sparkles around the tail while wagging
@@ -385,7 +393,7 @@ export function buildCat({ compact = false }: { compact?: boolean } = {}) {
         sparkPos[i * 3 + 2] = base.z + Math.sin(c * 6.28) * (0.2 + life * 0.4);
       }
       sparkGeo.attributes.position.needsUpdate = true;
-      (sparks.material as THREE.PointsMaterial).opacity = wagAmp;
+      (sparks.material as THREE.PointsMaterial).opacity = Math.min(1, wagAmp * 1.4);
     }
   }
 
