@@ -43,6 +43,11 @@ export async function PATCH(request: Request, { params }: Ctx) {
     if (callsign !== user.callsign) changes.push(`callsign → ${callsign}`);
     data.callsign = callsign;
   }
+  if (body.sex !== undefined) {
+    const sex = body.sex === "female" ? "female" : "male";
+    if (sex !== user.sex) changes.push(`sex → ${sex}`);
+    data.sex = sex;
+  }
   if (body.password !== undefined) {
     if (typeof body.password !== "string" || body.password.length < 8) {
       return badRequest("Temporary password must be at least 8 characters");

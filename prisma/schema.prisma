@@ -56,6 +56,8 @@ model User {
   role           Role
   callsign       String
   crewId         String
+  /// Biological sex / figure model ("male" | "female") for the 3D body map.
+  sex            String            @default("male")
   /// Disabled accounts can't sign in; their records and chats are kept.
   disabled       Boolean           @default(false)
   /// Generated test crew (prisma/synthetic.ts); every record they own is synthetic.
@@ -229,3 +231,4 @@ model AlertNote {
 
   @@index([alertId, createdAt])
 }
+

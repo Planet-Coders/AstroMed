@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { USER_SELECT, badRequest, requireRole } from "@/lib/authz";
 import { EMAIL_RE, idList, str } from "@/lib/validate";
 import { audit } from "@/lib/audit";
+import { defaultSexFor } from "@/lib/crewProfiles";
 
 export async function GET() {
   const auth = await requireRole(["SUPER_ADMIN"]);
@@ -26,6 +27,7 @@ export async function POST(request: Request) {
   const name = str(body.name);
   const email = str(body.email, 200).toLowerCase();
   const password = typeof body.password === "string" ? body.password : "";
+  const sex = body.sex === "female" ? "female" : (body.sex === "male" ? "male" : defaultSexFor(name));
   if (!role) return badRequest("Role must be ASTRONAUT or OVERSIGHT");
   if (!name) return badRequest("Name is required");
   if (!EMAIL_RE.test(email)) return badRequest("A valid email is required");
@@ -40,7 +42,7 @@ export async function POST(request: Request) {
     if (!group) return badRequest("Pick the astronaut's mission group");
     const callsign = str(body.callsign, 12).toUpperCase() || "CREW";
     const user = await prisma.user.create({
-      data: { name, email, password: hash, role, callsign, crewId: group.code, groupId: group.id },
+      data: { name, email, password: hash, role, callsign, crewId: group.code, groupId: group.id, sex },
       select: USER_SELECT,
     });
     await audit(auth.user, "user.create", { type: "user", id: user.id, label: `${name} <${email}>` }, `astronaut in ${group.code}`);
@@ -57,6 +59,7 @@ export async function POST(request: Request) {
       role,
       callsign: str(body.callsign, 12).toUpperCase() || "SURGEON",
       crewId: "HQ",
+      sex,
       overseenGroups: { connect: found },
     },
     select: USER_SELECT,
