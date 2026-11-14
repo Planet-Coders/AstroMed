@@ -58,6 +58,7 @@ type DashboardResponse = {
 export function SuperAdminDashboard({ user }: { user: SessionUser }) {
   const [data, setData] = useState<DashboardResponse | null>(null);
   const [tab, setTab] = useState("telemetry");
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   // The crew commander (CDR) sees their whole crew; other astronauts see only themselves.
   // The server enforces this too: /api/dashboard only returns what this user may see.
   const isCrewCommander = user.role === "ASTRONAUT" && user.callsign === "CDR";
@@ -198,143 +199,161 @@ export function SuperAdminDashboard({ user }: { user: SessionUser }) {
         : card;
     });
 
+  const missionName = data?.group
+    ? `${data.group.code} · ${data.group.destination ?? data.group.name}`
+    : user.role === "COMMANDER"
+      ? "All crews · Mars transit"
+      : `${user.crewId} · Mars transit`;
+
   return (
     <CopilotProvider>
-    <div className="flex min-h-screen flex-col bg-mc-bg font-sans text-foreground">
-      <SyncEngine />
-      <MissionHeader
-        crewRisks={crewRisks}
-        selfOnly={!seesCrew}
-        mission={
-          data?.group
-            ? `${data.group.code} · ${data.group.destination ?? data.group.name}`
-            : user.role === "COMMANDER"
-              ? "All crews · Mars transit"
-              : `${user.crewId} · Mars transit`
-        }
-      />
+      <div className="flex min-h-screen w-full bg-mc-bg font-sans text-foreground">
+        <SyncEngine />
 
-      {/* Sidebar navigation | selected section | co-pilot column (drops below the section under xl). */}
-      <div className="mx-auto grid w-full max-w-[1560px] flex-1 gap-6 p-4 pb-24 md:p-6 md:pb-24 lg:grid-cols-[210px_minmax(0,1fr)] xl:grid-cols-[210px_minmax(0,1fr)_340px]">
-        <SideNav tabs={tabs} active={tab} onChange={setTab} />
-        <main className="flex min-w-0 flex-col gap-5">
-          {tab === "telemetry" && <SelfCheckDue userId={user.userId} onStart={() => setTab("check")} />}
+        {/* Antigravity-Style Left Sidebar (Docked to screen left) */}
+        <SideNav
+          tabs={tabs}
+          active={tab}
+          onChange={setTab}
+          user={user}
+          mission={missionName}
+          crewRisks={crewRisks}
+          mobileOpen={mobileMenuOpen}
+          onMobileClose={() => setMobileMenuOpen(false)}
+        />
 
-          {tab === "telemetry" && (
-            <>
-              {seesCrew && (
-              <CrewOverview
-                members={
-                  data?.crews.find((c) => c.crewId === homeCrew)
-                    ? crewCards(data.crews.find((c) => c.crewId === homeCrew)!.members, 60)
-                    : members
-                }
-                selectedId={selectedId}
-                onSelect={setSelectedId}
-              />
-              )}
-              {user.role === "COMMANDER" &&
-                data?.crews
-                  .filter((c) => c.crewId !== homeCrew)
-                  .map((crew) => (
-                    <div key={crew.crewId} className="space-y-2">
-                      <h3 className="mc-label">Crew {crew.crewId}</h3>
+        {/* Main Content Workspace */}
+        <div className="flex flex-1 flex-col min-w-0 min-h-screen">
+          <MissionHeader
+            crewRisks={crewRisks}
+            selfOnly={!seesCrew}
+            mission={missionName}
+            activeTabLabel={tabs.find((t) => t.id === tab)?.label}
+            onOpenMobileMenu={() => setMobileMenuOpen(true)}
+          />
+
+          <div className="flex-1 w-full p-4 md:p-6 lg:p-7 pb-24">
+            <div className="mx-auto grid w-full max-w-[1680px] gap-6 lg:grid-cols-[minmax(0,1fr)_340px] xl:grid-cols-[minmax(0,1fr)_370px]">
+              <main key={tab} className="flex min-w-0 flex-col gap-5 animate-tab-enter">
+                {tab === "telemetry" && <SelfCheckDue userId={user.userId} onStart={() => setTab("check")} />}
+
+                {tab === "telemetry" && (
+                  <>
+                    {seesCrew && (
                       <CrewOverview
-                        members={crewCards(crew.members, 55)}
+                        members={
+                          data?.crews.find((c) => c.crewId === homeCrew)
+                            ? crewCards(data.crews.find((c) => c.crewId === homeCrew)!.members, 60)
+                            : members
+                        }
                         selectedId={selectedId}
                         onSelect={setSelectedId}
                       />
-                    </div>
-                  ))}
-              <VitalsMonitor
-                userId={selectedId}
-                userName={selectedMember?.name ?? user.name}
-                canWrite={canWrite}
-                onLive={setLiveSelected}
-                serverVitals={
-                  selectedServer
-                    ? {
-                        heartRate: selectedServer.heartRate,
-                        hrv: selectedServer.hrv ?? 60,
-                        spo2: selectedServer.spo2,
-                        radiation: selectedServer.radiation ?? 0.075,
+                    )}
+                    {user.role === "COMMANDER" &&
+                      data?.crews
+                        .filter((c) => c.crewId !== homeCrew)
+                        .map((crew) => (
+                          <div key={crew.crewId} className="space-y-2">
+                            <h3 className="mc-label">Crew {crew.crewId}</h3>
+                            <CrewOverview
+                              members={crewCards(crew.members, 55)}
+                              selectedId={selectedId}
+                              onSelect={setSelectedId}
+                            />
+                          </div>
+                        ))}
+                    <VitalsMonitor
+                      userId={selectedId}
+                      userName={selectedMember?.name ?? user.name}
+                      canWrite={canWrite}
+                      onLive={setLiveSelected}
+                      serverVitals={
+                        selectedServer
+                          ? {
+                              heartRate: selectedServer.heartRate,
+                              hrv: selectedServer.hrv ?? 60,
+                              spo2: selectedServer.spo2,
+                              radiation: selectedServer.radiation ?? 0.075,
+                            }
+                          : undefined
                       }
-                    : undefined
-                }
-              />
-              <LabPanel
-                name={selectedMember?.name ?? user.name}
-                callsign={selectedMember?.callsign ?? user.callsign}
-              />
-            </>
-          )}
+                    />
+                    <LabPanel
+                      name={selectedMember?.name ?? user.name}
+                      callsign={selectedMember?.callsign ?? user.callsign}
+                    />
+                  </>
+                )}
 
-          {tab === "body" && (
-            <BodyMap
-              userId={user.userId}
-              name={selectedMember?.name ?? user.name}
-              callsign={selectedMember?.callsign ?? user.callsign}
-              vitals={{
-                heartRate: selectedMember?.heartRate ?? selectedServer?.heartRate ?? 72,
-                hrv: selectedMember?.hrv ?? selectedServer?.hrv ?? 60,
-                spo2: selectedServer?.spo2 ?? 98,
-                radiation: selectedServer?.radiation ?? 0.075,
-              }}
-              onOpenSelfCheck={() => setTab("check")}
-            />
-          )}
+                {tab === "body" && (
+                  <BodyMap
+                    userId={user.userId}
+                    name={selectedMember?.name ?? user.name}
+                    callsign={selectedMember?.callsign ?? user.callsign}
+                    vitals={{
+                      heartRate: selectedMember?.heartRate ?? selectedServer?.heartRate ?? 72,
+                      hrv: selectedMember?.hrv ?? selectedServer?.hrv ?? 60,
+                      spo2: selectedServer?.spo2 ?? 98,
+                      radiation: selectedServer?.radiation ?? 0.075,
+                    }}
+                    onOpenSelfCheck={() => setTab("check")}
+                  />
+                )}
 
-          {tab === "monitoring" && <MonitoringView url="/api/monitoring/me" show="both" canResolve={false} />}
+                {tab === "monitoring" && <MonitoringView url="/api/monitoring/me" show="both" canResolve={false} />}
 
-          {tab === "missions" && <HealthMissions userId={user.userId} onGo={setTab} />}
+                {tab === "missions" && <HealthMissions userId={user.userId} onGo={setTab} />}
 
-          {tab === "check" && (
-            <DailySelfCheck
-              userId={user.userId}
-              userName={user.name}
-              onDone={() => setTab("telemetry")}
-              onReviewAlerts={user.role === "ASTRONAUT" ? () => setTab("monitoring") : undefined}
-            />
-          )}
+                {tab === "check" && (
+                  <DailySelfCheck
+                    userId={user.userId}
+                    userName={user.name}
+                    onDone={() => setTab("telemetry")}
+                    onReviewAlerts={user.role === "ASTRONAUT" ? () => setTab("monitoring") : undefined}
+                  />
+                )}
 
-          {tab === "habitat" && (
-            // Radiation (cabin dose + space weather) and exercise & sleep side by side, both from the top.
-            <div className="grid items-start gap-5 lg:grid-cols-2">
-              <div className="flex min-w-0 flex-col gap-5">
-                <CabinEnvironment />
-                <SpaceWeatherCard />
-              </div>
+                {tab === "habitat" && (
+                  // Radiation (cabin dose + space weather) and exercise & sleep side by side, both from the top.
+                  <div className="grid items-start gap-5 lg:grid-cols-2">
+                    <div className="flex min-w-0 flex-col gap-5">
+                      <CabinEnvironment />
+                      <SpaceWeatherCard />
+                    </div>
+                    <div className="min-w-0">
+                      <ExerciseSleep />
+                    </div>
+                  </div>
+                )}
+                {tab === "pvt" && <PVTTest />}
+                {tab === "queue" && <StoreForwardQueue />}
+              </main>
+
               <div className="min-w-0">
-                <ExerciseSleep />
+                <OfflineAICopilot
+                  userId={user.userId}
+                  userName={user.name}
+                  patientName={selectedMember?.name}
+                  patientCallsign={selectedMember?.callsign ?? user.callsign}
+                  crew={crewBriefs}
+                  displayVitals={
+                    selectedMember
+                      ? {
+                          heartRate: selectedMember.heartRate,
+                          hrv: selectedMember.hrv,
+                          spo2: selectedServer?.spo2 ?? 98,
+                          radiation: selectedServer?.radiation ?? 0.075,
+                        }
+                      : undefined
+                  }
+                />
               </div>
             </div>
-          )}
-          {tab === "pvt" && <PVTTest />}
-          {tab === "queue" && <StoreForwardQueue />}
-        </main>
-
-        <div className="min-w-0 lg:col-start-2 xl:col-start-3">
-        <OfflineAICopilot
-          userId={user.userId}
-          userName={user.name}
-          patientName={selectedMember?.name}
-          patientCallsign={selectedMember?.callsign ?? user.callsign}
-          crew={crewBriefs}
-          displayVitals={
-            selectedMember
-              ? {
-                  heartRate: selectedMember.heartRate,
-                  hrv: selectedMember.hrv,
-                  spo2: selectedServer?.spo2 ?? 98,
-                  radiation: selectedServer?.radiation ?? 0.075,
-                }
-              : undefined
-          }
-        />
+          </div>
         </div>
+        <CopilotFloatingLauncher />
       </div>
-      <CopilotFloatingLauncher />
-    </div>
     </CopilotProvider>
   );
 }

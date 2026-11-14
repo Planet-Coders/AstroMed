@@ -330,3 +330,25 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .kenburns { animation: none; }
 }
+
+/* Tab switching smooth transition */
+@keyframes tab-enter {
+  from {
+    opacity: 0.85;
+    transform: translateY(2px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-tab-enter {
+  animation: tab-enter 0.15s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-tab-enter {
+    animation: none;
+  }
+}
