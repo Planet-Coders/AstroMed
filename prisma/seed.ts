@@ -1,5 +1,6 @@
 import { PrismaClient, Role } from "@prisma/client";
 import bcrypt from "bcryptjs";
+import { refreshNasaStudies } from "../lib/osdrStore";
 
 const prisma = new PrismaClient();
 
@@ -182,6 +183,14 @@ async function main() {
   // Astronauts created before groups existed (e.g. demo sign-ins) join the group matching their crew code.
   for (const [code, id] of groupIds) {
     await prisma.user.updateMany({ where: { role: Role.ASTRONAUT, crewId: code, groupId: null }, data: { groupId: id } });
+  }
+
+  // Crew accounts are already written. A NASA outage must not undo that.
+  try {
+    await refreshNasaStudies(prisma);
+    console.log("OSDR studies refreshed from NASA.");
+  } catch (err) {
+    console.warn("OSDR refresh skipped; the checked-in snapshot stays available.", err);
   }
 
   console.log("Seed complete. Crew password:", DEMO_PASSWORD);
