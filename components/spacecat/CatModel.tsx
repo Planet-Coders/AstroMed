@@ -27,6 +27,7 @@ export function CatModel(props: {
   talking: boolean;
   wagging?: boolean;
   compact?: boolean;
+  lite?: boolean;
   onPart?: (part: CatPart | null) => void;
   className?: string;
   fallbackClassName?: string;

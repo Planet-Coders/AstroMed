@@ -21,7 +21,10 @@ const GLOW = 0x46e3ff;
 const FUR = 0x8f969f;
 const FUR_DARK = 0x464c55;
 
-export function buildCat({ compact = false }: { compact?: boolean } = {}) {
+export type CatQuality = "high" | "lite";
+
+export function buildCat({ compact = false, quality = "high" }: { compact?: boolean; quality?: CatQuality } = {}) {
+  const high = quality === "high";
   const disposables: { dispose(): void }[] = [];
   const keep = <T extends { dispose(): void }>(x: T) => {
     disposables.push(x);
@@ -30,22 +33,37 @@ export function buildCat({ compact = false }: { compact?: boolean } = {}) {
 
   // ---------- textures ----------
   const furTex = keep(stripeTexture());
-  const cheekTex = keep(cheekTexture());
+  const furNormal = keep(furNormalTexture());
+  const irisTex = keep(irisTexture());
+  const shineTex = keep(radialTexture("rgba(255,255,255,1)", "rgba(255,255,255,0)"));
+  const shellTex = high && !compact ? keep(shellTexture()) : null;
   const shadowTex = keep(radialTexture("rgba(40,30,20,0.55)", "rgba(40,30,20,0)"));
   const sparkTex = keep(radialTexture("rgba(255,240,170,1)", "rgba(255,200,80,0)"));
 
   // ---------- materials ----------
-  const furHead = keep(new THREE.MeshStandardMaterial({ map: furTex, roughness: 0.78 }));
-  const fur = keep(new THREE.MeshStandardMaterial({ color: FUR, roughness: 0.8 }));
-  const furCheek = keep(new THREE.MeshStandardMaterial({ map: cheekTex, roughness: 0.8 }));
-  const furDark = keep(new THREE.MeshStandardMaterial({ color: FUR_DARK, roughness: 0.8 }));
+  // Soft stylised fur: fine stroke normal map + velvet sheen for a fuzzy rim.
+  const furProps = {
+    normalMap: furNormal,
+    normalScale: new THREE.Vector2(0.45, 0.45),
+    roughness: 0.82,
+    sheen: 1,
+    sheenRoughness: 0.42,
+    sheenColor: new THREE.Color(0xe9f0f8),
+  };
+  const furHead = keep(new THREE.MeshPhysicalMaterial({ ...furProps, map: furTex }));
+  const fur = keep(new THREE.MeshPhysicalMaterial({ ...furProps, color: FUR }));
+  const furDark = keep(new THREE.MeshPhysicalMaterial({ ...furProps, color: FUR_DARK, sheenColor: new THREE.Color(0xb8c2cc) }));
   const white = keep(new THREE.MeshStandardMaterial({ color: 0xf7f8fa, roughness: 0.6 }));
   const pink = keep(new THREE.MeshStandardMaterial({ color: 0xff9db0, roughness: 0.35, emissive: 0x6a2030, emissiveIntensity: 0.35 }));
   const pinkSoft = keep(new THREE.MeshStandardMaterial({ color: 0xf5b8c3, roughness: 0.7 }));
   const dark = keep(new THREE.MeshStandardMaterial({ color: 0x1c2430, roughness: 0.2, metalness: 0.1 }));
+  const bean = keep(new THREE.MeshPhysicalMaterial({ color: 0x3d4249, roughness: 0.35, clearcoat: 0.6 }));
   const mouthMat = keep(new THREE.MeshStandardMaterial({ color: 0x6e2433, roughness: 0.5 }));
   const eyeWhite = keep(new THREE.MeshPhysicalMaterial({ color: 0xffffff, roughness: 0.12, clearcoat: 1 }));
-  const iris = keep(new THREE.MeshPhysicalMaterial({ color: 0x22374a, roughness: 0.08, clearcoat: 1, clearcoatRoughness: 0.05 }));
+  const iris = keep(new THREE.MeshPhysicalMaterial({ map: irisTex, roughness: 0.25 }));
+  const cornea = keep(
+    new THREE.MeshPhysicalMaterial({ color: 0xffffff, roughness: 0, clearcoat: 1, clearcoatRoughness: 0, transparent: true, opacity: 0.12, envMapIntensity: 2.5, depthWrite: false })
+  );
   const shine = keep(new THREE.MeshBasicMaterial({ color: 0xffffff }));
   const suit = keep(new THREE.MeshPhysicalMaterial({ color: 0xeef1f5, roughness: 0.42, clearcoat: 0.6, clearcoatRoughness: 0.3 }));
   const metal = keep(new THREE.MeshStandardMaterial({ color: 0xc8ced6, metalness: 1, roughness: 0.22 }));
@@ -53,6 +71,9 @@ export function buildCat({ compact = false }: { compact?: boolean } = {}) {
   const glowCore = keep(new THREE.MeshBasicMaterial({ color: GLOW, toneMapped: false }));
   const glowHalo = keep(
     new THREE.MeshBasicMaterial({ color: GLOW, transparent: true, opacity: 0.22, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false })
+  );
+  const glowHaloWide = keep(
+    new THREE.MeshBasicMaterial({ color: GLOW, transparent: true, opacity: 0.08, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false })
   );
   const red = keep(new THREE.MeshBasicMaterial({ color: 0xff5a5a, toneMapped: false }));
   const yellow = keep(new THREE.MeshBasicMaterial({ color: 0xffd54a, toneMapped: false }));
@@ -72,12 +93,15 @@ export function buildCat({ compact = false }: { compact?: boolean } = {}) {
   );
 
   // ---------- geometries (shared) ----------
-  const sphere = keep(new THREE.SphereGeometry(1, 40, 28));
+  const sphere = keep(new THREE.SphereGeometry(1, 48, 32));
+  const headGeo = keep(sculptHeadGeometry());
+  const earGeo = keep(earGeometry());
+  const irisGeo = keep(planarSphere());
+  const lidGeo = keep(new THREE.SphereGeometry(1, 32, 12, 0, Math.PI * 2, 0, 0.62));
   const lowSphere = keep(new THREE.SphereGeometry(1, 16, 12));
   const capsule = (r: number, len: number) => keep(new THREE.CapsuleGeometry(r, len, 8, 20));
   const torus = (r: number, tube: number) => keep(new THREE.TorusGeometry(r, tube, 12, 48));
   const box = (x: number, y: number, z: number) => keep(new THREE.BoxGeometry(x, y, z, 2, 2, 2));
-  const cone = (r: number, h: number) => keep(new THREE.ConeGeometry(r, h, 24));
   const cyl = (r: number, h: number) => keep(new THREE.CylinderGeometry(r, r, h, 24));
 
   const mesh = (g: THREE.BufferGeometry, m: THREE.Material, pos: [number, number, number] = [0, 0, 0], scale?: [number, number, number]) => {
@@ -90,6 +114,7 @@ export function buildCat({ compact = false }: { compact?: boolean } = {}) {
     const g = new THREE.Group();
     g.add(mesh(torus(r, tube), glowCore));
     g.add(mesh(torus(r, tube * 3.2), glowHalo));
+    if (high) g.add(mesh(torus(r, tube * 6.5), glowHaloWide));
     g.position.set(...pos);
     g.rotation.x = rotX;
     return g;
@@ -112,6 +137,13 @@ export function buildCat({ compact = false }: { compact?: boolean } = {}) {
   shadow.rotation.x = -Math.PI / 2;
   shadow.position.y = 0.005;
   root.add(shadow);
+  if (high && !compact) {
+    const catcher = new THREE.Mesh(keep(new THREE.PlaneGeometry(4, 4)), keep(new THREE.ShadowMaterial({ opacity: 0.18 })));
+    catcher.rotation.x = -Math.PI / 2;
+    catcher.receiveShadow = true;
+    catcher.raycast = () => {};
+    root.add(catcher);
+  }
 
   // legs + boots
   const legs = tag(new THREE.Group(), "body");
@@ -120,6 +152,7 @@ export function buildCat({ compact = false }: { compact?: boolean } = {}) {
     legs.add(mesh(box(0.26, 0.14, 0.12), metal, [s * 0.27, 0.42, 0.17]));
     legs.add(glowRing(0.205, 0.022, [s * 0.27, 0.27, 0]));
     legs.add(mesh(sphere, metal, [s * 0.29, 0.1, 0.06], [0.25, 0.15, 0.33]));
+    legs.add(mesh(sphere, suit, [s * 0.26, 0.52, 0], [0.22, 0.2, 0.22])); // hip joint
   }
   bob.add(legs);
 
@@ -153,14 +186,16 @@ export function buildCat({ compact = false }: { compact?: boolean } = {}) {
     const a = mesh(capsule(0.17, 0.42), suit, [0, -0.33, 0]);
     pivot.add(a);
     pivot.add(glowRing(0.175, 0.02, [0, -0.56, 0]));
-    const paw = mesh(sphere, fur, [0, -0.7, 0], [0.19, 0.19, 0.19]);
+    pivot.add(mesh(sphere, suit, [0, -0.02, 0], [0.2, 0.2, 0.2])); // shoulder joint
+    const paw = mesh(sphere, fur, [0, -0.72, 0], [0.2, 0.19, 0.2]);
     pivot.add(paw);
+    for (const [x, z] of [[-0.09, 0.05], [0, 0.08], [0.09, 0.05]]) pivot.add(mesh(sphere, fur, [x, -0.86, z], [0.07, 0.06, 0.07])); // toes
     if (side === 1) {
       // toe beans face the viewer when waving
       const beans = new THREE.Group();
-      beans.position.set(0, -0.74, 0.12);
-      beans.add(mesh(lowSphere, dark, [0, -0.02, 0.06], [0.07, 0.055, 0.03]));
-      for (const [x, y] of [[-0.08, 0.06], [0, 0.09], [0.08, 0.06]]) beans.add(mesh(lowSphere, dark, [x, y, 0.06], [0.03, 0.03, 0.02]));
+      beans.position.set(0, -0.76, 0.14);
+      beans.add(mesh(sphere, bean, [0, -0.02, 0.05], [0.075, 0.06, 0.03]));
+      for (const [x, y] of [[-0.085, 0.07], [0, 0.1], [0.085, 0.07]]) beans.add(mesh(sphere, bean, [x, y, 0.04], [0.032, 0.032, 0.02]));
       pivot.add(beans);
     }
     return pivot;
@@ -172,19 +207,26 @@ export function buildCat({ compact = false }: { compact?: boolean } = {}) {
   // head
   const head = tag(new THREE.Group(), "face");
   head.position.y = 2.32;
-  const skull = mesh(sphere, furHead, [0, 0, 0], [0.66, 0.6, 0.6]);
-  skull.rotation.y = -Math.PI / 2; // texture's forehead stripes to the front
-  head.add(skull);
-  for (const s of [-1, 1]) head.add(mesh(sphere, furCheek, [s * 0.43, -0.2, 0.14], [0.27, 0.22, 0.24]));
-  head.add(mesh(sphere, white, [0, -0.2, 0.47], [0.29, 0.19, 0.17]));
+  // one sculpted skull: chubby, with cheek fluff and a muzzle bump blended in
+  head.add(mesh(headGeo, furHead));
+  if (shellTex) {
+    // two short shells for a fuzzy silhouette (desktop only)
+    for (const k of [1.014, 1.028]) {
+      const shell = mesh(headGeo, keep(new THREE.MeshStandardMaterial({ map: furTex, alphaMap: shellTex, transparent: true, depthWrite: false, roughness: 1 })));
+      shell.scale.setScalar(k);
+      shell.raycast = () => {};
+      head.add(shell);
+    }
+  }
+  head.add(mesh(sphere, white, [0, -0.2, 0.49], [0.27, 0.17, 0.15]));
   head.add(mesh(sphere, pink, [0, -0.11, 0.63], [0.07, 0.048, 0.045]));
   // ears
   for (const s of [-1, 1]) {
     const ear = new THREE.Group();
     ear.position.set(s * 0.36, 0.48, -0.02);
     ear.rotation.z = -s * 0.38;
-    ear.add(mesh(cone(0.19, 0.42), fur));
-    ear.add(mesh(cone(0.11, 0.28), pinkSoft, [0, -0.03, 0.07]));
+    ear.add(mesh(earGeo, fur, [0, 0, 0], [0.2, 0.25, 0.2]));
+    ear.add(mesh(earGeo, pinkSoft, [0, -0.03, 0.055], [0.12, 0.17, 0.1]));
     head.add(ear);
   }
   // eyes (scale.y animates blink / wink / happy-closed)
@@ -193,9 +235,19 @@ export function buildCat({ compact = false }: { compact?: boolean } = {}) {
     const e = new THREE.Group();
     e.position.set(s * 0.235, 0.06, 0.53);
     e.add(mesh(sphere, eyeWhite, [0, 0, 0], [0.175, 0.205, 0.1]));
-    e.add(mesh(sphere, iris, [0, -0.012, 0.05], [0.135, 0.16, 0.075]));
-    e.add(mesh(lowSphere, shine, [0.05, 0.07, 0.122], [0.042, 0.042, 0.02]));
-    e.add(mesh(lowSphere, shine, [-0.045, -0.065, 0.122], [0.02, 0.02, 0.01]));
+    e.add(mesh(irisGeo, iris, [0, -0.012, 0.03], [0.135, 0.16, 0.075])); // gradient iris + pupil
+    e.add(mesh(sphere, cornea, [0, 0, 0.004], [0.178, 0.208, 0.112])); // glossy cornea
+    // upper lid: a fur cap over the top of the eye for soft lid shading
+    const lid = mesh(lidGeo, fur, [0, 0.004, 0], [0.185, 0.215, 0.108]);
+    lid.rotation.x = 0.12;
+    e.add(lid);
+    // camera-facing highlights
+    for (const [x, y, size] of [[0.05, 0.07, 0.085], [-0.045, -0.065, 0.04]]) {
+      const sp = new THREE.Sprite(keep(new THREE.SpriteMaterial({ map: shineTex, depthWrite: false })));
+      sp.position.set(x, y, 0.13);
+      sp.scale.setScalar(size);
+      e.add(sp);
+    }
     head.add(e);
     eyes.push(e);
   }
@@ -280,6 +332,17 @@ export function buildCat({ compact = false }: { compact?: boolean } = {}) {
     legs.visible = false;
     armL.visible = false;
     shadow.visible = false;
+  }
+
+  if (high && !compact) {
+    bob.traverse((o) => {
+      const m = o as THREE.Mesh;
+      if (!m.isMesh) return;
+      const mat = m.material as THREE.Material;
+      if (mat.transparent || (mat as THREE.MeshBasicMaterial).isMeshBasicMaterial) return;
+      m.castShadow = true;
+      m.receiveShadow = true;
+    });
   }
 
   // ---------- per-frame animation ----------
@@ -441,11 +504,165 @@ function stripeTexture() {
       g.fill();
     }
   }
+  // fine fur strokes
+  let seed = 7;
+  const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  for (let i = 0; i < 2600; i++) {
+    const x = rnd() * 512;
+    const y = rnd() * 256;
+    g.strokeStyle = rnd() > 0.5 ? "rgba(235,240,246,0.18)" : "rgba(40,46,54,0.14)";
+    g.lineWidth = 1;
+    g.beginPath();
+    g.moveTo(x, y);
+    g.lineTo(x + (rnd() - 0.5) * 3, y + 4 + rnd() * 5);
+    g.stroke();
+  }
   const tex = new THREE.CanvasTexture(c);
   tex.colorSpace = THREE.SRGBColorSpace;
   tex.anisotropy = 4;
+  tex.wrapS = THREE.RepeatWrapping;
+  tex.offset.x = 0.25; // stripes drawn at u=0.5 land on the sphere's front (u=0.25)
   return tex;
 }
+
+/** Unit sphere pushed out at cheeks, muzzle and forehead, then squashed: a chubby cartoon skull. */
+function sculptHeadGeometry() {
+  const g = new THREE.SphereGeometry(1, 96, 72);
+  const pos = g.attributes.position as THREE.BufferAttribute;
+  const bumps: [THREE.Vector3, number, number][] = [
+    [new THREE.Vector3(0.78, -0.42, 0.46).normalize(), 0.17, 0.42],
+    [new THREE.Vector3(-0.78, -0.42, 0.46).normalize(), 0.17, 0.42],
+    [new THREE.Vector3(0, -0.42, 0.9).normalize(), 0.09, 0.3],
+    [new THREE.Vector3(0, 0.35, 0.94).normalize(), 0.03, 0.5],
+    [new THREE.Vector3(0, -0.95, 0.2).normalize(), -0.08, 0.5], // flatter chin
+  ];
+  const v = new THREE.Vector3();
+  for (let i = 0; i < pos.count; i++) {
+    v.fromBufferAttribute(pos, i).normalize();
+    let r = 1;
+    for (const [c, amp, w] of bumps) r += amp * Math.exp(-v.distanceToSquared(c) / (w * w));
+    pos.setXYZ(i, v.x * r * 0.68, v.y * r * 0.6, v.z * r * 0.6);
+  }
+  g.computeVertexNormals();
+  return g;
+}
+
+/** Soft teardrop ear with a rounded tip, flattened front to back. */
+function earGeometry() {
+  const g = new THREE.SphereGeometry(1, 32, 24);
+  const pos = g.attributes.position as THREE.BufferAttribute;
+  for (let i = 0; i < pos.count; i++) {
+    const x = pos.getX(i);
+    const y = pos.getY(i);
+    const z = pos.getZ(i);
+    const t = (y + 1) / 2; // 0 bottom .. 1 tip
+    const taper = 1 - 0.72 * Math.pow(t, 1.4);
+    pos.setXYZ(i, x * taper, y, z * taper * 0.42);
+  }
+  g.computeVertexNormals();
+  return g;
+}
+
+/** Sphere with front-projected UVs, so a flat iris texture maps straight onto its face. */
+function planarSphere() {
+  const g = new THREE.SphereGeometry(1, 40, 28);
+  const pos = g.attributes.position as THREE.BufferAttribute;
+  const uv = g.attributes.uv as THREE.BufferAttribute;
+  for (let i = 0; i < pos.count; i++) uv.setXY(i, pos.getX(i) * 0.5 + 0.5, pos.getY(i) * 0.5 + 0.5);
+  return g;
+}
+
+/** Layered iris: dark limbal ring, blue-grey gradient with fibres, pupil, lid shadow on top. */
+function irisTexture() {
+  const c = document.createElement("canvas");
+  c.width = c.height = 256;
+  const g = c.getContext("2d")!;
+  const grad = g.createRadialGradient(128, 128, 20, 128, 128, 128);
+  grad.addColorStop(0, "#0a0f16");
+  grad.addColorStop(0.36, "#0a0f16");
+  grad.addColorStop(0.42, "#3d6a86");
+  grad.addColorStop(0.75, "#6fa8c6");
+  grad.addColorStop(0.9, "#2a465a");
+  grad.addColorStop(1, "#0d141c");
+  g.fillStyle = grad;
+  g.fillRect(0, 0, 256, 256);
+  g.strokeStyle = "rgba(180,220,240,0.18)";
+  for (let a = 0; a < 64; a++) {
+    const t = (a / 64) * Math.PI * 2;
+    g.beginPath();
+    g.moveTo(128 + Math.cos(t) * 52, 128 + Math.sin(t) * 52);
+    g.lineTo(128 + Math.cos(t) * 108, 128 + Math.sin(t) * 108);
+    g.stroke();
+  }
+  const lid = g.createLinearGradient(0, 0, 0, 120);
+  lid.addColorStop(0, "rgba(0,0,0,0.55)");
+  lid.addColorStop(1, "rgba(0,0,0,0)");
+  g.fillStyle = lid;
+  g.fillRect(0, 0, 256, 120);
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+
+/** Stroke noise turned into a normal map for a soft fur surface. */
+function furNormalTexture() {
+  const N = 256;
+  const c = document.createElement("canvas");
+  c.width = c.height = N;
+  const g = c.getContext("2d")!;
+  g.fillStyle = "#808080";
+  g.fillRect(0, 0, N, N);
+  let seed = 11;
+  const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  for (let i = 0; i < 3500; i++) {
+    const x = rnd() * N;
+    const y = rnd() * N;
+    const v = rnd() > 0.5 ? 255 : 0;
+    g.strokeStyle = `rgba(${v},${v},${v},0.25)`;
+    g.beginPath();
+    g.moveTo(x, y);
+    g.lineTo(x + (rnd() - 0.5) * 2, y + 3 + rnd() * 4);
+    g.stroke();
+  }
+  const h = g.getImageData(0, 0, N, N).data;
+  const out = g.createImageData(N, N);
+  const H = (x: number, y: number) => h[(((y + N) % N) * N + ((x + N) % N)) * 4] / 255;
+  for (let y = 0; y < N; y++)
+    for (let x = 0; x < N; x++) {
+      const dx = (H(x + 1, y) - H(x - 1, y)) * 2;
+      const dy = (H(x, y + 1) - H(x, y - 1)) * 2;
+      const len = Math.hypot(dx, dy, 1);
+      const i = (y * N + x) * 4;
+      out.data[i] = ((-dx / len) * 0.5 + 0.5) * 255;
+      out.data[i + 1] = ((-dy / len) * 0.5 + 0.5) * 255;
+      out.data[i + 2] = ((1 / len) * 0.5 + 0.5) * 255;
+      out.data[i + 3] = 255;
+    }
+  g.putImageData(out, 0, 0);
+  const tex = new THREE.CanvasTexture(c);
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  tex.repeat.set(4, 2);
+  return tex;
+}
+
+/** Sparse dots used as the alpha of the fur shells. */
+function shellTexture() {
+  const N = 256;
+  const c = document.createElement("canvas");
+  c.width = c.height = N;
+  const g = c.getContext("2d")!;
+  g.fillStyle = "#000";
+  g.fillRect(0, 0, N, N);
+  let seed = 23;
+  const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  g.fillStyle = "#fff";
+  for (let i = 0; i < 1800; i++) g.fillRect(rnd() * N, rnd() * N, 1.4, 1.4);
+  const tex = new THREE.CanvasTexture(c);
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  tex.repeat.set(6, 3);
+  return tex;
+}
+
 
 /** Rim-only glow so the clear helmet reads as glass. */
 function fresnelMaterial() {
@@ -459,26 +676,6 @@ function fresnelMaterial() {
     fragmentShader: `uniform vec3 uColor; varying vec3 vN; varying vec3 vV;
       void main(){ float f = pow(1.0 - abs(dot(normalize(vN), normalize(vV))), 3.0); gl_FragColor = vec4(uColor * f * 0.9, f); }`,
   });
-}
-
-/** Two short stripes per cheek. */
-function cheekTexture() {
-  const c = document.createElement("canvas");
-  c.width = 256;
-  c.height = 128;
-  const g = c.getContext("2d")!;
-  g.fillStyle = "#8f969f";
-  g.fillRect(0, 0, 256, 128);
-  g.fillStyle = "#464c55";
-  for (const cx of [0, 128, 256])
-    for (const dy of [-10, 10]) {
-      g.beginPath();
-      g.ellipse(cx, 60 + dy, 30, 5, 0, 0, Math.PI * 2);
-      g.fill();
-    }
-  const tex = new THREE.CanvasTexture(c);
-  tex.colorSpace = THREE.SRGBColorSpace;
-  return tex;
 }
 
 function radialTexture(inner: string, outer: string) {

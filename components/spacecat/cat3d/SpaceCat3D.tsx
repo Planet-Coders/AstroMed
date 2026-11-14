@@ -18,6 +18,7 @@ export default function SpaceCat3D({
   talking,
   wagging = false,
   compact = false,
+  lite = false,
   onPart,
   className = "",
 }: {
@@ -26,6 +27,8 @@ export default function SpaceCat3D({
   talking: boolean;
   wagging?: boolean;
   compact?: boolean;
+  /** Cheaper rendering (no bloom, shells or shadow maps), e.g. for the floating cat. */
+  lite?: boolean;
   onPart?: (part: CatPart | null) => void;
   className?: string;
 }) {
@@ -41,8 +44,14 @@ export default function SpaceCat3D({
     const host = hostRef.current;
     if (!host) return;
 
-    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: "low-power" });
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, compact ? 1.5 : 2));
+    // Phones and the small floating cat get the light path.
+    const high = !lite && !compact && window.innerWidth >= 768;
+    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, high ? 2 : 1.5));
+    if (high) {
+      renderer.shadowMap.enabled = true;
+      renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    }
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = 0.95;
     renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -63,15 +72,28 @@ export default function SpaceCat3D({
     scene.add(new THREE.HemisphereLight(0xffffff, 0x8a7f70, 0.75));
     const key = new THREE.DirectionalLight(0xffe7cc, 2.0);
     key.position.set(3, 5, 4);
+    if (high) {
+      key.castShadow = true;
+      key.shadow.mapSize.set(1024, 1024);
+      key.shadow.camera.left = -2;
+      key.shadow.camera.right = 2;
+      key.shadow.camera.top = 3.2;
+      key.shadow.camera.bottom = -0.5;
+      key.shadow.camera.near = 1;
+      key.shadow.camera.far = 14;
+      key.shadow.bias = -0.0004;
+      key.shadow.normalBias = 0.02;
+      key.shadow.radius = 4;
+    }
     scene.add(key);
-    const rim = new THREE.DirectionalLight(0x46e3ff, 2.2);
+    const rim = new THREE.DirectionalLight(0x46e3ff, 3.2);
     rim.position.set(-3, 3, -4);
     scene.add(rim);
     const fill = new THREE.DirectionalLight(0xffffff, 0.6);
     fill.position.set(-4, 1.5, 3);
     scene.add(fill);
 
-    const cat = buildCat({ compact });
+    const cat = buildCat({ compact, quality: high ? "high" : "lite" });
     scene.add(cat.root);
 
     const camera = new THREE.PerspectiveCamera(compact ? 32 : 30, 1, 0.1, 50);
@@ -165,7 +187,7 @@ export default function SpaceCat3D({
       renderer.forceContextLoss();
       el.remove();
     };
-  }, [compact]);
+  }, [compact, lite]);
 
   return <div ref={hostRef} className={className} />;
 }

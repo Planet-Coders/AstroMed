@@ -105,6 +105,7 @@ export function FloatingCat({ userId, hidden, onOpen }: { userId: string; hidden
             stage={growthStage(cat.feeds)}
             mood={isHungry(cat) ? "hungry" : "happy"}
             talking={talking}
+            lite
             className="pointer-events-none h-full w-full"
             fallbackClassName="h-full w-full"
           />
