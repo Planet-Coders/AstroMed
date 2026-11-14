@@ -201,6 +201,19 @@ model Alert {
   @@index([userId, status])
 }
 
+/// Cached NASA OSDR / GeneLab study used as a research analog on the crew console.
+/// Metrics are group means parsed from the study's transformed CSV, not crew measurements.
+model NasaStudy {
+  id          String   @id
+  title       String
+  description String
+  mission     String
+  organism    String
+  files       Json
+  metrics     Json
+  updatedAt   DateTime @updatedAt
+}
+
 /// The alert's history: opened, escalated, acknowledged, resolved, and free-text notes.
 model AlertNote {
   id         String   @id @default(cuid())

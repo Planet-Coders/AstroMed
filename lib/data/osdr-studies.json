@@ -1,0 +1,768 @@
+{
+  "fetchedAt": "2026-11-14T12:49:28.450Z",
+  "studies": [
+    {
+      "id": "OSD-751",
+      "title": "Effects of Space Flight on Inflammasome Activation in the Brain of Mice (Cortex; ECLIA)",
+      "description": "Space exploration exposes astronauts to stressors that alter the immune response, rendering them vulnerable to infections and diseases. In this study, we aimed to determine the levels of inflammasome activation in the brains of mice that were housed in the International Space Station (ISS) for 37 days. C57BL/6 mice were launched to the ISS as part of NASA’s Rodent Research 1 Mission on SpaceX-4 CRS-4 Dragon cargo spacecraft from September 21st, 2014, to October 25th, 2014. Dissected mouse brains from that mission were analyzed by immunoblotting of inflammasome signaling proteins and Electrochemiluminescence Immunoassay (ECLIA) for inflammatory cytokine levels. Our data indicate decreased inflammasome activation in the brains of mice that were housed in the ISS for 37 days when compared to the brains of mice that were maintained on the ground, and in mice corresponding to the baseline group that were sacrificed at the time of launching of SpaceX-4. Moreover, we did not detect any significant changes in the expression levels of the pro-inflammatory cytokines TNF-alpha, IL-2, IFN-gamma, IL-5, IL-6, IL-12p70 and IL-10 between the ground control and the flight groups. Together, these studies suggest that spaceflight results in a decrease in the levels of innate immune signaling molecules that govern inflammasome signaling in the brain of mice. This dataset derives results from the ECLIA assay using brain tissue.",
+      "mission": "SpaceX-4",
+      "organism": "Mus musculus",
+      "files": [
+        {
+          "name": "LSDS-112_Immunoassay_Roy_ECLIA_Cortex_TRANSFORMED.csv",
+          "url": "https://osdr.nasa.gov/geode-py/ws/studies/OSD-751/download?source=datamanager&file=LSDS-112_Immunoassay_Roy_ECLIA_Cortex_TRANSFORMED.csv",
+          "restUrl": "https://visualization.osdr.nasa.gov/biodata/api/v2/dataset/OSD-751/file/LSDS-112_Immunoassay_Roy_ECLIA_Cortex_TRANSFORMED.csv/"
+        },
+        {
+          "name": "LSDS-112_Immunoassay_Roy_ECLIA_AllTissues_SUBMITTED.xlsx",
+          "url": "https://osdr.nasa.gov/geode-py/ws/studies/OSD-751/download?source=datamanager&file=LSDS-112_Immunoassay_Roy_ECLIA_AllTissues_SUBMITTED.xlsx",
+          "restUrl": "https://visualization.osdr.nasa.gov/biodata/api/v2/dataset/OSD-751/file/LSDS-112_Immunoassay_Roy_ECLIA_AllTissues_SUBMITTED.xlsx/"
+        },
+        {
+          "name": "OSD-751_metadata_OSD-751-ISA.zip",
+          "url": "https://osdr.nasa.gov/geode-py/ws/studies/OSD-751/download?source=datamanager&file=OSD-751_metadata_OSD-751-ISA.zip",
+          "restUrl": "https://visualization.osdr.nasa.gov/biodata/api/v2/dataset/OSD-751/file/OSD-751_metadata_OSD-751-ISA.zip/"
+        },
+        {
+          "name": "OSD-751_dictionary_Roy_DataDictionary.csv",
+          "url": "https://osdr.nasa.gov/geode-py/ws/studies/OSD-751/download?source=datamanager&file=OSD-751_dictionary_Roy_DataDictionary.csv",
+          "restUrl": "https://visualization.osdr.nasa.gov/biodata/api/v2/dataset/OSD-751/file/OSD-751_dictionary_Roy_DataDictionary.csv/"
+        }
+      ],
+      "metrics": {
+        "gapNote": "This file does not contain a human or crew cytokine assay. The transformed CSV does not label spaceflight groups, so each mean is across every sample in the file.",
+        "biomarkers": [
+          {
+            "biomarkerId": "ifn_gamma_concentration_normalized",
+            "label": "IFN-gamma",
+            "unit": "pg/mg",
+            "group": "all samples",
+            "n": 8,
+            "mean": 0.023414931,
+            "fileName": "LSDS-112_Immunoassay_Roy_ECLIA_Cortex_TRANSFORMED.csv"
+          },
+          {
+            "biomarkerId": "il10_concentration_normalized",
+            "label": "IL-10",
+            "unit": "pg/mg",
+            "group": "all samples",
+            "n": 8,
+            "mean": 0.6270275531249999,
+            "fileName": "LSDS-112_Immunoassay_Roy_ECLIA_Cortex_TRANSFORMED.csv"
+          },
+          {
+            "biomarkerId": "il12p70_concentration_normalized",
+            "label": "IL-12p70",
+            "unit": "pg/mg",
+            "group": "all samples",
+            "n": 8,
+            "mean": 4.4359583785,
+            "fileName": "LSDS-112_Immunoassay_Roy_ECLIA_Cortex_TRANSFORMED.csv"
+          },
+          {
+            "biomarkerId": "il5_concentration_normalized",
+            "label": "IL-5",
+            "unit": "pg/mg",
+            "group": "all samples",
+            "n": 8,
+            "mean": 0.15060213600000003,
+            "fileName": "LSDS-112_Immunoassay_Roy_ECLIA_Cortex_TRANSFORMED.csv"
+          },
+          {
+            "biomarkerId": "il6_concentration_normalized",
+            "label": "IL-6",
+            "unit": "pg/mg",
+            "group": "all samples",
+            "n": 8,
+            "mean": 1.5485802248750002,
+            "fileName": "LSDS-112_Immunoassay_Roy_ECLIA_Cortex_TRANSFORMED.csv"
+          },
+          {
+            "biomarkerId": "tnf_alpha_concentration_normalized",
+            "label": "TNF-alpha",
+            "unit": "pg/mg",
+            "group": "all samples",
+            "n": 8,
+            "mean": 0.059612238875,
+            "fileName": "LSDS-112_Immunoassay_Roy_ECLIA_Cortex_TRANSFORMED.csv"
+          }
+        ]
+      }
+    },
+    {
+      "id": "OSD-661",
+      "title": "Toward countering muscle and bone loss with spaceflight: GSK3 as a potential target (Lumbar Spine, HLS, DXA Scanning)",
+      "description": "We examined the effects of ~30 days of spaceflight on glycogen synthase kinase 3 (GSK3) content and inhibitory serine phosphorylation in murine muscle and bone samples from four separate missions (BION-M1, Rodent Research RR1, RR9, and RR18). Spaceflight reduced GSK3b content across all missions, whereas its serine phosphorylation was elevated with RR18 and BION-M1. The reduction in GSK3b was linked to the reduction in type IIA fibers commonly observed with spaceflight as these fibers are particularly enriched with GSK3. We then tested the effects of inhibiting GSK3 before this fiber type shift, and we demonstrate that muscle-specific Gsk3 knockdown increased muscle mass, preserved muscle strength, and promoted the oxidative fiber type with Earth-based hindlimb unloading. In bone, GSK3 activation was enhanced after spaceflight; and strikingly, muscle-specific Gsk3 deletion increased bone mineral density in response to hindlimb unloading. Thus, future studies should test the effects of GSK3 inhibition during spaceflight. This study derives results from the DXA Scanning assay using lumbar spine tissue from HLS mice. The lumbar spine data in this study are related to other studies using tissues from the same experiment; OSD-654 (tibia), OSD-660 (tibialis anterior), OSD-662 (soleus), OSD-663 (femur), and OSD-664 (extensor digitorum longus).",
+      "mission": "Not listed",
+      "organism": "Mus musculus",
+      "files": [
+        {
+          "name": "LSDS-69_Bone_microstructure_DXA_SUBMITTED.xlsx",
+          "url": "https://osdr.nasa.gov/geode-py/ws/studies/OSD-661/download?source=datamanager&file=LSDS-69_Bone_microstructure_DXA_SUBMITTED.xlsx",
+          "restUrl": "https://visualization.osdr.nasa.gov/biodata/api/v2/dataset/OSD-661/file/LSDS-69_Bone_microstructure_DXA_SUBMITTED.xlsx/"
+        },
+        {
+          "name": "LSDS-69_Bone_microstructure_DXA_spine_TRANSFORMED.csv",
+          "url": "https://osdr.nasa.gov/geode-py/ws/studies/OSD-661/download?source=datamanager&file=LSDS-69_Bone_microstructure_DXA_spine_TRANSFORMED.csv",
+          "restUrl": "https://visualization.osdr.nasa.gov/biodata/api/v2/dataset/OSD-661/file/LSDS-69_Bone_microstructure_DXA_spine_TRANSFORMED.csv/"
+        },
+        {
+          "name": "OSD-661_metadata_OSD-661-ISA.zip",
+          "url": "https://osdr.nasa.gov/geode-py/ws/studies/OSD-661/download?source=datamanager&file=OSD-661_metadata_OSD-661-ISA.zip",
+          "restUrl": "https://visualization.osdr.nasa.gov/biodata/api/v2/dataset/OSD-661/file/OSD-661_metadata_OSD-661-ISA.zip/"
+        }
+      ],
+      "metrics": {
+        "gapNote": "This file does not contain this crew’s exercise log. The file does not contain a BMD-change column. Baseline and post-HLS regional BMD are separate columns, and no change was calculated.",
+        "biomarkers": [
+          {
+            "biomarkerId": "baseline_regional_BMD",
+            "label": "Baseline regional BMD",
+            "unit": "",
+            "group": "Flox_HLS",
+            "n": 3,
+            "mean": 40.333333333333336,
+            "fileName": "LSDS-69_Bone_microstructure_DXA_spine_TRANSFORMED.csv"
+          },
+          {
+            "biomarkerId": "body_fat_percent",
+            "label": "Body fat",
+            "unit": "%",
+            "group": "Flox_HLS",
+            "n": 4,
+            "mean": 9.188629509999998,
+            "fileName": "LSDS-69_Bone_microstructure_DXA_spine_TRANSFORMED.csv"
+          },
+          {
+            "biomarkerId": "lean_mass_percent",
+            "label": "Lean mass",
+            "unit": "%",
+            "group": "Flox_HLS",
+            "n": 4,
+            "mean": 90.18977459999999,
+            "fileName": "LSDS-69_Bone_microstructure_DXA_spine_TRANSFORMED.csv"
+          },
+          {
+            "biomarkerId": "post-HLS_regional_BMD",
+            "label": "Post-HLS regional BMD",
+            "unit": "",
+            "group": "Flox_HLS",
+            "n": 5,
+            "mean": 35.2,
+            "fileName": "LSDS-69_Bone_microstructure_DXA_spine_TRANSFORMED.csv"
+          },
+          {
+            "biomarkerId": "baseline_regional_BMD",
+            "label": "Baseline regional BMD",
+            "unit": "",
+            "group": "KD_HLS",
+            "n": 5,
+            "mean": 39.8,
+            "fileName": "LSDS-69_Bone_microstructure_DXA_spine_TRANSFORMED.csv"
+          },
+          {
+            "biomarkerId": "body_fat_percent",
+            "label": "Body fat",
+            "unit": "%",
+            "group": "KD_HLS",
+            "n": 4,
+            "mean": 7.829804960000001,
+            "fileName": "LSDS-69_Bone_microstructure_DXA_spine_TRANSFORMED.csv"
+          },
+          {
+            "biomarkerId": "lean_mass_percent",
+            "label": "Lean mass",
+            "unit": "%",
+            "group": "KD_HLS",
+            "n": 4,
+            "mean": 91.343741,
+            "fileName": "LSDS-69_Bone_microstructure_DXA_spine_TRANSFORMED.csv"
+          },
+          {
+            "biomarkerId": "post-HLS_regional_BMD",
+            "label": "Post-HLS regional BMD",
+            "unit": "",
+            "group": "KD_HLS",
+            "n": 5,
+            "mean": 38.4,
+            "fileName": "LSDS-69_Bone_microstructure_DXA_spine_TRANSFORMED.csv"
+          }
+        ]
+      }
+    },
+    {
+      "id": "OSD-489",
+      "title": "Quantifying Cancellous Bone Structural Changes in Microgravity: Axial Skeleton Results from the RR-1 Mission",
+      "description": "Objective of this study was to further validate bone degradation in microgravity as site-specific and preferential to weight bearing bone. An objective of this study was to further understand the role of the mechanical environment in controlling the process of bone remodeling, namely local formation and resorption to maintain a healthy structure. These data from the lumbar 4 bones of Rodent Research-1 mission aboard the International Space Station, are unpublished, and were presented at the 2016 meeting of the American Society for Gravitational Space Research. This dataset derives results from the micro–computed tomography (mCT) assay.",
+      "mission": "SpaceX-4",
+      "organism": "Mus musculus",
+      "files": [
+        {
+          "name": "LSDS-15_microCT_alwoodSUBMITTED.csv",
+          "url": "https://osdr.nasa.gov/geode-py/ws/studies/OSD-489/download?source=datamanager&file=LSDS-15_microCT_alwoodSUBMITTED.csv",
+          "restUrl": "https://visualization.osdr.nasa.gov/biodata/api/v2/dataset/OSD-489/file/LSDS-15_microCT_alwoodSUBMITTED.csv/"
+        },
+        {
+          "name": "LSDS-15_microCT_alwoodTRANSFORMED.csv",
+          "url": "https://osdr.nasa.gov/geode-py/ws/studies/OSD-489/download?source=datamanager&file=LSDS-15_microCT_alwoodTRANSFORMED.csv",
+          "restUrl": "https://visualization.osdr.nasa.gov/biodata/api/v2/dataset/OSD-489/file/LSDS-15_microCT_alwoodTRANSFORMED.csv/"
+        },
+        {
+          "name": "LSDS-15_microCT_alwood_log.txt",
+          "url": "https://osdr.nasa.gov/geode-py/ws/studies/OSD-489/download?source=datamanager&file=LSDS-15_microCT_alwood_log.txt",
+          "restUrl": "https://visualization.osdr.nasa.gov/biodata/api/v2/dataset/OSD-489/file/LSDS-15_microCT_alwood_log.txt/"
+        },
+        {
+          "name": "OSD-489_metadata_OSD-489-ISA.zip",
+          "url": "https://osdr.nasa.gov/geode-py/ws/studies/OSD-489/download?source=datamanager&file=OSD-489_metadata_OSD-489-ISA.zip",
+          "restUrl": "https://visualization.osdr.nasa.gov/biodata/api/v2/dataset/OSD-489/file/OSD-489_metadata_OSD-489-ISA.zip/"
+        }
+      ],
+      "metrics": {
+        "gapNote": "This file is not a dosimeter log and has no radiation or dose column. Cabin radiation is the cabin sensor only.",
+        "biomarkers": [
+          {
+            "biomarkerId": "bone_surface_by_volume_ratio_bsbv_mm_squared_by_mm_third",
+            "label": "Bone surface / volume",
+            "unit": "mm²/mm³",
+            "group": "Baseline",
+            "n": 10,
+            "mean": 53.64418500000001,
+            "fileName": "LSDS-15_microCT_alwoodTRANSFORMED.csv"
+          },
+          {
+            "biomarkerId": "Bone_surface_density_bstv_mm_squared_by_mm_third",
+            "label": "Bone surface density",
+            "unit": "mm²/mm³",
+            "group": "Baseline",
+            "n": 10,
+            "mean": 7.0697149999999995,
+            "fileName": "LSDS-15_microCT_alwoodTRANSFORMED.csv"
+          },
+          {
+            "biomarkerId": "bone_surface_mm_squared",
+            "label": "Bone surface",
+            "unit": "mm²",
+            "group": "Baseline",
+            "n": 10,
+            "mean": 17.67496,
+            "fileName": "LSDS-15_microCT_alwoodTRANSFORMED.csv"
+          },
+          {
+            "biomarkerId": "bone_volume_mm_third",
+            "label": "Bone volume",
+            "unit": "mm³",
+            "group": "Baseline",
+            "n": 10,
+            "mean": 0.333373,
+            "fileName": "LSDS-15_microCT_alwoodTRANSFORMED.csv"
+          },
+          {
+            "biomarkerId": "Connectivity density_1_by_mm_third",
+            "label": "Connectivity density",
+            "unit": "1/mm³",
+            "group": "Baseline",
+            "n": 10,
+            "mean": 138.864611,
+            "fileName": "LSDS-15_microCT_alwoodTRANSFORMED.csv"
+          },
+          {
+            "biomarkerId": "percent_bone_volume_bvtv_percent",
+            "label": "Bone volume fraction",
+            "unit": "%",
+            "group": "Baseline",
+            "n": 10,
+            "mean": 13.312437000000003,
+            "fileName": "LSDS-15_microCT_alwoodTRANSFORMED.csv"
+          },
+          {
+            "biomarkerId": "Standard_deviation_of_trabecular_separation",
+            "label": "SD of trabecular separation",
+            "unit": "",
+            "group": "Baseline",
+            "n": 10,
+            "mean": 0.119198,
+            "fileName": "LSDS-15_microCT_alwoodTRANSFORMED.csv"
+          },
+          {
+            "biomarkerId": "Standard_deviation_of_trabecular_thickness",
+            "label": "SD of trabecular thickness",
+            "unit": "",
+            "group": "Baseline",
+            "n": 10,
+            "mean": 0.022573,
+            "fileName": "LSDS-15_microCT_alwoodTRANSFORMED.csv"
+          },
+          {
+            "biomarkerId": "structure_model_index",
+            "label": "Structure model index",
+            "unit": "",
+            "group": "Baseline",
+            "n": 10,
+            "mean": 1.437517,
+            "fileName": "LSDS-15_microCT_alwoodTRANSFORMED.csv"
+          },
+          {
+            "biomarkerId": "tissue_surface_mm_squared",
+            "label": "Tissue surface",
+            "unit": "mm²",
+            "group": "Baseline",
+            "n": 10,
+            "mean": 11.565030000000002,
+            "fileName": "LSDS-15_microCT_alwoodTRANSFORMED.csv"
+          },
+          {
+            "biomarkerId": "tissue_volume_mm_third",
+            "label": "Tissue volume",
+            "unit": "mm³",
+            "group": "Baseline",
+            "n": 10,
+            "mean": 2.50627,
+            "fileName": "LSDS-15_microCT_alwoodTRANSFORMED.csv"
+          },
+          {
+            "biomarkerId": "trabecular_number_1_by_mm",
+            "label": "Trabecular number",
+            "unit": "1/mm",
+            "group": "Baseline",
+            "n": 10,
+            "mean": 1.9188660000000002,
+            "fileName": "LSDS-15_microCT_alwoodTRANSFORMED.csv"
+          },
+          {
+            "biomarkerId": "trabecular_pattern_factor",
+            "label": "Trabecular pattern factor",
+            "unit": "",
+            "group": "Baseline",
+            "n": 10,
+            "mean": 6.135295999999999,
+            "fileName": "LSDS-15_microCT_alwoodTRANSFORMED.csv"
+          },
+          {
+            "biomarkerId": "trabecular_separation_mm",
+            "label": "Trabecular separation",
+            "unit": "mm",
+            "group": "Baseline",
+            "n": 10,
+            "mean": 0.29015199999999997,
+            "fileName": "LSDS-15_microCT_alwoodTRANSFORMED.csv"
+          },
+          {
+            "biomarkerId": "trabecular_thickness_mm",
+            "label": "Trabecular thickness",
+            "unit": "mm",
+            "group": "Baseline",
+            "n": 10,
+            "mean": 0.069127,
+            "fileName": "LSDS-15_microCT_alwoodTRANSFORMED.csv"
+          },
+          {
+            "biomarkerId": "bone_surface_by_volume_ratio_bsbv_mm_squared_by_mm_third",
+            "label": "Bone surface / volume",
+            "unit": "mm²/mm³",
+            "group": "Vivarium",
+            "n": 10,
+            "mean": 53.905145000000005,
+            "fileName": "LSDS-15_microCT_alwoodTRANSFORMED.csv"
+          },
+          {
+            "biomarkerId": "Bone_surface_density_bstv_mm_squared_by_mm_third",
+            "label": "Bone surface density",
+            "unit": "mm²/mm³",
+            "group": "Vivarium",
+            "n": 10,
+            "mean": 7.207479999999999,
+            "fileName": "LSDS-15_microCT_alwoodTRANSFORMED.csv"
+          },
+          {
+            "biomarkerId": "bone_surface_mm_squared",
+            "label": "Bone surface",
+            "unit": "mm²",
+            "group": "Vivarium",
+            "n": 10,
+            "mean": 17.400129,
+            "fileName": "LSDS-15_microCT_alwoodTRANSFORMED.csv"
+          },
+          {
+            "biomarkerId": "bone_volume_mm_third",
+            "label": "Bone volume",
+            "unit": "mm³",
+            "group": "Vivarium",
+            "n": 10,
+            "mean": 0.325751,
+            "fileName": "LSDS-15_microCT_alwoodTRANSFORMED.csv"
+          },
+          {
+            "biomarkerId": "Connectivity density_1_by_mm_third",
+            "label": "Connectivity density",
+            "unit": "1/mm³",
+            "group": "Vivarium",
+            "n": 10,
+            "mean": 151.318694,
+            "fileName": "LSDS-15_microCT_alwoodTRANSFORMED.csv"
+          },
+          {
+            "biomarkerId": "percent_bone_volume_bvtv_percent",
+            "label": "Bone volume fraction",
+            "unit": "%",
+            "group": "Vivarium",
+            "n": 10,
+            "mean": 13.49502,
+            "fileName": "LSDS-15_microCT_alwoodTRANSFORMED.csv"
+          },
+          {
+            "biomarkerId": "Standard_deviation_of_trabecular_separation",
+            "label": "SD of trabecular separation",
+            "unit": "",
+            "group": "Vivarium",
+            "n": 10,
+            "mean": 0.12301499999999999,
+            "fileName": "LSDS-15_microCT_alwoodTRANSFORMED.csv"
+          },
+          {
+            "biomarkerId": "Standard_deviation_of_trabecular_thickness",
+            "label": "SD of trabecular thickness",
+            "unit": "",
+            "group": "Vivarium",
+            "n": 10,
+            "mean": 0.022378,
+            "fileName": "LSDS-15_microCT_alwoodTRANSFORMED.csv"
+          },
+          {
+            "biomarkerId": "structure_model_index",
+            "label": "Structure model index",
+            "unit": "",
+            "group": "Vivarium",
+            "n": 10,
+            "mean": 1.355407,
+            "fileName": "LSDS-15_microCT_alwoodTRANSFORMED.csv"
+          },
+          {
+            "biomarkerId": "tissue_surface_mm_squared",
+            "label": "Tissue surface",
+            "unit": "mm²",
+            "group": "Vivarium",
+            "n": 10,
+            "mean": 11.410655000000002,
+            "fileName": "LSDS-15_microCT_alwoodTRANSFORMED.csv"
+          },
+          {
+            "biomarkerId": "tissue_volume_mm_third",
+            "label": "Tissue volume",
+            "unit": "mm³",
+            "group": "Vivarium",
+            "n": 10,
+            "mean": 2.425187,
+            "fileName": "LSDS-15_microCT_alwoodTRANSFORMED.csv"
+          },
+          {
+            "biomarkerId": "trabecular_number_1_by_mm",
+            "label": "Trabecular number",
+            "unit": "1/mm",
+            "group": "Vivarium",
+            "n": 10,
+            "mean": 1.9480540000000002,
+            "fileName": "LSDS-15_microCT_alwoodTRANSFORMED.csv"
+          },
+          {
+            "biomarkerId": "trabecular_pattern_factor",
+            "label": "Trabecular pattern factor",
+            "unit": "",
+            "group": "Vivarium",
+            "n": 10,
+            "mean": 5.017819,
+            "fileName": "LSDS-15_microCT_alwoodTRANSFORMED.csv"
+          },
+          {
+            "biomarkerId": "trabecular_separation_mm",
+            "label": "Trabecular separation",
+            "unit": "mm",
+            "group": "Vivarium",
+            "n": 10,
+            "mean": 0.29259799999999997,
+            "fileName": "LSDS-15_microCT_alwoodTRANSFORMED.csv"
+          },
+          {
+            "biomarkerId": "trabecular_thickness_mm",
+            "label": "Trabecular thickness",
+            "unit": "mm",
+            "group": "Vivarium",
+            "n": 10,
+            "mean": 0.06888000000000001,
+            "fileName": "LSDS-15_microCT_alwoodTRANSFORMED.csv"
+          },
+          {
+            "biomarkerId": "bone_surface_by_volume_ratio_bsbv_mm_squared_by_mm_third",
+            "label": "Bone surface / volume",
+            "unit": "mm²/mm³",
+            "group": "Flight",
+            "n": 8,
+            "mean": 59.86139,
+            "fileName": "LSDS-15_microCT_alwoodTRANSFORMED.csv"
+          },
+          {
+            "biomarkerId": "Bone_surface_density_bstv_mm_squared_by_mm_third",
+            "label": "Bone surface density",
+            "unit": "mm²/mm³",
+            "group": "Flight",
+            "n": 8,
+            "mean": 6.283795,
+            "fileName": "LSDS-15_microCT_alwoodTRANSFORMED.csv"
+          },
+          {
+            "biomarkerId": "bone_surface_mm_squared",
+            "label": "Bone surface",
+            "unit": "mm²",
+            "group": "Flight",
+            "n": 8,
+            "mean": 15.316701250000001,
+            "fileName": "LSDS-15_microCT_alwoodTRANSFORMED.csv"
+          },
+          {
+            "biomarkerId": "bone_volume_mm_third",
+            "label": "Bone volume",
+            "unit": "mm³",
+            "group": "Flight",
+            "n": 8,
+            "mean": 0.26122500000000004,
+            "fileName": "LSDS-15_microCT_alwoodTRANSFORMED.csv"
+          },
+          {
+            "biomarkerId": "Connectivity density_1_by_mm_third",
+            "label": "Connectivity density",
+            "unit": "1/mm³",
+            "group": "Flight",
+            "n": 8,
+            "mean": 115.38163125000001,
+            "fileName": "LSDS-15_microCT_alwoodTRANSFORMED.csv"
+          },
+          {
+            "biomarkerId": "percent_bone_volume_bvtv_percent",
+            "label": "Bone volume fraction",
+            "unit": "%",
+            "group": "Flight",
+            "n": 8,
+            "mean": 10.7193925,
+            "fileName": "LSDS-15_microCT_alwoodTRANSFORMED.csv"
+          },
+          {
+            "biomarkerId": "Standard_deviation_of_trabecular_separation",
+            "label": "SD of trabecular separation",
+            "unit": "",
+            "group": "Flight",
+            "n": 8,
+            "mean": 0.1202525,
+            "fileName": "LSDS-15_microCT_alwoodTRANSFORMED.csv"
+          },
+          {
+            "biomarkerId": "Standard_deviation_of_trabecular_thickness",
+            "label": "SD of trabecular thickness",
+            "unit": "",
+            "group": "Flight",
+            "n": 8,
+            "mean": 0.0210875,
+            "fileName": "LSDS-15_microCT_alwoodTRANSFORMED.csv"
+          },
+          {
+            "biomarkerId": "structure_model_index",
+            "label": "Structure model index",
+            "unit": "",
+            "group": "Flight",
+            "n": 8,
+            "mean": 1.5390512499999998,
+            "fileName": "LSDS-15_microCT_alwoodTRANSFORMED.csv"
+          },
+          {
+            "biomarkerId": "tissue_surface_mm_squared",
+            "label": "Tissue surface",
+            "unit": "mm²",
+            "group": "Flight",
+            "n": 8,
+            "mean": 11.47946375,
+            "fileName": "LSDS-15_microCT_alwoodTRANSFORMED.csv"
+          },
+          {
+            "biomarkerId": "tissue_volume_mm_third",
+            "label": "Tissue volume",
+            "unit": "mm³",
+            "group": "Flight",
+            "n": 8,
+            "mean": 2.43765125,
+            "fileName": "LSDS-15_microCT_alwoodTRANSFORMED.csv"
+          },
+          {
+            "biomarkerId": "trabecular_number_1_by_mm",
+            "label": "Trabecular number",
+            "unit": "1/mm",
+            "group": "Flight",
+            "n": 8,
+            "mean": 1.6835725000000001,
+            "fileName": "LSDS-15_microCT_alwoodTRANSFORMED.csv"
+          },
+          {
+            "biomarkerId": "trabecular_pattern_factor",
+            "label": "Trabecular pattern factor",
+            "unit": "",
+            "group": "Flight",
+            "n": 8,
+            "mean": 9.41348,
+            "fileName": "LSDS-15_microCT_alwoodTRANSFORMED.csv"
+          },
+          {
+            "biomarkerId": "trabecular_separation_mm",
+            "label": "Trabecular separation",
+            "unit": "mm",
+            "group": "Flight",
+            "n": 8,
+            "mean": 0.30375875,
+            "fileName": "LSDS-15_microCT_alwoodTRANSFORMED.csv"
+          },
+          {
+            "biomarkerId": "trabecular_thickness_mm",
+            "label": "Trabecular thickness",
+            "unit": "mm",
+            "group": "Flight",
+            "n": 8,
+            "mean": 0.06309999999999999,
+            "fileName": "LSDS-15_microCT_alwoodTRANSFORMED.csv"
+          },
+          {
+            "biomarkerId": "bone_surface_by_volume_ratio_bsbv_mm_squared_by_mm_third",
+            "label": "Bone surface / volume",
+            "unit": "mm²/mm³",
+            "group": "Ground Control",
+            "n": 9,
+            "mean": 52.367801111111106,
+            "fileName": "LSDS-15_microCT_alwoodTRANSFORMED.csv"
+          },
+          {
+            "biomarkerId": "Bone_surface_density_bstv_mm_squared_by_mm_third",
+            "label": "Bone surface density",
+            "unit": "mm²/mm³",
+            "group": "Ground Control",
+            "n": 9,
+            "mean": 6.907362222222222,
+            "fileName": "LSDS-15_microCT_alwoodTRANSFORMED.csv"
+          },
+          {
+            "biomarkerId": "bone_surface_mm_squared",
+            "label": "Bone surface",
+            "unit": "mm²",
+            "group": "Ground Control",
+            "n": 9,
+            "mean": 16.018240000000002,
+            "fileName": "LSDS-15_microCT_alwoodTRANSFORMED.csv"
+          },
+          {
+            "biomarkerId": "bone_volume_mm_third",
+            "label": "Bone volume",
+            "unit": "mm³",
+            "group": "Ground Control",
+            "n": 9,
+            "mean": 0.3133844444444444,
+            "fileName": "LSDS-15_microCT_alwoodTRANSFORMED.csv"
+          },
+          {
+            "biomarkerId": "Connectivity density_1_by_mm_third",
+            "label": "Connectivity density",
+            "unit": "1/mm³",
+            "group": "Ground Control",
+            "n": 9,
+            "mean": 128.5688211111111,
+            "fileName": "LSDS-15_microCT_alwoodTRANSFORMED.csv"
+          },
+          {
+            "biomarkerId": "percent_bone_volume_bvtv_percent",
+            "label": "Bone volume fraction",
+            "unit": "%",
+            "group": "Ground Control",
+            "n": 9,
+            "mean": 13.508895555555556,
+            "fileName": "LSDS-15_microCT_alwoodTRANSFORMED.csv"
+          },
+          {
+            "biomarkerId": "Standard_deviation_of_trabecular_separation",
+            "label": "SD of trabecular separation",
+            "unit": "",
+            "group": "Ground Control",
+            "n": 9,
+            "mean": 0.12127888888888888,
+            "fileName": "LSDS-15_microCT_alwoodTRANSFORMED.csv"
+          },
+          {
+            "biomarkerId": "Standard_deviation_of_trabecular_thickness",
+            "label": "SD of trabecular thickness",
+            "unit": "",
+            "group": "Ground Control",
+            "n": 9,
+            "mean": 0.023030000000000002,
+            "fileName": "LSDS-15_microCT_alwoodTRANSFORMED.csv"
+          },
+          {
+            "biomarkerId": "structure_model_index",
+            "label": "Structure model index",
+            "unit": "",
+            "group": "Ground Control",
+            "n": 9,
+            "mean": 1.4170600000000002,
+            "fileName": "LSDS-15_microCT_alwoodTRANSFORMED.csv"
+          },
+          {
+            "biomarkerId": "tissue_surface_mm_squared",
+            "label": "Tissue surface",
+            "unit": "mm²",
+            "group": "Ground Control",
+            "n": 9,
+            "mean": 11.088835555555557,
+            "fileName": "LSDS-15_microCT_alwoodTRANSFORMED.csv"
+          },
+          {
+            "biomarkerId": "tissue_volume_mm_third",
+            "label": "Tissue volume",
+            "unit": "mm³",
+            "group": "Ground Control",
+            "n": 9,
+            "mean": 2.333588888888889,
+            "fileName": "LSDS-15_microCT_alwoodTRANSFORMED.csv"
+          },
+          {
+            "biomarkerId": "trabecular_number_1_by_mm",
+            "label": "Trabecular number",
+            "unit": "1/mm",
+            "group": "Ground Control",
+            "n": 9,
+            "mean": 1.885012222222222,
+            "fileName": "LSDS-15_microCT_alwoodTRANSFORMED.csv"
+          },
+          {
+            "biomarkerId": "trabecular_pattern_factor",
+            "label": "Trabecular pattern factor",
+            "unit": "",
+            "group": "Ground Control",
+            "n": 9,
+            "mean": 6.120987777777779,
+            "fileName": "LSDS-15_microCT_alwoodTRANSFORMED.csv"
+          },
+          {
+            "biomarkerId": "trabecular_separation_mm",
+            "label": "Trabecular separation",
+            "unit": "mm",
+            "group": "Ground Control",
+            "n": 9,
+            "mean": 0.29330888888888895,
+            "fileName": "LSDS-15_microCT_alwoodTRANSFORMED.csv"
+          },
+          {
+            "biomarkerId": "trabecular_thickness_mm",
+            "label": "Trabecular thickness",
+            "unit": "mm",
+            "group": "Ground Control",
+            "n": 9,
+            "mean": 0.07115666666666666,
+            "fileName": "LSDS-15_microCT_alwoodTRANSFORMED.csv"
+          }
+        ]
+      }
+    }
+  ]
+}

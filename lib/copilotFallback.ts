@@ -1,4 +1,5 @@
 import { riskLabel, type RiskLevel } from "@/lib/risk";
+import { osdrFallbackCitation, type OsdrStudy } from "@/lib/osdr";
 
 export type CopilotContext = {
   userName: string;
@@ -6,6 +7,7 @@ export type CopilotContext = {
   risk: RiskLevel;
   pvtSummary: string;
   webLlmReady: boolean;
+  osdrStudies?: Pick<OsdrStudy, "id" | "metrics" | "gapNote">[];
 };
 
 /** On-device rules when WebLLM is loading or WebGPU is unavailable (demo-safe triage text). */
@@ -13,6 +15,12 @@ export function generateCopilotFallback(
   userMessage: string,
   ctx: CopilotContext
 ): string {
+  const reply = fallbackReply(userMessage, ctx);
+  const cite = osdrFallbackCitation(userMessage, ctx.osdrStudies ?? []);
+  return cite ? `${reply} ${cite}` : reply;
+}
+
+function fallbackReply(userMessage: string, ctx: CopilotContext): string {
   const q = userMessage.toLowerCase();
   const prefix = ctx.webLlmReady
     ? ""
