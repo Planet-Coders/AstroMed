@@ -24,8 +24,23 @@ const STATUS: Record<RiskLevel, { text: string; cls: string; dot: string }> = {
   RED: { text: "Warning · act now", cls: "border-mc-red/60 bg-mc-red/10 text-mc-red", dot: "bg-mc-red animate-pulse" },
 };
 
-export function MissionHeader({ crewRisks, mission = "MTV-1 · Mars transit" }: { crewRisks: RiskLevel[]; mission?: string }) {
-  const { mode, setMode } = useMissionMode();
+const SELF_TEXT: Record<RiskLevel, string> = {
+  GREEN: "You're nominal",
+  YELLOW: "Caution · check in",
+  RED: "Warning · act now",
+};
+
+export function MissionHeader({
+  crewRisks,
+  mission = "MTV-1 · Mars transit",
+  selfOnly = false,
+}: {
+  crewRisks: RiskLevel[];
+  mission?: string;
+  /** Astronaut view: the status pill describes only the signed-in crew member. */
+  selfOnly?: boolean;
+}) {
+  const { mode } = useMissionMode();
   const { scenario, setScenario } = useMissionTelemetry();
   const [now, setNow] = useState(Date.now());
 
@@ -34,7 +49,8 @@ export function MissionHeader({ crewRisks, mission = "MTV-1 · Mars transit" }: 
     return () => clearInterval(id);
   }, []);
 
-  const status = STATUS[worstRisk(crewRisks.length ? crewRisks : ["GREEN"])];
+  const level = worstRisk(crewRisks.length ? crewRisks : ["GREEN"]);
+  const status = selfOnly ? { ...STATUS[level], text: SELF_TEXT[level] } : STATUS[level];
 
   return (
     <header className="flex flex-wrap items-center gap-x-6 gap-y-3 border-b border-mc-line bg-mc-header px-4 py-3 md:px-6">
@@ -78,27 +94,6 @@ export function MissionHeader({ crewRisks, mission = "MTV-1 · Mars transit" }: 
             ))}
           </select>
         </label>
-
-        <div role="group" aria-label="Operating mode" className="flex rounded-lg border border-mc-line-strong bg-mc-panel p-[3px]">
-          {(
-            [
-              ["space", "Space"],
-              ["earth", "Earth"],
-            ] as const
-          ).map(([id, label]) => (
-            <button
-              key={id}
-              type="button"
-              onClick={() => setMode(id)}
-              aria-pressed={mode === id}
-              className={`min-h-8 rounded-md px-3 text-xs ${
-                mode === id ? "bg-mc-nasa font-semibold text-white" : "font-medium text-mc-muted hover:text-white"
-              }`}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
 
         <button
           type="button"

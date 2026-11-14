@@ -58,6 +58,10 @@ type DashboardResponse = {
 export function SuperAdminDashboard({ user }: { user: SessionUser }) {
   const [data, setData] = useState<DashboardResponse | null>(null);
   const [tab, setTab] = useState("telemetry");
+  // The crew commander (CDR) sees their whole crew; other astronauts see only themselves.
+  // The server enforces this too: /api/dashboard only returns what this user may see.
+  const isCrewCommander = user.role === "ASTRONAUT" && user.callsign === "CDR";
+  const seesCrew = user.role === "COMMANDER" || isCrewCommander;
   const [selectedId, setSelectedId] = useState(
     user.role === "ASTRONAUT" ? user.userId : ""
   );
@@ -108,7 +112,9 @@ export function SuperAdminDashboard({ user }: { user: SessionUser }) {
     const filtered =
       user.role === "COMMANDER"
         ? flat
-        : flat.filter((m) => m.user.crewId === user.crewId);
+        : isCrewCommander
+          ? flat.filter((m) => m.user.crewId === user.crewId)
+          : flat.filter((m) => m.user.id === user.userId);
     return filtered.map((m) => ({
       id: m.user.id,
       name: m.user.name,
@@ -139,7 +145,7 @@ export function SuperAdminDashboard({ user }: { user: SessionUser }) {
     () =>
       (data?.crews ?? [])
         .flatMap((c) => c.members)
-        .filter((m) => user.role === "COMMANDER" || m.user.crewId === user.crewId)
+        .filter((m) => user.role === "COMMANDER" || (isCrewCommander ? m.user.crewId === user.crewId : m.user.id === user.userId))
         .map((m) => ({
           name: m.user.name,
           callsign: m.user.callsign,
@@ -163,7 +169,7 @@ export function SuperAdminDashboard({ user }: { user: SessionUser }) {
   const missions = useHealthMissions(user.userId);
 
   const tabs = [
-    { id: "telemetry", label: "Crew vitals" },
+    { id: "telemetry", label: seesCrew ? "Crew vitals" : "My vitals" },
     { id: "body", label: "Body map" },
     { id: "check", label: "Daily check" },
     ...(user.role === "ASTRONAUT" ? [{ id: "monitoring", label: "My monitoring" }] : []),
@@ -198,6 +204,7 @@ export function SuperAdminDashboard({ user }: { user: SessionUser }) {
       <SyncEngine />
       <MissionHeader
         crewRisks={crewRisks}
+        selfOnly={!seesCrew}
         mission={
           data?.group
             ? `${data.group.code} · ${data.group.destination ?? data.group.name}`
@@ -214,6 +221,7 @@ export function SuperAdminDashboard({ user }: { user: SessionUser }) {
 
           {tab === "telemetry" && (
             <>
+              {seesCrew && (
               <CrewOverview
                 members={
                   data?.crews.find((c) => c.crewId === homeCrew)
@@ -223,6 +231,7 @@ export function SuperAdminDashboard({ user }: { user: SessionUser }) {
                 selectedId={selectedId}
                 onSelect={setSelectedId}
               />
+              )}
               {user.role === "COMMANDER" &&
                 data?.crews
                   .filter((c) => c.crewId !== homeCrew)

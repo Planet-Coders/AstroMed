@@ -9,8 +9,21 @@ export async function GET() {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  // Read the signed-in user's crew and callsign from the database, not the cookie.
+  const meRow = await prisma.user
+    .findUnique({ where: { id: session.userId }, select: { crewId: true, callsign: true } })
+    .catch(() => null);
+  const isCrewCommander = session.role === "ASTRONAUT" && meRow?.callsign === "CDR";
+
   const users = await prisma.user.findMany({
-    where: session.role === "COMMANDER" ? { role: "ASTRONAUT" } : { role: "ASTRONAUT", crewId: session.crewId },
+    // Ground control sees every crew, a crew commander (CDR) sees their own crew,
+    // and every other astronaut only ever gets their own record.
+    where:
+      session.role === "COMMANDER"
+        ? { role: "ASTRONAUT" }
+        : isCrewCommander && meRow
+          ? { role: "ASTRONAUT", crewId: meRow.crewId }
+          : { role: "ASTRONAUT", id: session.userId },
     orderBy: [{ crewId: "asc" }, { name: "asc" }],
   });
 
