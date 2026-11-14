@@ -3,7 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { badRequest, requireRole } from "@/lib/authz";
 import { audit } from "@/lib/audit";
 import { loadRules } from "@/lib/monitoring/server";
-import { DEFAULT_RULES } from "@/lib/monitoring/catalog";
+import { DEFAULT_RULES, ruleKind } from "@/lib/monitoring/catalog";
 
 export async function GET() {
   const auth = await requireRole(["SUPER_ADMIN"]);
@@ -42,5 +42,5 @@ export async function PATCH(request: Request) {
     enabled !== rule.enabled && (enabled ? "switched on" : "switched off"),
   ].filter(Boolean);
   if (changes.length) await audit(auth.user, "rule.update", { type: "rule", id: rule.id, label: `Alert rule: ${rule.label}` }, changes.join("; "));
-  return NextResponse.json({ rule: updated });
+  return NextResponse.json({ rule: { ...updated, kind: ruleKind(updated.id, updated.kind) } });
 }

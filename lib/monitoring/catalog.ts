@@ -297,6 +297,11 @@ export const METRIC = Object.fromEntries(METRICS.map((m) => [m.id, m])) as Recor
 
 export const DEFAULT_RULES = METRICS.flatMap((m) => m.rules.map((r) => ({ ...r, metric: m.id })));
 
+export function ruleKind(id: string, storedKind: string): RuleDefault["kind"] {
+  // Existing copies of the fluid rule retain their settings while using the latest daily total.
+  return id === "hydration_low" && storedKind === "threshold" ? "latest" : storedKind as RuleDefault["kind"];
+}
+
 export function formatValue(metric: MetricId, v: number) {
   const m = METRIC[metric];
   return `${v.toFixed(m.decimals)}${m.unit.startsWith("/") ? "" : " "}${m.unit}`;

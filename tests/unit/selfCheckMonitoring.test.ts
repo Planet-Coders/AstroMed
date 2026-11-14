@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { assessBp } from "@/lib/selfCheck";
-import { DEFAULT_RULES } from "@/lib/monitoring/catalog";
+import { DEFAULT_RULES, ruleKind } from "@/lib/monitoring/catalog";
 import { awaitingReading, dailySeries, evaluateRules, planAlertChanges, type ActiveAlert } from "@/lib/monitoring/engine";
 import { selfCheckSamples } from "@/lib/monitoring/selfCheckSamples";
 
@@ -11,6 +11,11 @@ const assess = (reports: Parameters<typeof selfCheckSamples>[0], now = evening) 
   evaluateRules(rules, selfCheckSamples(reports), now);
 
 describe("Daily Check monitoring", () => {
+  it("uses existing fluid rule settings with the latest reading behaviour", () => {
+    expect(ruleKind("hydration_low", "threshold")).toBe("latest");
+    expect(ruleKind("sleep_low", "threshold")).toBe("threshold");
+  });
+
   it.each([[102, "RED"], [85, "YELLOW"], [59, "YELLOW"], [49, "RED"]] as const)(
     "assesses diastolic %i independently as %s",
     (diastolic, level) => {

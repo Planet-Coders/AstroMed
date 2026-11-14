@@ -1,6 +1,6 @@
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { DEFAULT_RULES, METRICS, type MetricId } from "./catalog";
+import { DEFAULT_RULES, METRICS, ruleKind, type MetricId } from "./catalog";
 import { dayKey } from "./days";
 import { selfCheckSamples } from "./selfCheckSamples";
 import {
@@ -35,7 +35,7 @@ export function ensureRules() {
 export async function loadRules(): Promise<Rule[]> {
   await ensureRules();
   const rows = await prisma.alertRule.findMany({ orderBy: [{ metric: "asc" }, { id: "asc" }] });
-  return rows.map((r) => ({ ...r, metric: r.metric as MetricId, kind: r.kind as Rule["kind"], comparator: r.comparator as Rule["comparator"] }));
+  return rows.map((r) => ({ ...r, metric: r.metric as MetricId, kind: ruleKind(r.id, r.kind), comparator: r.comparator as Rule["comparator"] }));
 }
 
 /** Logged metric samples plus heart rate and dose from the wearable, for the last `days` days. */
