@@ -48,7 +48,7 @@ export function TalkBack({ onStart }: { onStart?: () => void }) {
       urlRef.current = url;
       const audio = new Audio(url);
       audio.preservesPitch = false;
-      audio.playbackRate = 1.5;
+      audio.playbackRate = 1.6;
       audio.onended = () => setState("idle");
       audio.onerror = () => setState("idle");
       setState("playing");

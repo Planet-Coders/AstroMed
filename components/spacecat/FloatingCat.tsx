@@ -89,7 +89,7 @@ export function FloatingCat({ userId, hidden, onOpen }: { userId: string; hidden
       <button
         type="button"
         onClick={onOpen}
-        className="spacecat-float pointer-events-auto relative flex h-[72px] w-[72px] shrink-0 items-center justify-center overflow-hidden rounded-full border-2 border-mc-select bg-mc-panel shadow-lg hover:scale-105"
+        className="spacecat-float spacecat-glow-ring pointer-events-auto relative flex h-[76px] w-[76px] shrink-0 items-center justify-center overflow-hidden rounded-full bg-gradient-to-b from-[#1b2a3d] to-[#0d1730] hover:scale-105"
         aria-label="Space cat voice reminder. Open the Space cat"
         title="Space cat"
       >
@@ -97,7 +97,8 @@ export function FloatingCat({ userId, hidden, onOpen }: { userId: string; hidden
           stage={growthStage(cat.feeds)}
           mood={isHungry(cat) ? "hungry" : "happy"}
           talking={talking}
-          className="mt-5 w-[86px] max-w-none"
+          compact
+          className="w-[74px] max-w-none"
         />
         {talking && <span className="absolute right-1 top-1 h-2.5 w-2.5 animate-ping rounded-full bg-mc-green" aria-hidden />}
       </button>

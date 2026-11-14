@@ -23,8 +23,11 @@ import { useReminderText } from "../ExerciseSleep";
 import { CatArt, type CatMood } from "./CatArt";
 import { useCatVoice } from "./useCatVoice";
 import { TalkBack } from "./TalkBack";
+import { FlameCoin } from "./FlameCoin";
 
 const POKE_LINES = ["Hee hee, that tickles!", "Meow! Boop!", "Hey, I'm floating here!", "Again! Again!", "Mrrrow?"];
+const FACE_LINES = ["Hee hee! *wink*", "Boop on the helmet!", "You found my cute side!", "Peekaboo!"];
+const TAIL_LINES = ["Hey, that's my tail!", "Wiggle wiggle!", "My tail has a mind of its own!", "Tail power, activate!"];
 const PURR_LINES = ["Purrrr…", "Mmm, purrrr. That's nice.", "Prrrrt!"];
 
 export function SpaceCatView({
@@ -66,7 +69,7 @@ export function SpaceCatView({
 
   const { bubble, talking, say } = useCatVoice();
   const reminder = useReminderText();
-  const [action, setAction] = useState<"pour" | "eating" | "giggle" | "purr" | null>(null);
+  const [action, setAction] = useState<"pour" | "eating" | "giggle" | "purr" | "wink" | "wag" | null>(null);
   const [wobble, setWobble] = useState(0);
   const actionTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const runAction = useCallback((a: typeof action, ms: number, then?: () => void) => {
@@ -119,11 +122,22 @@ export function SpaceCatView({
     );
   };
 
-  const onPoke = () => {
+  const pick = (lines: string[]) => lines[Math.floor(Math.random() * lines.length)];
+  // One tap handler; the drawing tags its parts so we know what was touched.
+  const onPoke = (e: React.MouseEvent) => {
     if (action === "pour" || action === "eating") return;
-    setWobble((w) => w + 1);
-    runAction("giggle", 1200);
-    say(POKE_LINES[Math.floor(Math.random() * POKE_LINES.length)]);
+    const part = (e.target as Element).closest?.("[data-part]")?.getAttribute("data-part");
+    if (part === "tail") {
+      runAction("wag", 1600);
+      say(pick(TAIL_LINES));
+    } else if (part === "face") {
+      runAction("wink", 1300);
+      say(pick(FACE_LINES));
+    } else {
+      setWobble((w) => w + 1);
+      runAction("giggle", 1200);
+      say(pick(POKE_LINES));
+    }
   };
 
   // Stroking: enough pointer movement across the cat makes it purr (with a cooldown).
@@ -144,7 +158,7 @@ export function SpaceCatView({
   };
 
   const mood: CatMood =
-    action === "eating" ? "eating" : action === "giggle" ? "giggle" : action === "purr" ? "purr" : hungry || (due.length && !fedToday) ? "hungry" : "happy";
+    action === "eating" ? "eating" : action === "giggle" ? "giggle" : action === "purr" ? "purr" : action === "wink" ? "wink" : hungry || (due.length && !fedToday) ? "hungry" : "happy";
 
   return (
     <div className="flex flex-col gap-5">
@@ -167,7 +181,7 @@ export function SpaceCatView({
               🔊 Voice reminder
             </button>
             <div className="flex items-center gap-1.5 rounded-lg border border-mc-amber/60 bg-mc-panel/90 px-3 py-1.5 font-mono text-sm font-bold shadow-xs" aria-live="polite">
-              <span aria-hidden>⭐</span> {pts} PTS
+              <FlameCoin className="h-5 w-5" /> {pts} PTS
             </div>
           </div>
 
@@ -189,9 +203,9 @@ export function SpaceCatView({
               onPointerMove={onStroke}
               onPointerLeave={() => (lastPos.current = null)}
               className={`spacecat-float relative w-[min(62vw,250px)] cursor-pointer touch-none rounded-full focus-visible:outline-2 focus-visible:outline-mc-cyan ${wobble ? "spacecat-wobble" : ""}`}
-              aria-label="Poke the cat. Move the pointer back and forth over it to stroke it."
+              aria-label="Poke the cat. Tap its tail or face, or move the pointer back and forth over it to stroke it."
             >
-              <CatArt stage={stage} mood={mood} talking={talking} className="w-full drop-shadow-md" />
+              <CatArt stage={stage} mood={mood} talking={talking} wagging={action === "wag"} className="w-full drop-shadow-md" />
             </button>
           </div>
 
@@ -209,6 +223,12 @@ export function SpaceCatView({
             </button>
 
             <div className="flex flex-col items-center">
+              <div className="mb-1 flex h-5 items-center gap-1" aria-label={`${Math.floor(pts / FEED_COST)} meals affordable`}>
+                {Array.from({ length: Math.min(5, Math.floor(pts / FEED_COST)) }).map((_, i) => (
+                  <FlameCoin key={i} className="spacecat-coin h-5 w-5" />
+                ))}
+                {pts >= FEED_COST * 6 && <span className="font-mono text-[10px] text-mc-link">+{Math.floor(pts / FEED_COST) - 5}</span>}
+              </div>
               <div className="relative h-8 w-20" aria-hidden>
                 {action === "pour" &&
                   Array.from({ length: 7 }).map((_, i) => (
@@ -293,7 +313,7 @@ export function SpaceCatView({
 
         <Card title="Play">
           <ul className="space-y-2 text-sm text-mc-soft">
-            <li>👆 Tap the cat to poke it.</li>
+            <li>👆 Tap the cat to poke it, tap its face for a wink, tap its tail to make it wag.</li>
             <li>🤚 Move the pointer back and forth over it to stroke it and hear it purr.</li>
             <li>🔊 Voice reminder makes it read today&apos;s plan. Turn on Auto in Habitat &amp; routine and it floats on every screen.</li>
           </ul>

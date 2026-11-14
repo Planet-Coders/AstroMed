@@ -459,9 +459,14 @@ body {
 .spacecat-float { animation: spacecat-bob 3.6s ease-in-out infinite; }
 .spacecat-wobble { animation: spacecat-wobble 0.6s ease-in-out, spacecat-bob 3.6s ease-in-out 0.6s infinite; }
 .spacecat-svg .spacecat-body { transform-origin: 100px 190px; animation: spacecat-breathe 3s ease-in-out infinite; }
-.spacecat-svg .spacecat-tail { transform-origin: 140px 205px; animation: spacecat-swish 2.4s ease-in-out infinite; }
-.spacecat-svg .spacecat-eyes { transform-origin: 100px 89px; animation: spacecat-blink 5s infinite; }
-.spacecat-svg .spacecat-arm-right { transform-origin: 140px 168px; animation: spacecat-wave 4s ease-in-out infinite; }
+.spacecat-svg .spacecat-tail-seg { transform-origin: 0 0; animation: spacecat-curl 1.5s ease-in-out infinite alternate; }
+.spacecat-svg .spacecat-tail-fast .spacecat-tail-seg { animation-duration: 0.22s; }
+.spacecat-svg [data-part="tail"] { cursor: grab; }
+.spacecat-svg .spacecat-eye { animation: spacecat-blink 5s infinite; }
+.spacecat-svg .spacecat-arm-right { animation: spacecat-wave 4.5s ease-in-out infinite; }
+.spacecat-svg .spacecat-sparkle { animation: spacecat-twinkle 0.5s ease-in-out infinite alternate; }
+.spacecat-glow-ring { box-shadow: 0 0 0 2px #46e3ff, 0 0 16px 2px rgba(70, 227, 255, 0.55); }
+.spacecat-coin { filter: drop-shadow(0 0 4px rgba(70, 227, 255, 0.8)); }
 .spacecat-svg .spacecat-mouth-talk { transform-origin: 100px 114px; animation: spacecat-talk 0.22s ease-in-out infinite alternate; }
 .spacecat-svg .spacecat-rumble { animation: spacecat-shake 0.4s linear infinite; }
 .spacecat-svg .spacecat-heart { fill: #e0607a; animation: spacecat-rise 1.2s ease-out infinite; }
@@ -483,9 +488,10 @@ body {
   70% { transform: rotate(-3deg); }
 }
 @keyframes spacecat-breathe { 0%, 100% { transform: scale(1, 1); } 50% { transform: scale(1.025, 0.985); } }
-@keyframes spacecat-swish { 0%, 100% { transform: rotate(0); } 50% { transform: rotate(12deg); } }
+@keyframes spacecat-curl { from { transform: rotate(-11deg); } to { transform: rotate(13deg); } }
+@keyframes spacecat-twinkle { from { opacity: 0.4; transform: scale(0.8); } to { opacity: 1; transform: scale(1.1); } }
 @keyframes spacecat-blink { 0%, 92%, 100% { transform: scaleY(1); } 95% { transform: scaleY(0.1); } }
-@keyframes spacecat-wave { 0%, 70%, 100% { transform: rotate(0); } 78% { transform: rotate(-14deg); } 86% { transform: rotate(8deg); } }
+@keyframes spacecat-wave { 0%, 64%, 100% { transform: rotate(0); } 70% { transform: rotate(-16deg); } 76% { transform: rotate(10deg); } 82% { transform: rotate(-12deg); } 88% { transform: rotate(4deg); } }
 @keyframes spacecat-talk { from { transform: scaleY(0.25); } to { transform: scaleY(1.1); } }
 @keyframes spacecat-shake { 0%, 100% { transform: translateX(0); } 50% { transform: translateX(2px); } }
 @keyframes spacecat-rise { from { opacity: 1; transform: translateY(0); } to { opacity: 0; transform: translateY(-18px); } }
@@ -496,14 +502,17 @@ body {
   .spacecat-float,
   .spacecat-wobble,
   .spacecat-svg .spacecat-body,
-  .spacecat-svg .spacecat-tail,
-  .spacecat-svg .spacecat-eyes,
-  .spacecat-svg .spacecat-arm-right,
   .spacecat-svg .spacecat-rumble,
   .spacecat-svg .spacecat-heart,
   .spacecat-bubble {
     animation: none;
   }
   .spacecat-svg .spacecat-mouth-talk { animation-duration: 0.6s; }
+  /* slow, gentle versions instead of none */
+  .spacecat-svg .spacecat-tail-seg { animation-duration: 6s; }
+  .spacecat-svg .spacecat-tail-fast .spacecat-tail-seg { animation-duration: 1.5s; }
+  .spacecat-svg .spacecat-eye { animation-duration: 10s; }
+  .spacecat-svg .spacecat-arm-right { animation-duration: 12s; }
+  .spacecat-svg .spacecat-sparkle { animation: none; }
   .spacecat-kibble { animation-duration: 0.01s; }
 }
