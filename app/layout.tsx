@@ -20,8 +20,8 @@ const display = Playfair_Display({
 });
 
 export const metadata: Metadata = {
-  title: "AAHMS // EDGE AI",
-  description: "Autonomous Astronaut Health Monitoring System",
+  title: "AstroMed // EDGE AI",
+  description: "Astronaut Health Monitoring Console",
 };
 
 export default function RootLayout({

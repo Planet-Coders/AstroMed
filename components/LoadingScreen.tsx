@@ -1,8 +1,8 @@
-import { AahmsMark } from "@/components/AahmsMark";
+import { AstroMedMark } from "@/components/AstroMedMark";
 import { LOADING_IMAGE, localUrl } from "@/lib/nasaImages";
 
 /**
- * Full-screen loading state: the AAHMS mark breathing inside a spinning
+ * Full-screen loading state: the AstroMed mark breathing inside a spinning
  * orbit ring, with a status line and an indeterminate progress bar. Plain
  * markup + CSS so it can render on the server (route fallbacks) and the client.
  */
@@ -34,7 +34,7 @@ export function LoadingScreen({
         <div className="orbit-spin absolute -inset-6 rounded-full border border-sky-300/20" aria-hidden>
           <span className="absolute left-1/2 top-0 h-2.5 w-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-sky-200 shadow-[0_0_12px_4px_rgba(125,211,252,0.7)]" />
         </div>
-        <AahmsMark className="logo-breathe absolute inset-0 h-full w-full" />
+        <AstroMedMark className="logo-breathe absolute inset-0 h-full w-full" />
       </div>
       <div className="relative flex flex-col items-center gap-3">
         <p className="font-mono text-[11px] uppercase tracking-[0.35em] text-sky-100/80">{label}</p>
