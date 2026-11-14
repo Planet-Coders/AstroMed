@@ -29,8 +29,8 @@ import { getCycleLog } from "@/lib/periods";
 import { getLatestCheck } from "@/lib/selfCheck";
 import { reportRoutineDay } from "@/lib/routineLog";
 import { MonitoringView } from "./monitoring/MonitoringView";
-import { NasaOsdrPanel } from "./NasaOsdrPanel";
-import { useMissionTelemetry } from "@/components/MissionTelemetryProvider";
+// import { NasaOsdrPanel } from "./NasaOsdrPanel";
+// import { useMissionTelemetry } from "@/components/MissionTelemetryProvider";
 
 type DashboardResponse = {
   group: { code: string; name: string; destination: string | null } | null;
@@ -69,7 +69,7 @@ export function SuperAdminDashboard({ user }: { user: SessionUser }) {
     user.role === "ASTRONAUT" ? user.userId : ""
   );
   const { unsyncedCount } = useSync();
-  const telemetry = useMissionTelemetry();
+  // const telemetry = useMissionTelemetry();
   const [liveSelected, setLiveSelected] = useState<LiveVitals | null>(null);
 
   // Co-pilot chats and health logs from this console are mirrored to the server for
@@ -284,6 +284,7 @@ export function SuperAdminDashboard({ user }: { user: SessionUser }) {
                           : undefined
                       }
                     />
+                    {/* NASA OSDR research panel (OSD-751, OSD-661, OSD-489) — hidden for now
                     <NasaOsdrPanel
                       name={selectedMember?.name ?? user.name}
                       hrv={selectedHrv}
@@ -291,6 +292,7 @@ export function SuperAdminDashboard({ user }: { user: SessionUser }) {
                       exerciseTarget={telemetry.exerciseTarget}
                       doseRate={telemetry.radiation}
                     />
+                    */}
                     <LabPanel
                       name={selectedMember?.name ?? user.name}
                       callsign={selectedMember?.callsign ?? user.callsign}
