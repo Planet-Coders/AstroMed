@@ -292,12 +292,15 @@ export function SuperAdminDashboard({ user }: { user: SessionUser }) {
           )}
 
           {tab === "habitat" && (
-            <div className="grid gap-5 md:grid-cols-2">
-              <div className="md:col-span-2">
+            // Radiation (cabin dose + space weather) and exercise & sleep side by side, both from the top.
+            <div className="grid items-start gap-5 lg:grid-cols-2">
+              <div className="flex min-w-0 flex-col gap-5">
+                <CabinEnvironment />
                 <SpaceWeatherCard />
               </div>
-              <CabinEnvironment />
-              <ExerciseSleep />
+              <div className="min-w-0">
+                <ExerciseSleep />
+              </div>
             </div>
           )}
           {tab === "pvt" && <PVTTest />}
