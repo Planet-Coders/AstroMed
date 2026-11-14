@@ -15,6 +15,7 @@ import { InjuryDetail, NewInjuryPanel } from "./InjuryPanel";
 import { PeriodPanel } from "./PeriodPanel";
 import dynamic from "next/dynamic";
 import { canUseWebGL } from "./BodyMap3D";
+import { defaultSexFor } from "@/lib/crewProfiles";
 
 // three.js is large, so the 3D figure loads only when the body map is shown.
 const BodyMap3D = dynamic(() => import("./BodyMap3D").then((m) => m.BodyMap3D), {
@@ -34,7 +35,6 @@ const TONE: Record<RiskLevel, { text: string; fill: string; ring: string; bg: st
   RED: { text: "text-mc-red", fill: "#d63c3c", ring: "border-mc-red/70", bg: "bg-mc-red/10" },
 };
 
-const FIGURE_KEY = "aahms_body_figure";
 type Figure = "male" | "female";
 
 const noopSubscribe = () => () => {};
@@ -66,12 +66,14 @@ export function BodyMap({
   userId,
   name,
   callsign,
+  userSex,
   vitals,
   onOpenSelfCheck,
 }: {
   userId: string;
   name: string;
   callsign?: string;
+  userSex?: "male" | "female";
   vitals: { heartRate: number; hrv: number; spo2: number; radiation: number };
   onOpenSelfCheck: () => void;
 }) {
@@ -80,26 +82,10 @@ export function BodyMap({
   const sw = useSpaceWeather();
   useEffect(() => markBodyMapSeen(userId), [userId]);
   const client = useClientInputs(userId);
-  // Body figure per crew member, chosen by the crew and remembered in this browser.
-  const [figures, setFigures] = useState<Record<string, Figure>>({});
-  useEffect(() => {
-    try {
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time load from storage
-      setFigures(JSON.parse(localStorage.getItem(FIGURE_KEY) ?? "{}"));
-    } catch {
-      /* unavailable */
-    }
-  }, []);
-  const figure: Figure = figures[name] ?? "male";
-  const chooseFigure = (f: Figure) => {
-    const next = { ...figures, [name]: f };
-    setFigures(next);
-    try {
-      localStorage.setItem(FIGURE_KEY, JSON.stringify(next));
-    } catch {
-      /* unavailable */
-    }
-  };
+
+  // Body scan figure strictly matches the astronaut account's biological sex:
+  // Male accounts exclusively show the male body scan, and female accounts exclusively show the female scan.
+  const figure: Figure = userSex ?? defaultSexFor(name);
 
   const inputs = useMemo(
     () => ({
@@ -186,19 +172,15 @@ export function BodyMap({
         )}
       </div>
       <div className="mb-3 flex flex-wrap items-center gap-2">
-        <div className="flex overflow-hidden rounded-md border border-mc-line-strong text-xs" role="group" aria-label="Body figure">
-          {(["male", "female"] as const).map((f) => (
-            <button
-              key={f}
-              type="button"
-              aria-pressed={figure === f}
-              onClick={() => chooseFigure(f)}
-              className={`px-3 py-1.5 transition ${figure === f ? "bg-mc-select text-mc-on-select" : "text-mc-muted hover:bg-mc-raised"}`}
-            >
-              {f === "male" ? "♂ Male" : "♀ Female"}
-            </button>
-          ))}
-        </div>
+        <span
+          className="inline-flex items-center gap-1.5 rounded-md border border-mc-line-strong bg-mc-inset px-3 py-1.5 text-xs font-mono text-mc-soft"
+          title={`Body scan figure matched to ${name}'s account (${figure})`}
+        >
+          <span className={figure === "female" ? "text-pink-400 font-semibold" : "text-cyan-400 font-semibold"}>
+            {figure === "female" ? "♀" : "♂"}
+          </span>
+          <span className="capitalize">{figure} scan</span>
+        </span>
         {webgl && (
           <button
             type="button"

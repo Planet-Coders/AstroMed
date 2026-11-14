@@ -189,14 +189,23 @@ function RegionIcon({ id }: { id: RegionId }) {
   }
 }
 
-/** True when this browser can draw WebGL. */
+let cachedWebGL: boolean | null = null;
+
+/** True when this browser can draw WebGL (cached and cleans up test context to prevent context limits). */
 export function canUseWebGL(): boolean {
+  if (typeof window === "undefined") return false;
+  if (cachedWebGL !== null) return cachedWebGL;
   try {
     const c = document.createElement("canvas");
-    return !!(c.getContext("webgl2") || c.getContext("webgl"));
+    const gl = c.getContext("webgl2") || c.getContext("webgl");
+    cachedWebGL = !!gl;
+    if (gl) {
+      gl.getExtension("WEBGL_lose_context")?.loseContext();
+    }
   } catch {
-    return false;
+    cachedWebGL = false;
   }
+  return cachedWebGL;
 }
 
 /** Rim-lit translucent "hologram" surface. */
@@ -796,6 +805,7 @@ export function BodyMap3D({ figure, regions, activeId, dimmed, onPick, placing, 
       controls.dispose();
       for (const d of disposables) d.dispose();
       renderer.dispose();
+      renderer.forceContextLoss();
       renderer.domElement.remove();
     };
   }, [figure]);

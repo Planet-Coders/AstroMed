@@ -12,6 +12,7 @@ export type SessionUser = {
   role: Role;
   crewId: string;
   callsign: string;
+  sex?: "male" | "female";
 };
 
 function getSecret() {

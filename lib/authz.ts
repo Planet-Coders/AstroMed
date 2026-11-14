@@ -58,6 +58,7 @@ export const USER_SELECT = {
   role: true,
   callsign: true,
   crewId: true,
+  sex: true,
   disabled: true,
   groupId: true,
   createdAt: true,

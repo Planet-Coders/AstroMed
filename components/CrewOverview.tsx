@@ -6,6 +6,7 @@ export type CrewMemberView = {
   id: string;
   name: string;
   callsign: string;
+  sex?: "male" | "female";
   heartRate: number;
   hrv: number;
   risk: RiskLevel;
@@ -29,34 +30,27 @@ export function CrewOverview({
   return (
     <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
       {members.map((m) => {
-        const selected = selectedId === m.id;
+        const isSelected = m.id === selectedId;
         return (
           <button
             key={m.id}
             type="button"
             onClick={() => onSelect(m.id)}
-            aria-pressed={selected}
-            className={`flex flex-col gap-2 rounded-lg border px-4 py-3.5 text-left transition ${
-              selected
-                ? "border-mc-cyan bg-mc-raised"
-                : "border-mc-line bg-mc-panel hover:border-mc-line-strong"
+            className={`flex flex-col gap-1 rounded-lg border p-3 text-left transition ${
+              isSelected
+                ? "border-mc-cyan bg-mc-raised shadow-xs"
+                : "border-mc-line bg-mc-surface hover:border-mc-line-strong hover:bg-mc-raised/40"
             }`}
           >
-            <span className="flex items-center justify-between">
-              <span className="text-sm font-semibold">{m.name}</span>
-              <span className="font-mono text-[11px] text-mc-label">{m.callsign}</span>
-            </span>
-            <span className="flex items-baseline gap-3.5">
-              <span className="font-mono text-xl">
-                {m.heartRate}
-                <span className="text-[11px] text-mc-label"> BPM</span>
-              </span>
-              <span className="font-mono text-xs text-mc-muted">HRV {Math.round(m.hrv)}</span>
-              <span
-                className={`ml-auto h-2 w-2 self-center rounded-full ${RISK_DOT[m.risk]}`}
-                aria-label={`Risk ${m.risk.toLowerCase()}`}
-              />
-            </span>
+            <div className="flex items-center justify-between">
+              <span className="font-mono text-xs uppercase tracking-wider text-mc-label">{m.callsign}</span>
+              <span className={`h-2 w-2 rounded-full ${RISK_DOT[m.risk]}`} />
+            </div>
+            <div className="truncate text-sm font-semibold">{m.name}</div>
+            <div className="mt-1 flex items-baseline justify-between font-mono text-xs text-mc-soft">
+              <span>{m.heartRate} bpm</span>
+              <span>HRV {m.hrv.toFixed(0)}</span>
+            </div>
           </button>
         );
       })}
