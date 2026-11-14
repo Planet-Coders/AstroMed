@@ -20,7 +20,9 @@ import {
 } from "@/lib/spaceCat";
 import { subscribeCatSay } from "@/lib/voiceReminder";
 import { useReminderText } from "../ExerciseSleep";
-import { CatArt, type CatMood } from "./CatArt";
+import type { CatMood } from "./CatArt";
+import { CatModel } from "./CatModel";
+import type { CatPart } from "./cat3d/buildCat";
 import { useCatVoice } from "./useCatVoice";
 import { TalkBack } from "./TalkBack";
 import { FlameCoin } from "./FlameCoin";
@@ -70,7 +72,6 @@ export function SpaceCatView({
   const { bubble, talking, say } = useCatVoice();
   const reminder = useReminderText();
   const [action, setAction] = useState<"pour" | "eating" | "giggle" | "purr" | "wink" | "wag" | null>(null);
-  const [wobble, setWobble] = useState(0);
   const actionTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const runAction = useCallback((a: typeof action, ms: number, then?: () => void) => {
     if (actionTimer.current) clearTimeout(actionTimer.current);
@@ -124,9 +125,8 @@ export function SpaceCatView({
 
   const pick = (lines: string[]) => lines[Math.floor(Math.random() * lines.length)];
   // One tap handler; the drawing tags its parts so we know what was touched.
-  const onPoke = (e: React.MouseEvent) => {
+  const onPoke = (part: CatPart | null) => {
     if (action === "pour" || action === "eating") return;
-    const part = (e.target as Element).closest?.("[data-part]")?.getAttribute("data-part");
     if (part === "tail") {
       runAction("wag", 1600);
       say(pick(TAIL_LINES));
@@ -134,7 +134,6 @@ export function SpaceCatView({
       runAction("wink", 1300);
       say(pick(FACE_LINES));
     } else {
-      setWobble((w) => w + 1);
       runAction("giggle", 1200);
       say(pick(POKE_LINES));
     }
@@ -196,17 +195,35 @@ export function SpaceCatView({
 
           {/* the cat */}
           <div className="relative z-0 flex justify-center">
-            <button
-              type="button"
-              key={wobble}
-              onClick={onPoke}
+            <div
+              role="button"
+              tabIndex={0}
+              onClick={(e) => {
+                // SVG fallback: find the tapped part from the drawing's data-part tags
+                const el = (e.target as Element).closest?.("[data-part]");
+                if (el && !(e.target as Element).closest("canvas")) onPoke(el.getAttribute("data-part") as CatPart);
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  onPoke("body");
+                }
+              }}
               onPointerMove={onStroke}
               onPointerLeave={() => (lastPos.current = null)}
-              className={`spacecat-float relative w-[min(62vw,250px)] cursor-pointer touch-none rounded-full focus-visible:outline-2 focus-visible:outline-mc-cyan ${wobble ? "spacecat-wobble" : ""}`}
-              aria-label="Poke the cat. Tap its tail or face, or move the pointer back and forth over it to stroke it."
+              className={`relative h-[min(92vw,430px)] w-[min(92vw,430px)] cursor-pointer rounded-full focus-visible:outline-2 focus-visible:outline-mc-cyan ${action === "giggle" ? "spacecat-wobble" : ""}`}
+              aria-label="Poke the cat. Tap its tail or face, drag to turn it, or rub it to make it purr."
             >
-              <CatArt stage={stage} mood={mood} talking={talking} wagging={action === "wag"} className="w-full drop-shadow-md" />
-            </button>
+              <CatModel
+                stage={stage}
+                mood={mood}
+                talking={talking}
+                wagging={action === "wag"}
+                onPart={(p) => onPoke(p ?? "body")}
+                className="absolute inset-0"
+                fallbackClassName="mx-auto h-full drop-shadow-md"
+              />
+            </div>
           </div>
 
           {/* bottom controls */}
@@ -314,7 +331,7 @@ export function SpaceCatView({
         <Card title="Play">
           <ul className="space-y-2 text-sm text-mc-soft">
             <li>👆 Tap the cat to poke it, tap its face for a wink, tap its tail to make it wag.</li>
-            <li>🤚 Move the pointer back and forth over it to stroke it and hear it purr.</li>
+            <li>🤚 Drag sideways to turn it. Rub the pointer back and forth over it to hear it purr.</li>
             <li>🔊 Voice reminder makes it read today&apos;s plan. Turn on Auto in Habitat &amp; routine and it floats on every screen.</li>
           </ul>
           <TalkBack onStart={() => setAction(null)} />

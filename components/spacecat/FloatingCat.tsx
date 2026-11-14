@@ -11,7 +11,7 @@ import {
 } from "@/lib/voiceReminder";
 import { useReminderText } from "../ExerciseSleep";
 import { useCopilot } from "../CopilotProvider";
-import { CatArt } from "./CatArt";
+import { CatModel } from "./CatModel";
 import { useCatVoice } from "./useCatVoice";
 
 /**
@@ -93,12 +93,13 @@ export function FloatingCat({ userId, hidden, onOpen }: { userId: string; hidden
         aria-label="Space cat voice reminder. Open the Space cat"
         title="Space cat"
       >
-        <CatArt
+        <CatModel
           stage={growthStage(cat.feeds)}
           mood={isHungry(cat) ? "hungry" : "happy"}
           talking={talking}
           compact
-          className="w-[74px] max-w-none"
+          className="pointer-events-none h-full w-full"
+          fallbackClassName="w-[74px] max-w-none"
         />
         {talking && <span className="absolute right-1 top-1 h-2.5 w-2.5 animate-ping rounded-full bg-mc-green" aria-hidden />}
       </button>
