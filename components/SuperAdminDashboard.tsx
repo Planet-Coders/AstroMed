@@ -19,7 +19,7 @@ import { SpaceWeatherCard } from "./SpaceWeatherCard";
 import { HealthMissions } from "./HealthMissions";
 import { useHealthMissions } from "@/lib/missions";
 import { SelfCheckDue } from "./SelfCheckDue";
-import { TabBar } from "./ui/TabBar";
+import { SideNav } from "./ui/SideNav";
 import { useSync } from "./SyncContext";
 import { CopilotProvider, type CrewBrief } from "./CopilotProvider";
 import { CopilotFloatingLauncher } from "./CopilotFloatingLauncher";
@@ -214,9 +214,10 @@ export function SuperAdminDashboard({ user }: { user: SessionUser }) {
         }
       />
 
-      <div className="mx-auto grid w-full max-w-[1400px] flex-1 gap-6 p-4 pb-24 md:p-6 md:pb-24 lg:grid-cols-[minmax(0,1fr)_340px]">
+      {/* Sidebar navigation | selected section | co-pilot column (drops below the section under xl). */}
+      <div className="mx-auto grid w-full max-w-[1560px] flex-1 gap-6 p-4 pb-24 md:p-6 md:pb-24 lg:grid-cols-[210px_minmax(0,1fr)] xl:grid-cols-[210px_minmax(0,1fr)_340px]">
+        <SideNav tabs={tabs} active={tab} onChange={setTab} />
         <main className="flex min-w-0 flex-col gap-5">
-          <TabBar tabs={tabs} active={tab} onChange={setTab} />
           {tab === "telemetry" && <SelfCheckDue userId={user.userId} onStart={() => setTab("check")} />}
 
           {tab === "telemetry" && (
@@ -312,6 +313,7 @@ export function SuperAdminDashboard({ user }: { user: SessionUser }) {
           {tab === "queue" && <StoreForwardQueue />}
         </main>
 
+        <div className="min-w-0 lg:col-start-2 xl:col-start-3">
         <OfflineAICopilot
           userId={user.userId}
           userName={user.name}
@@ -329,6 +331,7 @@ export function SuperAdminDashboard({ user }: { user: SessionUser }) {
               : undefined
           }
         />
+        </div>
       </div>
       <CopilotFloatingLauncher />
     </div>
