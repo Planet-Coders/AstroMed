@@ -1,0 +1,38 @@
+{
+  "fetchedAt": "2026-11-02T15:05:20.373Z",
+  "source": "demo",
+  "scales": {
+    "R": 0,
+    "S": 0,
+    "G": 0
+  },
+  "forecast": {
+    "flareMinor": 1,
+    "flareMajor": 1,
+    "radiationStorm": 1
+  },
+  "protons10MeV": 0.23062288761138916,
+  "xray": {
+    "flux": 3.1000897138255823e-07,
+    "flareClass": "B3.1"
+  },
+  "kp": 0,
+  "alerts": [
+    {
+      "issued": "2026-11-02 12:03:53.987",
+      "title": "CONTINUED ALERT: Electron 2MeV Integral Flux exceeded 1,000pfu"
+    },
+    {
+      "issued": "2026-11-01 14:57:52.780",
+      "title": "EXTENDED WARNING: Geomagnetic K-index of 4 expected"
+    },
+    {
+      "issued": "2026-11-01 13:02:29.493",
+      "title": "ALERT: Electron 2MeV Integral Flux exceeded 1,000pfu"
+    }
+  ],
+  "donki": null,
+  "level": "GREEN",
+  "headline": "Quiet Sun",
+  "advice": "No solar radiation storm. Background galactic cosmic radiation only."
+}

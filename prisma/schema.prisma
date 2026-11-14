@@ -1,0 +1,218 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  COMMANDER
+  ASTRONAUT
+  /// Creates mission groups and accounts; sees every group.
+  SUPER_ADMIN
+  /// Flight surgeon / mission control: reads the data of the groups they are assigned.
+  OVERSIGHT
+}
+
+enum ChatRole {
+  USER
+  ASSISTANT
+}
+
+/// Which co-pilot produced a reply: the on-device model or the rule-based basic mode.
+enum ChatMode {
+  WEBLLM
+  BASIC
+}
+
+/// Health logs the console keeps on the device, mirrored to the server for oversight.
+enum HealthReportKind {
+  SELF_CHECK
+  ROUTINE
+  INJURIES
+  PERIODS
+}
+
+/// A space mission crew / project. Astronauts belong to one group.
+model MissionGroup {
+  id          String   @id @default(cuid())
+  name        String
+  /// Short crew code shown in the console (e.g. MTV-1); mirrored to User.crewId.
+  code        String   @unique
+  description String?
+  destination String?
+  members     User[]   @relation("GroupMembers")
+  overseers   User[]   @relation("GroupOversight")
+  createdAt   DateTime @default(now())
+}
+
+model User {
+  id             String            @id @default(cuid())
+  name           String
+  email          String            @unique
+  password       String
+  role           Role
+  callsign       String
+  crewId         String
+  /// Disabled accounts can't sign in; their records and chats are kept.
+  disabled       Boolean           @default(false)
+  /// Generated test crew (prisma/synthetic.ts); every record they own is synthetic.
+  synthetic      Boolean           @default(false)
+  groupId        String?
+  group          MissionGroup?     @relation("GroupMembers", fields: [groupId], references: [id], onDelete: SetNull)
+  /// Groups an OVERSIGHT user may read.
+  overseenGroups MissionGroup[]    @relation("GroupOversight")
+  records        BiometricRecord[]
+  chatMessages   ChatMessage[]
+  healthReports  HealthReport[]
+  metricSamples  MetricSample[]
+  alerts         Alert[]
+  createdAt      DateTime          @default(now())
+
+  @@index([groupId])
+}
+
+model BiometricRecord {
+  id        String   @id
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  heartRate Int
+  hrv       Float?
+  spo2      Float
+  radiation Float?
+  synced    Boolean  @default(true)
+  timestamp DateTime
+  createdAt DateTime @default(now())
+
+  @@index([userId, timestamp])
+}
+
+/// One message of an astronaut's AI co-pilot conversation. The id comes from the
+/// device so a message queued offline is stored once even if it is sent twice.
+model ChatMessage {
+  id         String   @id
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role       ChatRole
+  content    String
+  mode       ChatMode
+  createdAt  DateTime
+  receivedAt DateTime @default(now())
+
+  @@index([userId, createdAt])
+}
+
+/// Latest copy of one device-side health log: a self-check (key = time taken), a day's
+/// exercise and sleep (key = date), or the injury / period log (key = "current").
+model HealthReport {
+  id         String           @id @default(cuid())
+  userId     String
+  user       User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  kind       HealthReportKind
+  key        String
+  data       Json
+  recordedAt DateTime
+  updatedAt  DateTime         @updatedAt
+
+  @@unique([userId, kind, key])
+  @@index([userId, kind, recordedAt])
+}
+
+/// Who did what in the super admin console. Actor and target are copied as text so the
+/// entry survives when either account is later deleted.
+model AdminAuditLog {
+  id          String   @id @default(cuid())
+  actorId     String
+  actorName   String
+  action      String
+  targetType  String
+  targetId    String?
+  targetLabel String
+  detail      String?
+  createdAt   DateTime @default(now())
+
+  @@index([createdAt])
+}
+
+/// One value of a monitored metric (lib/monitoring/catalog.ts): a day's sleep, exercise
+/// or fluid intake. Heart rate and radiation come from BiometricRecord instead.
+model MetricSample {
+  id         String   @id
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  metric     String
+  value      Float
+  recordedAt DateTime
+  /// "log" (crew console), "self-report" or "synthetic".
+  source     String
+  synthetic  Boolean  @default(false)
+  detail     Json?
+
+  @@index([userId, metric, recordedAt])
+}
+
+/// An alert rule a super admin can tune. Defaults come from the metric catalog.
+model AlertRule {
+  id         String   @id
+  metric     String
+  /// "threshold" (window average), "trend" (% change vs the previous window) or "missing" (hours since last value).
+  kind       String
+  /// "above" or "below".
+  comparator String
+  amber      Float
+  red        Float
+  windowDays Int
+  enabled    Boolean  @default(true)
+  label      String
+  updatedAt  DateTime @updatedAt
+  updatedBy  String?
+  alerts     Alert[]
+}
+
+enum AlertStatus {
+  OPEN
+  ACKNOWLEDGED
+  RESOLVED
+}
+
+model Alert {
+  id             String      @id @default(cuid())
+  userId         String
+  user           User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  ruleId         String
+  rule           AlertRule   @relation(fields: [ruleId], references: [id], onDelete: Cascade)
+  metric         String
+  /// "YELLOW" or "RED".
+  level          String
+  status         AlertStatus @default(OPEN)
+  value          Float?
+  threshold      Float?
+  explanation    String
+  openedAt       DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+  acknowledgedAt DateTime?
+  acknowledgedBy String?
+  resolvedAt     DateTime?
+  resolvedBy     String?
+  notes          AlertNote[]
+
+  @@index([userId, status])
+}
+
+/// The alert's history: opened, escalated, acknowledged, resolved, and free-text notes.
+model AlertNote {
+  id         String   @id @default(cuid())
+  alertId    String
+  alert      Alert    @relation(fields: [alertId], references: [id], onDelete: Cascade)
+  authorId   String?
+  authorName String
+  /// The author's role, or "SYSTEM" for automatic changes.
+  authorRole String
+  action     String
+  text       String
+  createdAt  DateTime @default(now())
+
+  @@index([alertId, createdAt])
+}
