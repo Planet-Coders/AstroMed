@@ -13,6 +13,18 @@ import { getLatestCheck, type StoredCheck } from "@/lib/selfCheck";
 import { INJURY_TYPES, areaFor, injuryLevel, useInjuries } from "@/lib/injuries";
 import { InjuryDetail, NewInjuryPanel } from "./InjuryPanel";
 import { PeriodPanel } from "./PeriodPanel";
+import dynamic from "next/dynamic";
+import { canUseWebGL } from "./BodyMap3D";
+
+// three.js is large, so the 3D figure loads only when the body map is shown.
+const BodyMap3D = dynamic(() => import("./BodyMap3D").then((m) => m.BodyMap3D), {
+  ssr: false,
+  loading: () => (
+    <div className="flex h-[560px] items-center justify-center rounded-xl border border-cyan-400/30 bg-[#071423] font-mono text-xs uppercase tracking-[0.2em] text-cyan-200/70 sm:h-[620px]">
+      Loading 3D body…
+    </div>
+  ),
+});
 
 const MISSION_EPOCH = Date.UTC(2026, 0, 15);
 
@@ -154,6 +166,11 @@ export function BodyMap({
   const openInjury = injuries.find((i) => i.id === injuryId) ?? null;
   const activeInjuries = injuries.filter((i) => !i.healed);
 
+  // 3D figure by default; the flat 2D figure is kept for placing injuries and for browsers without WebGL.
+  const webgl = useSyncExternalStore(noopSubscribe, canUseWebGL, () => false);
+  const [view, setView] = useState<"3d" | "2d">("3d");
+  const show3d = webgl && view === "3d" && !placing;
+
   return (
     <Card title={`Body map · ${name}`}>
       {/* NASA HRP's five hazards; picking one highlights the body systems it affects */}
@@ -204,6 +221,21 @@ export function BodyMap({
             </button>
           ))}
         </div>
+        {webgl && (
+          <div className="flex overflow-hidden rounded-md border border-mc-line-strong text-xs" role="group" aria-label="Body view">
+            {(["3d", "2d"] as const).map((v) => (
+              <button
+                key={v}
+                type="button"
+                aria-pressed={view === v}
+                onClick={() => setView(v)}
+                className={`px-3 py-1.5 font-mono uppercase transition ${view === v ? "bg-cyan-500/20 text-cyan-100" : "text-mc-muted hover:bg-mc-raised"}`}
+              >
+                {v}
+              </button>
+            ))}
+          </div>
+        )}
         <button
           type="button"
           onClick={() => {
@@ -228,8 +260,25 @@ export function BodyMap({
         )}
       </div>
       {/* While placing an injury the figure grows and shows the area under the pointer. */}
-      <div className={`grid gap-6 ${placing ? "lg:grid-cols-[minmax(300px,420px)_1fr]" : "lg:grid-cols-[minmax(240px,320px)_1fr]"}`}>
-        {/* Figure */}
+      <div
+        className={`grid gap-6 ${
+          show3d ? "xl:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)]" : placing ? "lg:grid-cols-[minmax(300px,420px)_1fr]" : "lg:grid-cols-[minmax(240px,320px)_1fr]"
+        }`}
+      >
+        {show3d ? (
+          <BodyMap3D
+            figure={figure}
+            regions={regions}
+            activeId={active.id}
+            dimmed={(id) => !inHazard(id)}
+            onPick={(id) => {
+              setPicked(id);
+              setInjuryId(null);
+              setDraft(null);
+            }}
+          />
+        ) : (
+        /* Figure */
         <div
           className={`relative mx-auto aspect-[1/2] w-full ${placing ? "max-w-[420px] cursor-none rounded-lg ring-1 ring-cyan-500/50" : "max-w-[300px]"}`}
           onPointerMove={(e) => {
@@ -478,6 +527,8 @@ export function BodyMap({
             );
           })}
         </div>
+
+        )}
 
         {/* Detail panel: a new injury report, an injury's details, or the picked body system */}
         {reporting && !draft ? (
