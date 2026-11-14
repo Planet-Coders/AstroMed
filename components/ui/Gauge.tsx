@@ -29,15 +29,15 @@ export function Gauge({
         percent={pct}
         progressClassName={progressClass}
       >
-        <div className="font-mono text-xl leading-none text-cyan-100">
+        <div className="font-mono text-xl leading-none text-foreground">
           {value}
-          <span className="text-sm text-slate-500">/{max}</span>
+          <span className="text-sm text-mc-label">/{max}</span>
         </div>
-        <div className="mt-1 max-w-[90px] text-[10px] leading-tight text-slate-400">
+        <div className="mt-1 max-w-[90px] text-[10px] leading-tight text-mc-muted">
           {label}
         </div>
         {sublabel && (
-          <div className="mt-0.5 text-[10px] text-emerald-400">{sublabel}</div>
+          <div className="mt-0.5 text-[10px] text-mc-green">{sublabel}</div>
         )}
       </CircularProgress>
     </div>

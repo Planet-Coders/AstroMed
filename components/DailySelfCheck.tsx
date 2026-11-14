@@ -114,7 +114,7 @@ export function DailySelfCheck({ userId, userName, onDone }: { userId: string; u
           <button
             type="button"
             onClick={() => setStep(0)}
-            className="min-h-12 shrink-0 rounded-md border border-mc-nasa-edge bg-mc-nasa px-6 text-sm font-semibold text-white"
+            className="min-h-12 shrink-0 rounded-md border border-mc-select bg-mc-select px-6 text-sm font-semibold text-mc-on-select"
           >
             Start check
           </button>
@@ -169,7 +169,7 @@ export function DailySelfCheck({ userId, userName, onDone }: { userId: string; u
           <button
             type="button"
             onClick={askCopilot}
-            className="min-h-11 rounded-md border border-mc-nasa-edge bg-mc-nasa px-4 text-sm font-semibold text-white"
+            className="min-h-11 rounded-md border border-mc-select bg-mc-select px-4 text-sm font-semibold text-mc-on-select"
           >
             Ask the co-pilot about my results
           </button>
@@ -281,7 +281,7 @@ export function DailySelfCheck({ userId, userName, onDone }: { userId: string; u
                     aria-checked={mood === m.value}
                     onClick={() => setMood(m.value)}
                     className={`flex min-h-20 flex-col items-center justify-center gap-1 rounded-lg border text-xs transition ${
-                      mood === m.value ? "border-mc-select bg-mc-select/15 text-white" : "border-mc-line-strong text-mc-muted hover:text-white"
+                      mood === m.value ? "border-mc-select bg-mc-select text-mc-on-select" : "border-mc-line-strong text-mc-muted hover:text-foreground"
                     }`}
                   >
                     <span className="text-3xl" aria-hidden>
@@ -309,7 +309,7 @@ export function DailySelfCheck({ userId, userName, onDone }: { userId: string; u
                     key={ml}
                     type="button"
                     onClick={() => setFluid(String((Number(fluid) || 0) + ml))}
-                    className="min-h-9 rounded-md border border-mc-line-strong px-3 text-xs text-mc-soft hover:text-white"
+                    className="min-h-9 rounded-md border border-mc-line-strong px-3 text-xs text-mc-soft hover:text-foreground"
                   >
                     + {ml} mL
                   </button>
@@ -364,21 +364,21 @@ export function DailySelfCheck({ userId, userName, onDone }: { userId: string; u
           </div>
 
           <div className="mt-auto flex items-center justify-between gap-2 pt-2">
-            <button type="button" onClick={() => setStep(step - 1)} className="min-h-11 rounded-md px-3 text-sm text-mc-muted hover:text-white">
+            <button type="button" onClick={() => setStep(step - 1)} className="min-h-11 rounded-md px-3 text-sm text-mc-muted hover:text-foreground">
               ← Back
             </button>
             <div className="flex gap-2">
               <button
                 type="button"
                 onClick={() => (step === n - 1 ? finish() : setStep(step + 1))}
-                className="min-h-11 rounded-md px-3 text-sm text-mc-label hover:text-white"
+                className="min-h-11 rounded-md px-3 text-sm text-mc-label hover:text-foreground"
               >
                 Skip
               </button>
               <button
                 type="button"
                 onClick={() => (step === n - 1 ? finish() : setStep(step + 1))}
-                className="min-h-11 rounded-md border border-mc-nasa-edge bg-mc-nasa px-5 text-sm font-semibold text-white"
+                className="min-h-11 rounded-md border border-mc-select bg-mc-select px-5 text-sm font-semibold text-mc-on-select"
               >
                 {step === n - 1 ? "See results" : "Next →"}
               </button>

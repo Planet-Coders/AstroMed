@@ -5,6 +5,7 @@ import { DEMO_SCENARIOS, type DemoScenarioId } from "@/lib/demoScenarios";
 import { worstRisk, type RiskLevel } from "@/lib/risk";
 import { useMissionTelemetry } from "@/components/MissionTelemetryProvider";
 import { useMissionMode } from "./MissionModeContext";
+import { ThemeToggle } from "./ThemeToggle";
 
 const MISSION_EPOCH = new Date("2026-01-15T00:00:00Z").getTime();
 
@@ -62,7 +63,7 @@ export function MissionHeader({
         <button
           type="button"
           onClick={onOpenMobileMenu}
-          className="flex h-8 w-8 items-center justify-center rounded-lg border border-mc-line-strong text-mc-label hover:bg-mc-raised hover:text-white lg:hidden"
+          className="flex h-8 w-8 items-center justify-center rounded-lg border border-mc-line-strong text-mc-label hover:bg-mc-raised hover:text-foreground lg:hidden"
           aria-label="Open navigation menu"
         >
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -87,7 +88,7 @@ export function MissionHeader({
       <div className="hidden lg:flex items-center gap-2 text-xs font-mono">
         <span className="text-mc-label">{mission}</span>
         <span className="text-mc-line-strong">/</span>
-        <span className="font-semibold text-white tracking-wide">{activeTabLabel ?? "Dashboard"}</span>
+        <span className="font-semibold text-foreground tracking-wide">{activeTabLabel ?? "Dashboard"}</span>
       </div>
 
       <span className={`flex items-center gap-2 rounded-full border px-3 py-1 text-[12px] font-semibold ${status.cls}`} role="status">
@@ -119,13 +120,14 @@ export function MissionHeader({
           </select>
         </label>
 
+        <ThemeToggle />
         <button
           type="button"
           onClick={async () => {
             await fetch("/api/auth/logout", { method: "POST" }).catch(() => {});
             window.location.assign("/login");
           }}
-          className="min-h-8 rounded-md border border-mc-line-strong px-3 text-xs font-medium text-mc-muted hover:text-white"
+          className="min-h-8 rounded-md border border-mc-line-strong px-3 text-xs font-medium text-mc-muted hover:text-foreground"
         >
           Sign out
         </button>

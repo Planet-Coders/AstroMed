@@ -116,7 +116,7 @@ export function OversightConsole({ user }: { user: { id: string; name: string; r
   );
 
   return (
-    <div className="flex min-h-screen flex-col bg-mc-bg font-sans text-foreground">
+    <div className="flex min-h-screen flex-col font-sans text-foreground">
       <StaffHeader user={user} active="/oversight" subtitle="Crew oversight · flight surgeon & mission control" />
       <main className="mx-auto flex w-full max-w-[1400px] flex-col gap-5 p-4 md:p-6">
         {error && <p className="rounded-md border border-mc-red/50 bg-mc-red/10 px-4 py-2.5 text-sm text-mc-red">{error}</p>}
@@ -273,7 +273,7 @@ function MemberView({ id, onBack }: { id: string; onBack: () => void }) {
   return (
     <div className="flex flex-col gap-5">
       <div className="flex flex-wrap items-center gap-4">
-        <button type="button" onClick={onBack} className="min-h-9 rounded-md border border-mc-line-strong px-3 text-xs font-medium text-mc-muted hover:text-white">
+        <button type="button" onClick={onBack} className="min-h-9 rounded-md border border-mc-line-strong px-3 text-xs font-medium text-mc-muted hover:text-foreground">
           ← Back to group
         </button>
         {detail && (
@@ -590,8 +590,8 @@ function Transcript({ memberId, name }: { memberId: string; name: string }) {
                 <div
                   className={`max-w-[80%] rounded-2xl px-3 py-2 text-sm leading-relaxed ${
                     m.role === "USER"
-                      ? "rounded-br-md border border-cyan-500/20 bg-cyan-600/25 text-cyan-50"
-                      : "rounded-bl-md border border-slate-700/50 bg-slate-800/80 text-slate-300"
+                      ? "rounded-br-md border border-mc-select bg-mc-select text-mc-on-select"
+                      : "rounded-bl-md border border-mc-line bg-mc-raised text-foreground"
                   }`}
                 >
                   <p className="mb-1 flex gap-2 font-mono text-[10px] text-mc-label">

@@ -13,7 +13,7 @@ export function Card({
 }) {
   return (
     <section
-      className={`rounded-lg border border-mc-line bg-mc-panel px-6 py-5 ${className}`}
+      className={`rounded-lg border border-mc-line bg-mc-panel px-6 py-5 shadow-[0_1px_2px_rgba(60,50,20,0.05),0_10px_28px_rgba(60,50,20,0.05)] ${className}`}
     >
       {(title || action) && (
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">

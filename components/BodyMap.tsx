@@ -29,9 +29,9 @@ const BodyMap3D = dynamic(() => import("./BodyMap3D").then((m) => m.BodyMap3D), 
 const MISSION_EPOCH = Date.UTC(2026, 0, 15);
 
 const TONE: Record<RiskLevel, { text: string; fill: string; ring: string; bg: string }> = {
-  GREEN: { text: "text-mc-green", fill: "#3ddc97", ring: "border-mc-green/50", bg: "bg-mc-green/10" },
-  YELLOW: { text: "text-mc-amber", fill: "#f5b82e", ring: "border-mc-amber/60", bg: "bg-mc-amber/10" },
-  RED: { text: "text-mc-red", fill: "#ff5d5d", ring: "border-mc-red/70", bg: "bg-mc-red/10" },
+  GREEN: { text: "text-mc-green", fill: "#0f8f5b", ring: "border-mc-green/50", bg: "bg-mc-green/10" },
+  YELLOW: { text: "text-mc-amber", fill: "#b47d08", ring: "border-mc-amber/60", bg: "bg-mc-amber/10" },
+  RED: { text: "text-mc-red", fill: "#d63c3c", ring: "border-mc-red/70", bg: "bg-mc-red/10" },
 };
 
 const FIGURE_KEY = "aahms_body_figure";
@@ -193,7 +193,7 @@ export function BodyMap({
               type="button"
               aria-pressed={figure === f}
               onClick={() => chooseFigure(f)}
-              className={`px-3 py-1.5 transition ${figure === f ? "bg-mc-select/25 text-white" : "text-mc-muted hover:bg-mc-raised"}`}
+              className={`px-3 py-1.5 transition ${figure === f ? "bg-mc-select text-mc-on-select" : "text-mc-muted hover:bg-mc-raised"}`}
             >
               {f === "male" ? "♂ Male" : "♀ Female"}
             </button>
@@ -207,7 +207,7 @@ export function BodyMap({
               setDraft(null);
             }}
             className={`rounded-md border px-3 py-1.5 text-xs font-medium transition ${
-              reporting ? "border-cyan-400 bg-cyan-500/20 text-cyan-100" : "border-mc-line-strong text-mc-soft hover:bg-mc-raised"
+              reporting ? "border-mc-cyan bg-mc-raised text-foreground" : "border-mc-line-strong text-mc-soft hover:bg-mc-raised"
             }`}
           >
             {reporting ? "Tap the body where it hurts… (cancel)" : "🩹 Report injury"}
@@ -273,7 +273,7 @@ export function BodyMap({
                       setInjuryId(null);
                     }}
                     className={`flex w-full items-center justify-between gap-3 rounded-md border px-3 py-2 text-left text-sm transition ${
-                      active.id === r.id ? "border-white/60 bg-white/10" : "border-mc-line hover:border-mc-line-strong"
+                      active.id === r.id ? "border-mc-cyan bg-mc-raised" : "border-mc-line hover:border-mc-line-strong"
                     } ${inHazard(r.id) ? "" : "opacity-40"}`}
                   >
                     <span>{r.name}</span>
@@ -288,7 +288,7 @@ export function BodyMap({
         {/* Detail panel: a new injury report, an injury's details, or the picked body system */}
         {reporting && !draft ? (
           <section aria-live="polite" className="min-w-0">
-            <div className="rounded-lg border border-cyan-500/40 bg-cyan-500/10 p-4 text-sm leading-relaxed text-mc-soft">
+            <div className="rounded-lg border border-mc-line-strong bg-mc-raised p-4 text-sm leading-relaxed text-mc-soft">
               <h3 className="text-xl font-semibold text-foreground">Where does it hurt?</h3>
               <p className="mt-2">Move over the 3D body: the label shows the area under the pointer. Tap to place the marker. Drag to turn the body if the spot is on the side or back.</p>
               <p className="mt-2 text-xs text-mc-label">Facing you, the body&apos;s right side is on your left. You can fine-tune the area from a list after tapping.</p>

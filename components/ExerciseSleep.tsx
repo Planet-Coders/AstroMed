@@ -113,7 +113,7 @@ export function ExerciseSleep() {
         <button
           type="button"
           onClick={speak}
-          className="min-h-9 rounded-md border border-mc-line-strong bg-[#0f182b] px-3.5 text-[13px] font-medium hover:bg-mc-raised"
+          className="min-h-9 rounded-md border border-mc-line-strong bg-mc-inset px-3.5 text-[13px] font-medium hover:bg-mc-raised"
         >
           🔊 Voice reminder
         </button>
@@ -145,7 +145,7 @@ export function ExerciseSleep() {
 
 function SourceTag({ source }: { source: "sensor" | "manual" }) {
   return source === "sensor" ? (
-    <span className="rounded border border-[#1f4470] px-1.5 py-0.5 font-mono text-[10px] text-mc-link">✓ ACCEL + HRV</span>
+    <span className="rounded border border-mc-line-strong px-1.5 py-0.5 font-mono text-[10px] text-mc-link">✓ ACCEL + HRV</span>
   ) : (
     <span className="rounded border border-mc-line-strong px-1.5 py-0.5 font-mono text-[10px] text-mc-label">MANUAL</span>
   );

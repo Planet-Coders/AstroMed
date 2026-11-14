@@ -106,7 +106,7 @@ export function PeriodPanel({ name }: { name: string }) {
                     type="button"
                     aria-pressed={flow === f}
                     onClick={() => setFlow(f)}
-                    className={`px-2.5 py-1.5 capitalize ${flow === f ? "bg-pink-500/25 text-white" : "text-mc-muted hover:bg-mc-raised"}`}
+                    className={`px-2.5 py-1.5 capitalize ${flow === f ? "bg-pink-500/20 text-foreground" : "text-mc-muted hover:bg-mc-raised"}`}
                   >
                     {f}
                   </button>
@@ -128,7 +128,7 @@ export function PeriodPanel({ name }: { name: string }) {
                   aria-pressed={on}
                   onClick={() => setSymptoms((cur) => (on ? cur.filter((x) => x !== sym) : [...cur, sym]))}
                   className={`rounded-full border px-2.5 py-1 text-[11px] ${
-                    on ? "border-pink-400 bg-pink-500/20 text-white" : "border-mc-line text-mc-muted hover:border-mc-line-strong"
+                    on ? "border-pink-400 bg-pink-500/15 text-foreground" : "border-mc-line text-mc-muted hover:border-mc-line-strong"
                   }`}
                 >
                   {sym}
@@ -140,7 +140,7 @@ export function PeriodPanel({ name }: { name: string }) {
             <button type="submit" className="rounded-md border border-pink-400/60 bg-pink-500/15 px-4 py-1.5 text-sm text-pink-100 hover:bg-pink-500/25">
               Save day
             </button>
-            <button type="button" onClick={() => setOpen(false)} className="px-3 py-1.5 text-xs text-mc-label hover:text-white">
+            <button type="button" onClick={() => setOpen(false)} className="px-3 py-1.5 text-xs text-mc-label hover:text-foreground">
               Cancel
             </button>
           </div>
@@ -180,7 +180,7 @@ function Stat({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-md border border-mc-line bg-mc-inset px-2 py-1.5">
       <div className="text-[10px] uppercase tracking-wider text-mc-label">{label}</div>
-      <div className="text-slate-100">{value}</div>
+      <div className="text-foreground">{value}</div>
     </div>
   );
 }

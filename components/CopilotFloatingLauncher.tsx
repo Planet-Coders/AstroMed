@@ -32,7 +32,7 @@ export function CopilotFloatingLauncher() {
             <button
               type="button"
               onClick={() => setChatOpen(false)}
-              className="absolute -right-2 -top-2 z-10 flex h-7 w-7 items-center justify-center rounded-full border border-slate-600 bg-slate-800 text-sm text-slate-300 shadow-lg hover:bg-slate-700"
+              className="absolute -right-2 -top-2 z-10 flex h-7 w-7 items-center justify-center rounded-full border border-mc-line-strong bg-mc-panel text-sm text-foreground shadow-lg hover:bg-mc-raised"
               aria-label="Close chat"
             >
               ×
@@ -59,10 +59,10 @@ export function CopilotFloatingLauncher() {
       <button
         type="button"
         onClick={toggleChat}
-        className={`fixed bottom-4 right-4 sm:right-6 z-40 flex items-center gap-2 rounded-full px-4 py-3 text-sm font-medium shadow-lg shadow-cyan-900/40 transition ${
+        className={`fixed bottom-4 right-4 sm:right-6 z-40 flex items-center gap-2 rounded-full px-4 py-3 text-sm font-medium shadow-lg shadow-[0_8px_24px_rgba(60,50,20,0.12)] transition ${
           chatOpen
-            ? "border border-cyan-500/50 bg-slate-800 text-cyan-200"
-            : "border border-cyan-500/40 bg-cyan-600 text-white hover:bg-cyan-500"
+            ? "border border-mc-line-strong bg-mc-panel text-foreground"
+            : "border border-mc-select bg-mc-select text-mc-on-select hover:bg-mc-soft"
         }`}
         aria-expanded={chatOpen}
         aria-label={chatOpen ? "Close co-pilot chat" : "Ask co-pilot"}

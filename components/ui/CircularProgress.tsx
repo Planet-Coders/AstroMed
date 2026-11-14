@@ -4,8 +4,8 @@ export function CircularProgress({
   size = 120,
   strokeWidth = 8,
   percent,
-  trackClassName = "stroke-slate-800",
-  progressClassName = "stroke-cyan-400",
+  trackClassName = "stroke-mc-line",
+  progressClassName = "stroke-mc-cyan",
   children,
 }: {
   size?: number;
