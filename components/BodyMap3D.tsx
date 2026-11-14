@@ -197,10 +197,13 @@ export function canUseWebGL(): boolean {
   if (cachedWebGL !== null) return cachedWebGL;
   try {
     const c = document.createElement("canvas");
-    const gl = c.getContext("webgl2") || c.getContext("webgl");
+    const gl =
+      c.getContext("webgl2", { failIfMajorPerformanceCaveat: false }) ||
+      c.getContext("webgl", { failIfMajorPerformanceCaveat: false }) ||
+      c.getContext("experimental-webgl", { failIfMajorPerformanceCaveat: false });
     cachedWebGL = !!gl;
-    if (gl) {
-      gl.getExtension("WEBGL_lose_context")?.loseContext();
+    if (gl && "getExtension" in gl) {
+      (gl as WebGLRenderingContext).getExtension("WEBGL_lose_context")?.loseContext();
     }
   } catch {
     cachedWebGL = false;
@@ -318,7 +321,12 @@ export function BodyMap3D({ figure, regions, activeId, dimmed, onPick, placing, 
     const wrap = wrapRef.current;
     if (!host || !wrap) return;
 
-    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+    const renderer = new THREE.WebGLRenderer({
+      antialias: true,
+      alpha: true,
+      failIfMajorPerformanceCaveat: false,
+      powerPreference: "default",
+    });
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     host.appendChild(renderer.domElement);
     renderer.domElement.style.display = "block";

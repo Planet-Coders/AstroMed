@@ -181,20 +181,23 @@ export function BodyMap({
           </span>
           <span className="capitalize">{figure} scan</span>
         </span>
-        {webgl && (
-          <button
-            type="button"
-            onClick={() => {
+        <button
+          type="button"
+          onClick={() => {
+            if (!webgl && !reporting && !draft) {
+              setDraft({ x: 0, y: 25, area: "Chest" });
+              setReporting(false);
+            } else {
               setReporting((r) => !r);
               setDraft(null);
-            }}
-            className={`rounded-md border px-3 py-1.5 text-xs font-medium transition ${
-              reporting ? "border-mc-cyan bg-mc-raised text-foreground" : "border-mc-line-strong text-mc-soft hover:bg-mc-raised"
-            }`}
-          >
-            {reporting ? "Tap the body where it hurts… (cancel)" : "🩹 Report injury"}
-          </button>
-        )}
+            }
+          }}
+          className={`rounded-md border px-3 py-1.5 text-xs font-medium transition ${
+            reporting || draft ? "border-mc-cyan bg-mc-raised text-foreground" : "border-mc-line-strong text-mc-soft hover:bg-mc-raised"
+          }`}
+        >
+          {reporting || draft ? "Cancel report" : "🩹 Report injury"}
+        </button>
         {activeInjuries.length > 0 && (
           <span className="text-xs text-mc-amber">
             {activeInjuries.length} active injur{activeInjuries.length === 1 ? "y" : "ies"}:{" "}
@@ -243,8 +246,21 @@ export function BodyMap({
           />
         ) : (
           <div className="rounded-xl border border-mc-line bg-mc-inset p-4">
-            <p className="text-xs text-mc-label">This browser can&apos;t show the 3D body. Pick a body system:</p>
-            <ul className="mt-3 grid gap-2">
+            <div className="mb-4 rounded-lg border border-mc-amber/50 bg-mc-amber/10 p-3.5 text-xs leading-relaxed text-mc-soft">
+              <p className="font-semibold text-mc-amber mb-1">WebGL / 3D Graphics Unavailable in This Browser</p>
+              <p>
+                Your browser reported <span className="font-mono text-mc-amber text-[11px]">Failed to create WebGPU / WebGL context</span>.
+                This occurs when hardware graphics acceleration is disabled.
+              </p>
+              <p className="mt-2 text-foreground font-medium">To restore the 3D body map and co-pilot GPU features:</p>
+              <ol className="mt-1 list-decimal list-inside space-y-1 text-mc-muted text-[11px]">
+                <li>Open browser settings (<code className="text-mc-cyan font-mono">chrome://settings/system</code> or <code className="text-mc-cyan font-mono">edge://settings/system</code>)</li>
+                <li>Turn ON <strong className="text-foreground">&ldquo;Use graphics acceleration when available&rdquo;</strong></li>
+                <li>Relaunch the browser</li>
+              </ol>
+            </div>
+            <p className="text-xs text-mc-label mb-2">You can still inspect all body systems and log injuries below:</p>
+            <ul className="grid gap-2">
               {regions.map((r) => (
                 <li key={r.id}>
                   <button
