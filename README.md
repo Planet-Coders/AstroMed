@@ -2,6 +2,8 @@
 
 **Live demo:** https://astro-med-ashy.vercel.app
 
+jih
+
 A NASA Space Apps Challenge prototype: a self-assessment health console for astronauts on long missions. Our scenario is the MTV-1 Mars transit, 20 light-minutes from Earth.
 
 Crew members measure their own health and see colour-coded results with plain-language explanations. When something is wrong, an on-device AI co-pilot tells them what to do, and it keeps working when the link to Earth is down.
