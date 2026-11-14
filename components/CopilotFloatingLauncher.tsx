@@ -24,7 +24,7 @@ export function CopilotFloatingLauncher() {
     <>
       {chatOpen && (
         <div
-          className="fixed bottom-20 left-4 z-[100] w-[min(calc(100vw-2rem),400px)]"
+          className="fixed bottom-20 right-4 sm:right-6 z-40 w-[min(calc(100vw-2rem),400px)]"
           role="dialog"
           aria-label="Flight Surgeon Co-Pilot chat"
         >
@@ -59,7 +59,7 @@ export function CopilotFloatingLauncher() {
       <button
         type="button"
         onClick={toggleChat}
-        className={`fixed bottom-4 left-4 z-[100] flex items-center gap-2 rounded-full px-4 py-3 text-sm font-medium shadow-lg shadow-cyan-900/40 transition ${
+        className={`fixed bottom-4 right-4 sm:right-6 z-40 flex items-center gap-2 rounded-full px-4 py-3 text-sm font-medium shadow-lg shadow-cyan-900/40 transition ${
           chatOpen
             ? "border border-cyan-500/50 bg-slate-800 text-cyan-200"
             : "border border-cyan-500/40 bg-cyan-600 text-white hover:bg-cyan-500"
