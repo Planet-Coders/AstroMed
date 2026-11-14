@@ -50,9 +50,20 @@ export async function queueHealth(kind: OutboxHealth["kind"], key: string, data:
 }
 
 let flushing: Promise<void> | null = null;
+let flushAgain = false;
+export const HEALTH_REPORTS_SYNCED = "astromed:health-reports-synced";
 
 export function flushOutbox(): Promise<void> {
-  flushing ??= doFlush().finally(() => {
+  if (flushing) {
+    flushAgain = true;
+    return flushing;
+  }
+  flushing = (async () => {
+    do {
+      flushAgain = false;
+      await doFlush();
+    } while (flushAgain);
+  })().finally(() => {
     flushing = null;
   });
   return flushing;
@@ -76,6 +87,7 @@ async function send<T extends OutboxItem>(items: T[], url: string, field: string
       if (current && current.createdAt === item.createdAt) await db.outbox.delete(item.id);
     }
   });
+  if (field === "reports" && saved.length) window.dispatchEvent(new Event(HEALTH_REPORTS_SYNCED));
 }
 
 async function doFlush() {
