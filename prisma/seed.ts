@@ -1,6 +1,7 @@
 import { PrismaClient, Role } from "@prisma/client";
 import bcrypt from "bcryptjs";
 import { refreshNasaStudies } from "../lib/osdrStore";
+import { ensureCrewBaseline } from "../lib/monitoring/crewBaseline";
 
 const prisma = new PrismaClient();
 
@@ -169,27 +170,8 @@ async function main() {
       },
     });
 
-    if (u.vitals) {
-      const existing = await prisma.biometricRecord.findFirst({
-        where: { userId: user.id },
-      });
-      if (!existing) {
-        const now = new Date();
-        for (let i = 0; i < 12; i++) {
-          await prisma.biometricRecord.create({
-            data: {
-              id: `seed-${user.id}-${i}`,
-              userId: user.id,
-              heartRate: u.vitals.heartRate + Math.floor(Math.random() * 6 - 3),
-              hrv: u.vitals.hrv + Math.random() * 4 - 2,
-              spo2: u.vitals.spo2,
-              radiation: u.vitals.radiation,
-              synced: true,
-              timestamp: new Date(now.getTime() - i * 3600_000),
-            },
-          });
-        }
-      }
+    if (u.role === Role.ASTRONAUT) {
+      await ensureCrewBaseline(prisma, user.id);
     }
   }
 
