@@ -7,6 +7,7 @@ import type { RiskLevel } from "@/lib/risk";
 import { riskLabel } from "@/lib/risk";
 import type { RegionId, RegionStatus } from "@/lib/bodyMap";
 import { BODY_JOINTS, BODY_MODEL_SCALE } from "@/lib/bodyModelJoints";
+import { frontToModel, modelToFront } from "@/lib/bodyModelMapping";
 
 type Figure = "male" | "female";
 
@@ -252,15 +253,26 @@ function limb(a: THREE.Vector3, b: THREE.Vector3, r: number) {
   return geo;
 }
 
+export type InjuryMarker = { id: string; x: number; y: number; color: string; pulse: boolean; healed: boolean; label: string };
+
 type Props = {
   figure: Figure;
   regions: RegionStatus[];
   activeId: RegionId;
   dimmed: (id: RegionId) => boolean;
   onPick: (id: RegionId) => void;
+  /** Report mode: tapping the body places an injury marker instead of picking a system. */
+  placing: boolean;
+  /** Injury markers, positioned in the front-view % space used by lib/injuries. */
+  injuries: InjuryMarker[];
+  selectedInjury: string | null;
+  draft: { x: number; y: number; area: string } | null;
+  areaLabel: (x: number, y: number) => string;
+  onPlace: (x: number, y: number) => void;
+  onPickInjury: (id: string) => void;
 };
 
-export function BodyMap3D({ figure, regions, activeId, dimmed, onPick }: Props) {
+export function BodyMap3D({ figure, regions, activeId, dimmed, onPick, placing, injuries, selectedInjury, draft, areaLabel, onPlace, onPickInjury }: Props) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const canvasHost = useRef<HTMLDivElement>(null);
   const svgRef = useRef<SVGSVGElement>(null);
@@ -271,11 +283,24 @@ export function BodyMap3D({ figure, regions, activeId, dimmed, onPick }: Props) 
   const levelsRef = useRef<Record<RegionId, RiskLevel>>({} as Record<RegionId, RiskLevel>);
   const activeRef = useRef(activeId);
   const pickRef = useRef(onPick);
+  const placingRef = useRef(placing);
+  const injuriesRef = useRef(injuries);
+  const draftRef = useRef(draft);
+  const areaLabelRef = useRef(areaLabel);
+  const placeRef = useRef(onPlace);
+  const markerRefs = useRef<Record<string, HTMLButtonElement | null>>({});
+  const draftElRef = useRef<HTMLDivElement>(null);
+  const hoverElRef = useRef<HTMLDivElement>(null);
   // The render loop reads the latest props through refs, so it never restarts on a status change.
   useEffect(() => {
     levelsRef.current = Object.fromEntries(regions.map((r) => [r.id, r.level])) as Record<RegionId, RiskLevel>;
     activeRef.current = activeId;
     pickRef.current = onPick;
+    placingRef.current = placing;
+    injuriesRef.current = injuries;
+    draftRef.current = draft;
+    areaLabelRef.current = areaLabel;
+    placeRef.current = onPlace;
   });
   const levelKey = regions.map((r) => r.level).join(",");
 
@@ -319,6 +344,8 @@ export function BodyMap3D({ figure, regions, activeId, dimmed, onPick }: Props) 
     const body = new THREE.Group();
     scene.add(body);
     let disposed = false;
+    let skinMesh: THREE.Mesh | null = null;
+    let skinPos: Float32Array | null = null;
     loadBodyModel()
       .then((model) => {
         if (disposed) return;
@@ -330,6 +357,9 @@ export function BodyMap3D({ figure, regions, activeId, dimmed, onPick }: Props) 
         const lines = new THREE.LineSegments(wire, track(wireMaterial(HOLO, 0.2)));
         skin.renderOrder = back.renderOrder = lines.renderOrder = -1;
         body.add(back, skin, lines);
+        skinMesh = skin;
+        skinPos = model[figure];
+        markerCache.clear();
       })
       .catch(() => {
         // Without the surface mesh the skeleton and organs below still show.
@@ -531,19 +561,79 @@ export function BodyMap3D({ figure, regions, activeId, dimmed, onPick }: Props) 
       sprites.set(id, s);
     }
 
-    // Click a hotspot in the scene to pick it (ignoring drags).
+    // Injury markers sit on the skin: find the surface point in front of a stored front-view spot.
+    const markerCache = new Map<string, THREE.Vector3>();
+    const frontRay = new THREE.Raycaster();
+    const markerPos = (x: number, y: number) => {
+      const key = `${x}:${y}`;
+      const hit = markerCache.get(key);
+      if (hit) return hit;
+      const m = frontToModel(figure, { x, y });
+      let p = new THREE.Vector3(m.x, m.y, 0.12);
+      if (skinMesh) {
+        frontRay.set(new THREE.Vector3(m.x, m.y, 3), new THREE.Vector3(0, 0, -1));
+        const h = frontRay.intersectObject(skinMesh)[0];
+        if (h) p = h.point.clone();
+        else if (skinPos) {
+          // Between the limbs: snap to the nearest point of the skin.
+          let best = Infinity;
+          for (let i = 0; i < skinPos.length; i += 3) {
+            const d = (skinPos[i] - m.x) ** 2 + (skinPos[i + 1] - m.y) ** 2 - skinPos[i + 2] * 0.01;
+            if (d < best) {
+              best = d;
+              p = new THREE.Vector3(skinPos[i], skinPos[i + 1], skinPos[i + 2]);
+            }
+          }
+        }
+        markerCache.set(key, p);
+      }
+      return p;
+    };
+
+    // Report mode: a ring follows the pointer over the skin and shows the area underneath.
+    const cursorM = track(new THREE.SpriteMaterial({ map: tex, color: 0x9ff3ff, transparent: true, depthTest: false, blending: THREE.AdditiveBlending }));
+    const cursor = new THREE.Sprite(cursorM);
+    cursor.scale.setScalar(0.07);
+    cursor.renderOrder = 11;
+    cursor.visible = false;
+    body.add(cursor);
+    let hoverAt: THREE.Vector3 | null = null;
+
+    // Click a hotspot to pick it, or the skin to place an injury (ignoring drags).
     const ray = new THREE.Raycaster();
+    const ndc = (e: PointerEvent) => {
+      const r = renderer.domElement.getBoundingClientRect();
+      return new THREE.Vector2(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
+    };
+    const skinHit = (e: PointerEvent) => {
+      if (!skinMesh) return null;
+      ray.setFromCamera(ndc(e), camera);
+      return ray.intersectObject(skinMesh)[0]?.point ?? null;
+    };
     let down: { x: number; y: number } | null = null;
     const onDown = (e: PointerEvent) => (down = { x: e.clientX, y: e.clientY });
+    const onMove = (e: PointerEvent) => {
+      hoverAt = placingRef.current && !e.buttons ? skinHit(e) : null;
+    };
+    const onLeave = () => (hoverAt = null);
     const onUp = (e: PointerEvent) => {
       if (!down || Math.hypot(e.clientX - down.x, e.clientY - down.y) > 5) return;
-      const r = renderer.domElement.getBoundingClientRect();
-      ray.setFromCamera(new THREE.Vector2(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1), camera);
+      if (placingRef.current) {
+        const p = skinHit(e);
+        if (p) {
+          const f = modelToFront(figure, p);
+          placeRef.current(f.x, f.y);
+        }
+        return;
+      }
+      ray.setFromCamera(ndc(e), camera);
       const hit = ray.intersectObjects([...sprites.values()])[0];
       if (hit) pickRef.current(hit.object.userData.id as RegionId);
     };
     renderer.domElement.addEventListener("pointerdown", onDown);
     renderer.domElement.addEventListener("pointerup", onUp);
+    renderer.domElement.addEventListener("pointermove", onMove);
+    renderer.domElement.addEventListener("pointerleave", onLeave);
 
     let w = 0;
     let h = 0;
@@ -583,6 +673,56 @@ export function BodyMap3D({ figure, regions, activeId, dimmed, onPick }: Props) 
         m.uniforms.uColor.value.setHex(LEVEL_HEX[levelsRef.current[id] ?? "GREEN"]);
       }
 
+      const placingNow = placingRef.current;
+      renderer.domElement.style.cursor = placingNow ? (hoverAt ? "crosshair" : "grab") : "";
+
+      // Screen position of a point on the body, and whether it faces the camera.
+      const toScreen = (p: THREE.Vector3) => {
+        tmp.copy(p);
+        body.localToWorld(tmp);
+        center.set(0, tmp.y, 0);
+        toCam.copy(camera.position).sub(center);
+        const facing = tmp.clone().sub(center).dot(toCam) >= -0.002;
+        tmp.project(camera);
+        return { x: (tmp.x * 0.5 + 0.5) * w, y: (-tmp.y * 0.5 + 0.5) * h, facing };
+      };
+
+      // Injury markers and the one being placed.
+      for (const m of injuriesRef.current) {
+        const el = markerRefs.current[m.id];
+        if (!el) continue;
+        const s = toScreen(markerPos(m.x, m.y));
+        el.style.transform = `translate(${s.x}px, ${s.y}px) translate(-50%, -50%)`;
+        el.style.visibility = "visible";
+        el.style.opacity = s.facing ? "" : "0.35";
+      }
+      const dEl = draftElRef.current;
+      const d = draftRef.current;
+      if (dEl) {
+        if (d) {
+          const s = toScreen(markerPos(d.x, d.y));
+          dEl.style.transform = `translate(${s.x}px, ${s.y}px)`;
+          dEl.style.visibility = "visible";
+          dEl.style.opacity = s.facing ? "" : "0.5";
+        } else dEl.style.visibility = "hidden";
+      }
+      const hEl = hoverElRef.current;
+      cursor.visible = !!hoverAt;
+      if (hoverAt) {
+        cursor.position.copy(hoverAt);
+        cursor.scale.setScalar(0.06 + Math.sin(t * 6) * 0.008);
+      }
+      if (hEl) {
+        if (hoverAt) {
+          const s = toScreen(hoverAt);
+          const f = modelToFront(figure, hoverAt);
+          hEl.textContent = areaLabelRef.current(f.x, f.y);
+          const flip = s.x > w * 0.6;
+          hEl.style.transform = `translate(${s.x + (flip ? -14 : 14)}px, ${s.y}px) translate(${flip ? "-100%" : "0"}, -50%)`;
+          hEl.style.visibility = "visible";
+        } else hEl.style.visibility = "hidden";
+      }
+
       // Callouts: project each hotspot to the screen and draw a leader line to its label.
       const labelsLeft: Array<[RegionId, number, number, boolean]> = [];
       const labelsRight: Array<[RegionId, number, number, boolean]> = [];
@@ -592,6 +732,7 @@ export function BodyMap3D({ figure, regions, activeId, dimmed, onPick }: Props) 
         const on = activeRef.current === id;
         const pulse = lv === "GREEN" ? 1 : 1 + Math.sin(t * 5) * 0.25;
         s.scale.setScalar((on ? 0.11 : 0.085) * pulse);
+        s.visible = !placingNow;
         s.getWorldPosition(tmp);
         center.set(0, tmp.y, 0);
         toCam.copy(camera.position).sub(center);
@@ -619,11 +760,14 @@ export function BodyMap3D({ figure, regions, activeId, dimmed, onPick }: Props) 
           const line = lineRefs.current[id];
           const dot = dotRefs.current[id];
           if (!el || !line || !dot) return;
+          // While placing an injury the callouts step aside so the whole body is free to tap.
+          el.style.visibility = placingNow ? "hidden" : "visible";
+          line.style.visibility = dot.style.visibility = placingNow ? "hidden" : "visible";
+          if (placingNow) return;
           const ly = ys[i];
           const lw = el.offsetWidth;
           const lx = side === "left" ? 8 : w - lw - 8;
           el.style.transform = `translate(${lx}px, ${ly - el.offsetHeight / 2}px)`;
-          el.style.visibility = "visible";
           el.style.opacity = facing ? "" : "0.45";
           const edge = side === "left" ? lx + lw : lx;
           const elbow = side === "left" ? Math.min(x - 18, edge + 24) : Math.max(x + 18, edge - 24);
@@ -646,6 +790,8 @@ export function BodyMap3D({ figure, regions, activeId, dimmed, onPick }: Props) 
       ro.disconnect();
       renderer.domElement.removeEventListener("pointerdown", onDown);
       renderer.domElement.removeEventListener("pointerup", onUp);
+      renderer.domElement.removeEventListener("pointermove", onMove);
+      renderer.domElement.removeEventListener("pointerleave", onLeave);
       controls.dispose();
       for (const d of disposables) d.dispose();
       renderer.dispose();
@@ -656,7 +802,7 @@ export function BodyMap3D({ figure, regions, activeId, dimmed, onPick }: Props) 
   return (
     <div
       ref={wrapRef}
-      className="relative h-[560px] w-full select-none overflow-hidden rounded-xl border border-cyan-400/30 bg-[radial-gradient(ellipse_at_50%_35%,#0d2a3f_0%,#071423_55%,#050b16_100%)] shadow-[inset_0_0_40px_rgba(56,232,255,0.08)] sm:h-[620px]"
+      className={`relative h-[560px] w-full select-none overflow-hidden rounded-xl border border-cyan-400/30 bg-[radial-gradient(ellipse_at_50%_35%,#0d2a3f_0%,#071423_55%,#050b16_100%)] shadow-[inset_0_0_40px_rgba(56,232,255,0.08)] sm:h-[620px] ${placing ? "ring-2 ring-cyan-400/60" : ""}`}
       data-levels={levelKey}
     >
       {/* faint grid */}
@@ -727,8 +873,39 @@ export function BodyMap3D({ figure, regions, activeId, dimmed, onPick }: Props) 
           </button>
         );
       })}
-      <div className="pointer-events-none absolute bottom-2 left-1/2 -translate-x-1/2 font-mono text-[10px] uppercase tracking-[0.2em] text-cyan-200/60">
-        Drag to rotate · scroll to zoom
+      {injuries.map((m) => (
+        <button
+          key={m.id}
+          ref={(el) => {
+            markerRefs.current[m.id] = el;
+          }}
+          type="button"
+          aria-label={m.label}
+          title={m.label}
+          onClick={() => onPickInjury(m.id)}
+          className={`absolute left-0 top-0 z-10 flex h-6 w-6 items-center justify-center rounded-full border-2 text-[11px] text-slate-900 shadow transition-opacity ${
+            selectedInjury === m.id ? "border-white" : "border-black/50"
+          } ${m.healed ? "opacity-50" : ""} ${placing ? "pointer-events-none !opacity-40" : ""}`}
+          style={{ background: m.color, visibility: "hidden" }}
+        >
+          {m.pulse && <span className="absolute inset-0 animate-ping rounded-full opacity-50" style={{ background: m.color }} />}
+          <span className="relative">✚</span>
+        </button>
+      ))}
+      <div ref={draftElRef} className="pointer-events-none absolute left-0 top-0 z-10" style={{ visibility: "hidden" }} aria-hidden>
+        <span className="absolute h-6 w-6 -translate-x-1/2 -translate-y-1/2 animate-pulse rounded-full border-2 border-dashed border-cyan-300 bg-cyan-300/20" />
+        {draft && (
+          <span className="absolute left-4 -translate-y-1/2 whitespace-nowrap rounded bg-white px-2 py-0.5 text-[11px] font-semibold text-slate-900">{draft.area}</span>
+        )}
+      </div>
+      <div
+        ref={hoverElRef}
+        className="pointer-events-none absolute left-0 top-0 z-20 whitespace-nowrap rounded bg-cyan-400 px-2 py-0.5 text-[11px] font-semibold text-slate-900"
+        style={{ visibility: "hidden" }}
+        aria-hidden
+      />
+      <div className="pointer-events-none absolute bottom-2 left-1/2 -translate-x-1/2 whitespace-nowrap font-mono text-[10px] uppercase tracking-[0.2em] text-cyan-200/60">
+        {placing ? "Tap where it hurts · drag to turn" : "Drag to rotate · scroll to zoom"}
       </div>
       <button
         type="button"
