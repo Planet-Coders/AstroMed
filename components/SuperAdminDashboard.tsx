@@ -32,6 +32,8 @@ import { MonitoringView } from "./monitoring/MonitoringView";
 import { NasaOsdrPanel } from "./NasaOsdrPanel";
 import { SpaceCatView } from "./spacecat/SpaceCatView";
 import { FloatingCat } from "./spacecat/FloatingCat";
+import { CrewHotline } from "./hotline/CrewHotline";
+import { useHotlineUnread } from "./hotline/useHotlineUnread";
 import { useMissionTelemetry } from "@/components/MissionTelemetryProvider";
 
 type DashboardResponse = {
@@ -175,6 +177,7 @@ export function SuperAdminDashboard({ user }: { user: SessionUser }) {
     user.role === "ASTRONAUT" && selectedId === user.userId;
 
   const missions = useHealthMissions(user.userId);
+  const hotlineUnread = useHotlineUnread(user.role === "ASTRONAUT", tab === "hotline");
 
   const tabs = [
     { id: "telemetry", label: seesCrew ? "Crew vitals" : "My vitals" },
@@ -185,6 +188,7 @@ export function SuperAdminDashboard({ user }: { user: SessionUser }) {
     { id: "habitat", label: "Habitat & routine" },
     { id: "pvt", label: "Cognitive test" },
     { id: "queue", label: "Sync queue", badge: unsyncedCount || undefined },
+    ...(user.role === "ASTRONAUT" ? [{ id: "hotline", label: "Hotline", badge: hotlineUnread || undefined }] : []),
     { id: "spacecat", label: "Space cat" },
   ];
 
@@ -343,6 +347,15 @@ export function SuperAdminDashboard({ user }: { user: SessionUser }) {
                 )}
                 {tab === "pvt" && <PVTTest />}
                 {tab === "queue" && <StoreForwardQueue />}
+                {tab === "hotline" && (
+                  <CrewHotline
+                    vitals={
+                      selectedId === user.userId
+                        ? { heartRate: selectedHr, spo2: selectedServer?.spo2 ?? 98, hrv: selectedHrv, radiation: telemetry.radiation }
+                        : null
+                    }
+                  />
+                )}
                 {tab === "spacecat" && (
                   <SpaceCatView
                     userId={user.userId}

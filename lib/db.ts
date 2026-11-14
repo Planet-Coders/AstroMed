@@ -29,13 +29,25 @@ export interface OutboxHealth {
   recordedAt: number;
 }
 
+/** A hotline message to Earth waiting to be sent (id doubles as the server's clientId). */
+export interface OutboxHotline {
+  id: string;
+  clientId: string;
+  body: string;
+  urgency: "ROUTINE" | "URGENT" | "EMERGENCY";
+  vitals: unknown;
+  delaySeconds: number;
+  createdAt: number;
+}
+
 /**
  * Store-and-forward queue for things other than vitals. Items are written here first and
  * removed once the server confirms them, so nothing is lost offline or on a failed request.
  */
 export type OutboxItem =
   | { id: string; userId: string; type: "chat"; createdAt: number; payload: OutboxChat }
-  | { id: string; userId: string; type: "health"; createdAt: number; payload: OutboxHealth };
+  | { id: string; userId: string; type: "health"; createdAt: number; payload: OutboxHealth }
+  | { id: string; userId: string; type: "hotline"; createdAt: number; payload: OutboxHotline };
 
 export class AAHMSDatabase extends Dexie {
   vitals!: Table<VitalRecord, string>;
