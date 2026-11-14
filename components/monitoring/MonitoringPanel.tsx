@@ -98,7 +98,7 @@ export function MonitoringPanel({ data, onDays, loading }: { data: MonitoringDat
               type="button"
               onClick={() => onDays(d)}
               aria-pressed={data.days === d}
-              className={`min-h-8 rounded-md px-3 text-xs ${data.days === d ? "bg-mc-nasa font-semibold text-white" : "font-medium text-mc-muted hover:text-white"}`}
+              className={`min-h-8 rounded-md px-3 text-xs ${data.days === d ? "bg-mc-select font-semibold text-mc-on-select" : "font-medium text-mc-muted hover:text-foreground"}`}
             >
               {d} days
             </button>

@@ -46,7 +46,7 @@ export function WarpScene({
       y: (Math.random() - 0.5) * 2000,
       z: Math.random() * DEPTH,
       pz: 0,
-      tint: Math.random() < 0.12 ? "#ffb48a" : Math.random() < 0.2 ? "#9fd3ff" : "#eef3ff",
+      tint: Math.random() < 0.12 ? "#c4920a" : Math.random() < 0.2 ? "#8a6a10" : "#5c5346",
     }));
     stars.forEach((s) => (s.pz = s.z));
 
@@ -72,8 +72,12 @@ export function WarpScene({
       cx += (px * w * 0.12 - cx) * 0.05;
       cy += (py * h * 0.12 - cy) * 0.05;
 
-      // Trails: translucent clear leaves streaks at warp speed.
-      ctx.fillStyle = `rgba(3,5,12,${speed > 6 ? 0.35 : 1})`;
+      // Trails: translucent clear leaves streaks at warp speed. Color follows the active theme.
+      const wash = getComputedStyle(document.documentElement);
+      const wr = wash.getPropertyValue("--warp-r").trim() || "244";
+      const wg = wash.getPropertyValue("--warp-g").trim() || "239";
+      const wb = wash.getPropertyValue("--warp-b").trim() || "228";
+      ctx.fillStyle = `rgba(${wr},${wg},${wb},${speed > 6 ? 0.35 : 1})`;
       ctx.fillRect(0, 0, w, h);
 
       const ox = w / 2 - cx, oy = h * 0.42 - cy;
@@ -128,11 +132,10 @@ export function WarpScene({
   }, []);
 
   return (
-    <div className="pointer-events-none fixed inset-0 overflow-hidden bg-[#03050c]" aria-hidden>
+    <div className="pointer-events-none fixed inset-0 overflow-hidden bg-background" aria-hidden>
       <canvas ref={canvasRef} className="absolute inset-0 h-full w-full" />
 
-      {/* Nebula haze */}
-      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_20%_20%,rgba(99,102,241,0.18),transparent_55%),radial-gradient(ellipse_at_80%_10%,rgba(56,189,248,0.10),transparent_50%)]" />
+      <div className="theme-loading-glow absolute inset-0" />
 
       {/* Mars on approach, lower right */}
       {planet && (

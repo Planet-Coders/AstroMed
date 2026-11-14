@@ -1,6 +1,9 @@
 # AstroMed · Astronaut Health Monitoring Console
 
+hii
 **Live demo:** https://astro-med-ashy.vercel.app
+
+jih
 
 A NASA Space Apps Challenge prototype: a self-assessment health console for astronauts on long missions. Our scenario is the MTV-1 Mars transit, 20 light-minutes from Earth.
 
@@ -12,25 +15,27 @@ On the ground, a **super admin** sets up mission groups and crew accounts, and *
 
 ## How it meets the challenge
 
-| Challenge asks for | AstroMed |
-|---|---|
-| Astronauts assess their own health | Each crew member signs in to their own console, takes a guided **Daily self-check**, and sees their own vitals |
-| Indicators: blood pressure, heart rate, blood sugar, temperature, sleep, mood | All six, plus HRV, SpO₂, radiation dose, cabin CO₂, exercise and a reaction-time test |
-| Guidance on treatment and improvement | Advice on every reading, plus an **AI co-pilot** with ISS-style protocols, crew baselines and the medicine kit |
-| When to involve crew or flight surgeons | Daily Check shows follow-up guidance on flagged readings, and **Crew oversight** shows synced monitoring alerts for assigned groups |
-| Managing many crews | A **Super admin console** creates mission groups and astronaut accounts, and decides which groups each oversight user can see |
-| NASA HRP's five hazards | **RIDGE strip** (Radiation, Isolation, Distance, Gravity, hostile Environment), linked to the body systems each one affects |
-| Clickable human figure | **Body map**: brain, eyes, heart, lungs, blood, bones & muscles and reproductive health, each with status, what it does, how space affects it and what to do |
-| Prompts and routine | Morning self-check banner, exercise and sleep voice reminders |
-| Gamification | **Health missions** with points, streaks and mission patches |
-| Charts over time | Live ECG, 24 h HRV trend, exercise and sleep progress |
-| Colour coding | Green / amber / red everywhere, following NASA-STD-3001 caution & warning colours |
-| Simple instructions | Each measurement has numbered "how to measure" steps and a "why this matters in space" note |
+| Challenge asks for                                                            | AstroMed                                                                                                                                                     |
+| ----------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Astronauts assess their own health                                            | Each crew member signs in to their own console, takes a guided **Daily self-check**, and sees their own vitals                                               |
+| Indicators: blood pressure, heart rate, blood sugar, temperature, sleep, mood | All six, plus HRV, SpO₂, radiation dose, cabin CO₂, exercise and a reaction-time test                                                                        |
+| Guidance on treatment and improvement                                         | Advice on every reading, plus an **AI co-pilot** with ISS-style protocols, crew baselines and the medicine kit                                               |
+| When to involve crew or flight surgeons                                       | Daily Check shows follow-up guidance on flagged readings, and **Crew oversight** shows synced monitoring alerts for assigned groups            |
+| Managing many crews                                                           | A **Super admin console** creates mission groups and astronaut accounts, and decides which groups each oversight user can see                                |
+| NASA HRP's five hazards                                                       | **RIDGE strip** (Radiation, Isolation, Distance, Gravity, hostile Environment), linked to the body systems each one affects                                  |
+| Clickable human figure                                                        | **Body map**: brain, eyes, heart, lungs, blood, bones & muscles and reproductive health, each with status, what it does, how space affects it and what to do |
+| Prompts and routine                                                           | Morning self-check banner, exercise and sleep voice reminders                                                                                                |
+| Gamification                                                                  | **Health missions** with points, streaks and mission patches                                                                                                 |
+| Charts over time                                                              | Live ECG, 24 h HRV trend, exercise and sleep progress                                                                                                        |
+| Colour coding                                                                 | Green / amber / red everywhere, following NASA-STD-3001 caution & warning colours                                                                            |
+| Simple instructions                                                           | Each measurement has numbered "how to measure" steps and a "why this matters in space" note                                                                  |
 
 ## Features
 
 ### Daily self-check
+
 Six guided steps:
+
 - **Blood pressure** (mmHg)
 - **Blood sugar** (mg/dL, fasting or after a meal)
 - **Body temperature** (°C)
@@ -41,31 +46,37 @@ Six guided steps:
 Results turn green, amber or red as they're typed, with follow-up guidance. Open **My monitoring** from flagged results to follow synced alerts. On a **Low fluid intake** alert, use **Log water** to add 250 mL, 500 mL or a custom amount after the last check. A fresh 24-hour reading replaces the prior total.
 
 ### Body map + five hazards
+
 - An anatomical astronaut figure with a clickable status point per body system.
 - Each system shows its readings, what it does, how spaceflight affects it, and what to do now.
 - Injury and period tracking are built in.
 - The **RIDGE** strip shows a live status for each hazard. Picking one highlights the body systems it affects.
 
 ### My vitals / Crew vitals
+
 - Each astronaut sees **only their own** vitals (tab **My vitals**). The crew commander (callsign CDR) sees their whole crew, and ground control sees every crew (tab **Crew vitals**). This is enforced on the server: `/api/dashboard` only returns the records the signed-in user may see.
 - Big heart rate, SpO₂ and HRV tiles.
 - A realistic Lead II ECG: PQRST beats, HRV-driven rhythm and a monitor sweep. It turns irregular in the arrhythmia scenario.
 - 24 h HRV trend, plus per-crew baselines (and a crew overview for the commander and ground control).
 
 ### Health missions
+
 - Four daily core missions: self-check, exercise plan, 7 h sleep and the reaction-time test. Reviewing the body map is a bonus.
 - Points, a 🔥 streak and eight mission patches.
 - Patches reward habits, never health values.
 
 ### Habitat & routine
+
 - Cabin CO₂ and radiation dose against flight-rule limits, with a scrubber/shielding boost.
 - Exercise log for ARED, treadmill and cycle against an ISS-style plan.
 - Sleep log and spoken reminders.
 
 ### Cognitive test
+
 - **Beacon Lock**: a reaction-time (PVT) game that measures alertness and lapses.
 
 ### AI co-pilot
+
 - Runs **Llama 3.2 1B** fully in the browser with [WebLLM](https://github.com/mlc-ai/web-llm), so answers don't depend on the link to Earth.
 - Every question and reply is saved for mission oversight (queued offline, sent when the link is back). The chat panel tells the crew so.
 - It gets the crew's vitals, baselines, protocols, medicine kit, today's self-check and habitat data.
@@ -73,21 +84,24 @@ Results turn green, amber or red as they're typed, with follow-up guidance. Open
 - On GPUs without `shader-f16` it uses f32 builds, and it tries a smaller model before giving up.
 
 ### Offline first
+
 - Vitals are saved to IndexedDB (Dexie) and synced to Postgres with **Sync to Earth** when the link is back.
 - Co-pilot chats, self-checks, exercise and sleep, injuries and period logs go through the same kind of IndexedDB outbox. An item leaves the queue only when the server confirms it.
 
 ### Mission groups and roles
-| Role | Lands on | Can do |
-|---|---|---|
-| **Super admin** | `/admin` | Create, edit and delete mission groups; create astronaut and oversight accounts; move astronauts between groups; assign groups to oversight; read every group in `/oversight` |
-| **Oversight** (flight surgeon / mission control) | `/oversight` | Read the astronauts in their assigned groups only, including their AI conversations |
-| **Commander** (ground control) | Console | Sees every crew on the console |
-| **Astronaut, crew commander** (callsign `CDR`) | Console | Their own console plus every member of their own crew |
-| **Astronaut** | Console | Only their own health console and data; belongs to one mission group |
+
+| Role                                             | Lands on     | Can do                                                                                                                                                                        |
+| ------------------------------------------------ | ------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Super admin**                                  | `/admin`     | Create, edit and delete mission groups; create astronaut and oversight accounts; move astronauts between groups; assign groups to oversight; read every group in `/oversight` |
+| **Oversight** (flight surgeon / mission control) | `/oversight` | Read the astronauts in their assigned groups only, including their AI conversations                                                                                           |
+| **Commander** (ground control)                   | Console      | Sees every crew on the console                                                                                                                                                |
+| **Astronaut, crew commander** (callsign `CDR`)   | Console      | Their own console plus every member of their own crew                                                                                                                         |
+| **Astronaut**                                    | Console      | Only their own health console and data; belongs to one mission group                                                                                                          |
 
 Every admin and oversight API checks the role on the server, from the database. An oversight user asking for a group or astronaut outside their assignment gets a 404.
 
 ### Super admin console (`/admin`)
+
 - **Mission groups:** name, code (shown as the crew id, e.g. `MTV-1`), mission / destination and description. A group with members can't be deleted.
 - **Astronauts:** create an account inside a group with name, callsign, email and a temporary password (a **Generate** button makes one; it's stored hashed with bcrypt). Move astronauts between groups from the list.
 - **CSV import:** paste `name, email, callsign` lines to create many astronauts in one group. Each gets its own temporary password, shown once.
@@ -101,6 +115,7 @@ Every admin and oversight API checks the role on the server, from the database. 
 - **Audit log:** who did what, to which group or account, and when, for every admin action.
 
 ### Crew oversight dashboard (`/oversight`)
+
 - Pick a group to see every astronaut at a glance: latest vitals in green / amber / red, sleep, exercise, self-check result, open injuries, cycle status, AI chat count and the top alerts.
 - Click an astronaut for their full record:
   - **Status & alerts**
@@ -109,6 +124,7 @@ Every admin and oversight API checks the role on the server, from the database. 
   - **AI conversations:** the full co-pilot transcript in time order, searchable, with each reply marked on-device AI or basic mode
 
 ### Health monitoring
+
 Full detail, thresholds and NASA sources: **[docs/METRICS.md](docs/METRICS.md)**.
 
 - **Metrics:** all Daily Check readings, exercise, pulse trend and radiation dose. Blood pressure shows both numbers, and blood sugar keeps fasting context. Each metric has a definition, expected cadence and rationale under **Why we monitor this**.
@@ -117,7 +133,9 @@ Full detail, thresholds and NASA sources: **[docs/METRICS.md](docs/METRICS.md)**
 - **Synthetic crew:** `npm run db:synthetic` seeds group **SIM-1** with six SYNTHETIC astronauts (normal, missing data, sleep debt, rising heart rate, dehydration, solar particle event), 14–30 days each, seedable.
 
 ### Demo scenarios
+
 The header's **Demo** dropdown switches between:
+
 - Nominal
 - Arrhythmia · 20m latency
 - EV1 voice stress
@@ -151,13 +169,13 @@ For the full AI co-pilot, use Chrome or Edge 113+ on a computer with a WebGPU-ca
 
 ### Environment variables
 
-| Name | Required | Purpose |
-|---|---|---|
-| `DATABASE_URL` | yes | PostgreSQL connection string |
-| `SESSION_SECRET` | yes | Long random string used to sign the login cookie |
-| `DEMO_MODE` | no | `true` lets any email/password sign in and auto-creates an astronaut profile. Super admin and oversight accounts always need their real password, and demo mode never creates them. Defaults to on outside production and off in production. **Set `false` for any public deployment.** |
-| `SEED_ADMIN_PASSWORD`, `SEED_OVERSIGHT_PASSWORD` | no | Passwords the seed gives the super admin and oversight accounts. **Set them for any deployment other people can reach**; the defaults are in `prisma/seed.ts`. |
-| `NEXT_PUBLIC_WEBLLM_MODEL` | no | Pin a WebLLM model, e.g. `SmolLM2-360M-Instruct-q4f16_1-MLC` for a much smaller download |
+| Name                                             | Required | Purpose                                                                                                                                                                                                                                                                                 |
+| ------------------------------------------------ | -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `DATABASE_URL`                                   | yes      | PostgreSQL connection string                                                                                                                                                                                                                                                            |
+| `SESSION_SECRET`                                 | yes      | Long random string used to sign the login cookie                                                                                                                                                                                                                                        |
+| `DEMO_MODE`                                      | no       | `true` lets any email/password sign in and auto-creates an astronaut profile. Super admin and oversight accounts always need their real password, and demo mode never creates them. Defaults to on outside production and off in production. **Set `false` for any public deployment.** |
+| `SEED_ADMIN_PASSWORD`, `SEED_OVERSIGHT_PASSWORD` | no       | Passwords the seed gives the super admin and oversight accounts. **Set them for any deployment other people can reach**; the defaults are in `prisma/seed.ts`.                                                                                                                          |
+| `NEXT_PUBLIC_WEBLLM_MODEL`                       | no       | Pin a WebLLM model, e.g. `SmolLM2-360M-Instruct-q4f16_1-MLC` for a much smaller download                                                                                                                                                                                                |
 
 ### Demo accounts
 
@@ -165,17 +183,18 @@ For the full AI co-pilot, use Chrome or Edge 113+ on a computer with a WebGPU-ca
 
 **Fresh local seed:** crew get **`aahms2025`**, and admin/oversight get `SEED_ADMIN_PASSWORD` / `SEED_OVERSIGHT_PASSWORD` (or the defaults in `prisma/seed.ts`). In demo mode, any password works for crew.
 
-| Email | Role |
-|---|---|
-| `admin@aahms.demo` | Super admin: `/admin` creates mission groups, astronaut and oversight accounts |
-| `surgeon@aahms.demo` | Oversight (flight surgeon): `/oversight` reads MTV-1 (and SIM-1 after `db:synthetic`), including AI co-pilot chats |
-| `sim-normal@aahms.demo` … `sim-spe@aahms.demo` | SYNTHETIC test astronauts in SIM-1, one per profile |
-| `ground@aahms.demo` | Commander (ground control), sees every crew |
-| `vance@aahms.demo` | Crew commander CDR (MTV-1), sees the whole MTV-1 crew |
-| `john@aahms.demo` | Astronaut EV1 (MTV-1), sees only himself |
-| `cho@aahms.demo`, `silva@aahms.demo`, `reyes@aahms.demo`, `park@aahms.demo`, `okonkwo@aahms.demo` | Other crew |
+| Email                                                                                             | Role                                                                                                               |
+| ------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| `admin@aahms.demo`                                                                                | Super admin: `/admin` creates mission groups, astronaut and oversight accounts                                     |
+| `surgeon@aahms.demo`                                                                              | Oversight (flight surgeon): `/oversight` reads MTV-1 (and SIM-1 after `db:synthetic`), including AI co-pilot chats |
+| `sim-normal@aahms.demo` … `sim-spe@aahms.demo`                                                    | SYNTHETIC test astronauts in SIM-1, one per profile                                                                |
+| `ground@aahms.demo`                                                                               | Commander (ground control), sees every crew                                                                        |
+| `vance@aahms.demo`                                                                                | Crew commander CDR (MTV-1), sees the whole MTV-1 crew                                                              |
+| `john@aahms.demo`                                                                                 | Astronaut EV1 (MTV-1), sees only himself                                                                           |
+| `cho@aahms.demo`, `silva@aahms.demo`, `reyes@aahms.demo`, `park@aahms.demo`, `okonkwo@aahms.demo` | Other crew                                                                                                         |
 
 ## Five-minute demo script
+
 1. Sign in as `john@aahms.demo`.
 2. **My vitals:** follow the "Morning self-check due" banner and do the check. Try BP `118/102` to see a red diastolic result, then open **My monitoring** to see the alert.
 3. **Body map:** click the regions, then pick **G** (Gravity) in the hazards strip to see which systems it affects.
@@ -206,6 +225,7 @@ Never commit `.env` or the database URL: secrets live only in `.env` and in Verc
 - Deployed to Vercel with a Neon database (see above).
 
 ## Tech stack
+
 - **Next.js 16** (App Router, built with webpack), **React 19**, TypeScript, **Tailwind CSS v4**
 - **Prisma 6** + **PostgreSQL** (Neon) with migrations, including an admin audit log; JWT session cookie (`jose`); role checks against the database for admin and oversight APIs
 - **Dexie** (IndexedDB) store-and-forward queue
@@ -234,6 +254,7 @@ docs/METRICS.md      Metric definitions, thresholds and citations (generated fro
 ```
 
 ## Notes and limits
+
 - Thresholds and advice are demo guidance based on common clinical cut-offs and NASA Human Research Program summaries. They are not medical advice.
 - Monitoring alerts are a simulation: rules are evaluated when a crew member's monitoring is viewed, not by a background job, and nothing is paged or sent anywhere.
 - Missions and the PVT result stay in the browser. Vitals, self-checks, exercise and sleep, injuries and period logs sync to the database through the offline queue so mission oversight can read them.

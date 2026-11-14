@@ -211,7 +211,7 @@ export function VitalsMonitor({
       </div>
 
       <details className="group mt-4 border-t border-mc-line pt-3">
-        <summary className="flex min-h-9 cursor-pointer list-none items-center justify-between text-xs font-medium text-mc-muted hover:text-white">
+        <summary className="flex min-h-9 cursor-pointer list-none items-center justify-between text-xs font-medium text-mc-muted hover:text-foreground">
           24 h HRV trend{canWrite ? " and manual entry" : ""}
           <span className="transition group-open:rotate-180" aria-hidden>▾</span>
         </summary>
@@ -250,7 +250,7 @@ export function VitalsMonitor({
           ))}
           <button
             type="submit"
-            className="col-span-2 min-h-11 rounded-md border border-mc-nasa-edge bg-mc-nasa text-sm font-semibold text-white md:col-span-1 md:self-end"
+            className="col-span-2 min-h-11 rounded-md border border-mc-select bg-mc-select text-sm font-semibold text-mc-on-select md:col-span-1 md:self-end"
           >
             Record vitals
           </button>

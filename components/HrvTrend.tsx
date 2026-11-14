@@ -55,7 +55,7 @@ export function HrvTrend({ userId, values, current }: { userId: string; values: 
               key={i}
               title={`${hours.length - 1 - i === 0 ? "Now" : `−${hours.length - 1 - i} h`}: ${Math.round(v)} ms`}
               className={`flex-1 rounded-t-sm ${
-                isNow ? "bg-mc-green" : low ? "bg-mc-amber/70" : "bg-[#3a4a6b] hover:bg-[#4f6390]"
+                isNow ? "bg-mc-green" : low ? "bg-mc-amber" : "bg-mc-line-strong hover:bg-mc-label"
               }`}
               style={{ height: `${Math.max(6, pct(v))}%` }}
             />

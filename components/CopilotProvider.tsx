@@ -14,6 +14,8 @@ import { describeCheck, getLatestCheck } from "@/lib/selfCheck";
 import { describeSpaceWeather, useSpaceWeather } from "@/lib/useSpaceWeather";
 import { describeLabs, labsFor } from "@/lib/labs";
 import { evaRecommendation, findProtocols, protocolsForReadings } from "@/lib/copilotKnowledge";
+import { hasBiomarkers, osdrBaselineBlock } from "@/lib/osdr";
+import { useNasaStudies } from "@/lib/useNasaStudies";
 import { useMissionTelemetry } from "@/components/MissionTelemetryProvider";
 import { describeProfile } from "@/lib/crewProfiles";
 import { INJURY_TYPES, getInjuries } from "@/lib/injuries";
@@ -92,6 +94,7 @@ export function CopilotProvider({ children }: { children: ReactNode }) {
   const [input, setInput] = useState("");
   const llm = useWebLLM();
   const spaceWeather = useSpaceWeather();
+  const nasaStudies = useNasaStudies();
   const telemetry = useMissionTelemetry();
   const engineStatus = llm.status;
   const [inferMs, setInferMs] = useState<number | null>(null);
@@ -139,8 +142,9 @@ export function CopilotProvider({ children }: { children: ReactNode }) {
       risk,
       pvtSummary: getPvtSummary(),
       webLlmReady: engineStatus === "ready",
+      osdrStudies: nasaStudies.data?.studies ?? [],
     };
-  }, [session, risk, engineStatus]);
+  }, [session, risk, engineStatus, nasaStudies.data]);
 
   const sendMessage = useCallback(async () => {
     if (!input.trim() || isSending) return;
@@ -253,6 +257,7 @@ export function CopilotProvider({ children }: { children: ReactNode }) {
           ...detailed.slice(0, 2).map((m) => describeLabs(m.name, labsFor(m.callsign))),
           "PROTOCOLS:",
           ...protocols.map((p) => `${p.title}: ${p.text}`),
+          hasBiomarkers(nasaStudies.data?.studies ?? []) ? osdrBaselineBlock(nasaStudies.data?.studies ?? []) : "",
         ]
           .filter(Boolean)
           .join("\n");
@@ -323,6 +328,7 @@ export function CopilotProvider({ children }: { children: ReactNode }) {
     messages,
     session,
     telemetry,
+    nasaStudies.data,
   ]);
 
   const toggleChat = useCallback(() => setChatOpen((o) => !o), []);

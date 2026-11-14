@@ -63,7 +63,7 @@ export function AlertsPanel({
             type="button"
             onClick={() => setShow(id)}
             aria-pressed={show === id}
-            className={`min-h-8 rounded-md px-3 text-xs ${show === id ? "bg-mc-nasa font-semibold text-white" : "font-medium text-mc-muted hover:text-white"}`}
+            className={`min-h-8 rounded-md px-3 text-xs ${show === id ? "bg-mc-select font-semibold text-mc-on-select" : "font-medium text-mc-muted hover:text-foreground"}`}
           >
             {label}
           </button>
@@ -105,7 +105,7 @@ function AlertCard({ alert: a, rule, canResolve, canLogWater, onChanged }: {
   const m = METRIC[a.metric];
   const customAmount = Number(water);
   const validAmount = Number.isInteger(customAmount) && customAmount >= 1 && customAmount <= 8000;
-  const actionButton = "min-h-9 rounded-md border border-mc-line-strong px-3 text-xs font-medium text-mc-soft hover:text-white disabled:opacity-40";
+  const actionButton = "min-h-9 rounded-md border border-mc-line-strong px-3 text-xs font-medium text-mc-soft hover:text-foreground disabled:opacity-40";
 
   const act = async (action: "note" | "acknowledge" | "resolve" | "log-water", amountMl?: number) => {
     if (busy) return;
@@ -213,7 +213,7 @@ function AlertCard({ alert: a, rule, canResolve, canLogWater, onChanged }: {
         />
         <div className="flex flex-wrap gap-2">
           {a.status === "OPEN" && (
-            <button type="button" disabled={busy} onClick={() => void act("acknowledge")} className="min-h-9 rounded-md bg-mc-nasa px-3 text-xs font-semibold text-white hover:bg-mc-nasa-edge disabled:opacity-50">
+            <button type="button" disabled={busy} onClick={() => void act("acknowledge")} className="min-h-9 rounded-md bg-mc-select px-3 text-xs font-semibold text-mc-on-select hover:bg-mc-soft disabled:opacity-50">
               Acknowledge
             </button>
           )}
@@ -226,7 +226,7 @@ function AlertCard({ alert: a, rule, canResolve, canLogWater, onChanged }: {
             type="button"
             disabled={busy || !note.trim()}
             onClick={() => void act("note")}
-            className="min-h-9 rounded-md border border-mc-line-strong px-3 text-xs font-medium text-mc-muted hover:text-white disabled:opacity-40"
+            className="min-h-9 rounded-md border border-mc-line-strong px-3 text-xs font-medium text-mc-muted hover:text-foreground disabled:opacity-40"
           >
             Add note
           </button>

@@ -26,7 +26,7 @@ export function SelfCheckDue({ userId, onStart }: { userId: string; onStart: () 
       <button
         type="button"
         onClick={onStart}
-        className="min-h-10 rounded-md border border-mc-nasa-edge bg-mc-nasa px-4 text-sm font-semibold text-white"
+        className="min-h-10 rounded-md border border-mc-select bg-mc-select px-4 text-sm font-semibold text-mc-on-select"
       >
         Start now
       </button>

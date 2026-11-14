@@ -1,34 +1,109 @@
 @import "tailwindcss";
 
 :root {
-  --background: #060a13;
-  --foreground: #e8edf6;
+  --background: #f4efe4;
+  --foreground: #1c1a16;
+  --page-background: linear-gradient(160deg, #e4e1da 0%, #f7f1dc 42%, #f3e6bf 100%);
+  --mc-bg: #f6f3ec;
+  --mc-header: #faf6ec;
+  --mc-bar: #f7f3ea;
+  --mc-panel: #fffdf8;
+  --mc-inset: #f6f1e6;
+  --mc-raised: #f3ead4;
+  --mc-line: #e6dfd2;
+  --mc-line-strong: #d4cbb8;
+  --mc-label: #8a8172;
+  --mc-muted: #6b6458;
+  --mc-soft: #3a342c;
+  --mc-nasa: #0b3d91;
+  --mc-nasa-edge: #2a5bc0;
+  --mc-select: #1c1c1c;
+  --mc-on-select: #ffffff;
+  --mc-cyan: #c4920a;
+  --mc-link: #8a6a10;
+  --mc-green: #0f8f5b;
+  --mc-amber: #b47d08;
+  --mc-red: #d63c3c;
+  --mc-violet: #7a6ad4;
+  --warp-r: 244;
+  --warp-g: 239;
+  --warp-b: 228;
+  --photo-veil: linear-gradient(180deg, rgba(244, 239, 228, 0.72) 0%, rgba(247, 241, 220, 0.55) 35%, rgba(243, 230, 191, 0.78) 75%, rgba(244, 239, 228, 0.92) 100%);
+  --photo-veil-radial: radial-gradient(ellipse at 50% 45%, transparent 30%, rgba(228, 225, 218, 0.72) 100%);
+  --loading-veil: radial-gradient(circle at 50% 45%, rgba(247, 241, 220, 0.55) 0%, rgba(244, 239, 228, 0.88) 58%, #f4efe4 100%);
+  --loading-glow: radial-gradient(circle at 50% 45%, rgba(243, 230, 191, 0.45), transparent 55%);
+  --ecg-paper: #f6f1e6;
+  --ecg-grid-strong: rgba(15, 143, 91, 0.22);
+  --ecg-grid: rgba(15, 143, 91, 0.08);
+  --ecg-trace: #0f8f5b;
+  --ecg-alert: #d63c3c;
+  --ecg-label: rgba(107, 100, 88, 0.85);
 }
 
-/* Mission Console design tokens (from the AstroMed design canvas) */
+/* Black console with a sharp yellow accent, matching the KPI dashboard. */
+html[data-theme="dark"] {
+  --background: #0e0e0e;
+  --foreground: #f4f4f4;
+  --page-background: #0e0e0e;
+  --mc-bg: #141414;
+  --mc-header: #121212;
+  --mc-bar: #121212;
+  --mc-panel: #1c1c1c;
+  --mc-inset: #141414;
+  --mc-raised: #262626;
+  --mc-line: #2e2e2e;
+  --mc-line-strong: #3a3a3a;
+  --mc-label: #7a7a7a;
+  --mc-muted: #9a9a9a;
+  --mc-soft: #d0d0d0;
+  --mc-select: #d6ef3c;
+  --mc-on-select: #141414;
+  --mc-cyan: #d6ef3c;
+  --mc-link: #e7f76a;
+  --mc-green: #3ddc6a;
+  --mc-amber: #e2c14a;
+  --mc-red: #ff5d5d;
+  --mc-violet: #b09cff;
+  --warp-r: 14;
+  --warp-g: 14;
+  --warp-b: 14;
+  --photo-veil: linear-gradient(180deg, rgba(14, 14, 14, 0.72) 0%, rgba(14, 14, 14, 0.45) 35%, rgba(14, 14, 14, 0.78) 75%, rgba(14, 14, 14, 0.92) 100%);
+  --photo-veil-radial: radial-gradient(ellipse at 50% 45%, transparent 30%, rgba(14, 14, 14, 0.72) 100%);
+  --loading-veil: radial-gradient(circle at 50% 45%, rgba(14, 14, 14, 0.45) 0%, rgba(14, 14, 14, 0.88) 58%, #0e0e0e 100%);
+  --loading-glow: radial-gradient(circle at 50% 45%, rgba(214, 239, 60, 0.16), transparent 55%);
+  --ecg-paper: #141414;
+  --ecg-grid-strong: rgba(61, 220, 106, 0.28);
+  --ecg-grid: rgba(61, 220, 106, 0.1);
+  --ecg-trace: #3ddc6a;
+  --ecg-alert: #ff5d5d;
+  --ecg-label: rgba(154, 154, 154, 0.9);
+}
+
+/* Tokens point at the variables above so a theme switch restyles every utility. */
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --color-mc-bg: #060a13;
-  --color-mc-header: #08101e;
-  --color-mc-bar: #070d19;
-  --color-mc-panel: #0c1322;
-  --color-mc-inset: #0a1120;
-  --color-mc-raised: #131d33;
-  --color-mc-line: #1c2840;
-  --color-mc-line-strong: #24314d;
-  --color-mc-label: #8a95ac;
-  --color-mc-muted: #a3aec2;
-  --color-mc-soft: #c9d2e3;
-  --color-mc-nasa: #0b3d91;
-  --color-mc-nasa-edge: #2a5bc0;
-  --color-mc-select: #4c8dff;
-  --color-mc-cyan: #5cc8ff;
-  --color-mc-link: #7fb2ff;
-  --color-mc-green: #3ddc97;
-  --color-mc-amber: #f5b82e;
-  --color-mc-red: #ff5d5d;
-  --color-mc-violet: #9c8cff;
+  --color-mc-bg: var(--mc-bg);
+  --color-mc-header: var(--mc-header);
+  --color-mc-bar: var(--mc-bar);
+  --color-mc-panel: var(--mc-panel);
+  --color-mc-inset: var(--mc-inset);
+  --color-mc-raised: var(--mc-raised);
+  --color-mc-line: var(--mc-line);
+  --color-mc-line-strong: var(--mc-line-strong);
+  --color-mc-label: var(--mc-label);
+  --color-mc-muted: var(--mc-muted);
+  --color-mc-soft: var(--mc-soft);
+  --color-mc-nasa: var(--mc-nasa);
+  --color-mc-nasa-edge: var(--mc-nasa-edge);
+  --color-mc-select: var(--mc-select);
+  --color-mc-on-select: var(--mc-on-select);
+  --color-mc-cyan: var(--mc-cyan);
+  --color-mc-link: var(--mc-link);
+  --color-mc-green: var(--mc-green);
+  --color-mc-amber: var(--mc-amber);
+  --color-mc-red: var(--mc-red);
+  --color-mc-violet: var(--mc-violet);
   --font-sans: var(--font-inter), "Helvetica Neue", Helvetica, Arial, sans-serif;
   --font-mono: var(--font-plex-mono), ui-monospace, "Cascadia Code", monospace;
   --font-display: var(--font-playfair), Georgia, "Times New Roman", serif;
@@ -39,14 +114,21 @@
   font-weight: 600;
   letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: var(--color-mc-label);
+  color: var(--mc-label);
 }
 
 body {
-  background: var(--background);
+  background: var(--page-background);
+  background-attachment: fixed;
   color: var(--foreground);
   font-family: var(--font-sans);
+  min-height: 100vh;
 }
+
+.theme-photo-veil { background: var(--photo-veil); }
+.theme-photo-veil-radial { background: var(--photo-veil-radial); }
+.theme-loading-veil { background: var(--loading-veil); }
+.theme-loading-glow { background: var(--loading-glow); }
 
 * {
   box-sizing: border-box;
@@ -93,11 +175,11 @@ body {
   padding: 1px;
   background: conic-gradient(
     from var(--angle),
-    rgba(34, 211, 238, 0.9),
-    rgba(139, 92, 246, 0.15) 25%,
-    rgba(34, 211, 238, 0.1) 50%,
-    rgba(139, 92, 246, 0.9) 75%,
-    rgba(34, 211, 238, 0.9)
+    rgba(212, 164, 23, 0.9),
+    rgba(228, 225, 218, 0.25) 25%,
+    rgba(212, 164, 23, 0.12) 50%,
+    rgba(196, 146, 10, 0.85) 75%,
+    rgba(212, 164, 23, 0.9)
   );
   -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
   -webkit-mask-composite: xor;
@@ -128,18 +210,18 @@ body {
 
 /* Cognitive PVT "Beacon Lock" game */
 .pvt-arena {
-  background: radial-gradient(ellipse at 30% 20%, #0f1d3a 0%, #070c18 60%, #04070f 100%);
+  background: radial-gradient(ellipse at 30% 20%, #fbf6e4 0%, #f3ead0 55%, #e7e2d6 100%);
 }
 
 .pvt-stars {
   position: absolute;
   inset: -50%;
   background-image:
-    radial-gradient(1px 1px at 10% 20%, rgba(255, 255, 255, 0.7), transparent),
-    radial-gradient(1px 1px at 30% 70%, rgba(255, 255, 255, 0.5), transparent),
-    radial-gradient(1.5px 1.5px at 55% 35%, rgba(180, 220, 255, 0.8), transparent),
-    radial-gradient(1px 1px at 75% 80%, rgba(255, 255, 255, 0.6), transparent),
-    radial-gradient(1px 1px at 90% 15%, rgba(255, 255, 255, 0.5), transparent);
+    radial-gradient(1px 1px at 10% 20%, rgba(138, 106, 16, 0.45), transparent),
+    radial-gradient(1px 1px at 30% 70%, rgba(90, 78, 52, 0.35), transparent),
+    radial-gradient(1.5px 1.5px at 55% 35%, rgba(196, 146, 10, 0.55), transparent),
+    radial-gradient(1px 1px at 75% 80%, rgba(90, 78, 52, 0.4), transparent),
+    radial-gradient(1px 1px at 90% 15%, rgba(138, 106, 16, 0.35), transparent);
   background-size: 220px 220px;
   animation: pvt-drift 60s linear infinite;
   pointer-events: none;
@@ -288,8 +370,8 @@ body {
 }
 
 @keyframes logo-breathe {
-  0%, 100% { transform: scale(1); filter: drop-shadow(0 0 18px rgba(76, 141, 255, 0.35)); }
-  50% { transform: scale(1.04); filter: drop-shadow(0 0 34px rgba(76, 141, 255, 0.6)); }
+  0%, 100% { transform: scale(1); filter: drop-shadow(0 0 18px rgba(196, 146, 10, 0.28)); }
+  50% { transform: scale(1.04); filter: drop-shadow(0 0 34px rgba(196, 146, 10, 0.45)); }
 }
 
 @keyframes loader-bar {

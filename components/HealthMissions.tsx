@@ -69,7 +69,7 @@ export function HealthMissions({ userId, onGo }: { userId: string; onGo: (tab: s
                 <button
                   type="button"
                   onClick={() => onGo(t.tab)}
-                  className="min-h-9 rounded-md border border-mc-nasa-edge px-3 text-xs font-semibold text-[#b5d2ff] hover:bg-mc-nasa/30"
+                  className="min-h-9 rounded-md border border-mc-line-strong px-3 text-xs font-semibold text-mc-link hover:bg-mc-raised"
                 >
                   Go
                 </button>

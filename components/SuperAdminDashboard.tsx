@@ -29,6 +29,8 @@ import { getCycleLog } from "@/lib/periods";
 import { getLatestCheck } from "@/lib/selfCheck";
 import { reportRoutineDay } from "@/lib/routineLog";
 import { MonitoringView } from "./monitoring/MonitoringView";
+import { NasaOsdrPanel } from "./NasaOsdrPanel";
+import { useMissionTelemetry } from "@/components/MissionTelemetryProvider";
 
 type DashboardResponse = {
   group: { code: string; name: string; destination: string | null } | null;
@@ -67,6 +69,7 @@ export function SuperAdminDashboard({ user }: { user: SessionUser }) {
     user.role === "ASTRONAUT" ? user.userId : ""
   );
   const { unsyncedCount } = useSync();
+  const telemetry = useMissionTelemetry();
   const [liveSelected, setLiveSelected] = useState<LiveVitals | null>(null);
 
   // Co-pilot chats and health logs from this console are mirrored to the server for
@@ -137,6 +140,8 @@ export function SuperAdminDashboard({ user }: { user: SessionUser }) {
   const selectedServer = data?.crews
     .flatMap((c) => c.members)
     .find((m) => m.user.id === selectedId)?.latest;
+  const selectedHrv = liveSelected?.userId === selectedId ? liveSelected.hrv : (selectedMember?.hrv ?? selectedServer?.hrv ?? 60);
+  const selectedHr = liveSelected?.userId === selectedId ? liveSelected.heartRate : (selectedMember?.heartRate ?? selectedServer?.heartRate ?? 72);
 
   const crewRisks = members.map((m) => m.risk);
 
@@ -279,6 +284,13 @@ export function SuperAdminDashboard({ user }: { user: SessionUser }) {
                           : undefined
                       }
                     />
+                    <NasaOsdrPanel
+                      name={selectedMember?.name ?? user.name}
+                      hrv={selectedHrv}
+                      exerciseMinutes={telemetry.exerciseMinutes}
+                      exerciseTarget={telemetry.exerciseTarget}
+                      doseRate={telemetry.radiation}
+                    />
                     <LabPanel
                       name={selectedMember?.name ?? user.name}
                       callsign={selectedMember?.callsign ?? user.callsign}
@@ -340,8 +352,8 @@ export function SuperAdminDashboard({ user }: { user: SessionUser }) {
                   displayVitals={
                     selectedMember
                       ? {
-                          heartRate: selectedMember.heartRate,
-                          hrv: selectedMember.hrv,
+                          heartRate: selectedHr,
+                          hrv: selectedHrv,
                           spo2: selectedServer?.spo2 ?? 98,
                           radiation: selectedServer?.radiation ?? 0.075,
                         }

@@ -24,13 +24,13 @@ export function TabBar({
           aria-current={active === tab.id ? "page" : undefined}
           className={`flex min-h-11 items-center gap-2 rounded-md px-4 text-[13px] font-medium transition ${
             active === tab.id
-              ? "bg-[#16223b] text-white"
+              ? "bg-mc-select text-mc-on-select"
               : "text-mc-muted hover:bg-mc-raised hover:text-foreground"
           }`}
         >
           {tab.label}
           {tab.badge != null && (
-            <span className="rounded bg-[#13284d] px-1.5 font-mono text-[11px] text-mc-link">
+            <span className={`rounded px-1.5 font-mono text-[11px] ${active === tab.id ? "bg-black/10 text-mc-on-select" : "bg-mc-raised text-mc-link"}`}>
               {tab.badge}
             </span>
           )}

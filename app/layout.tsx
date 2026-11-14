@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Script from "next/script";
 import { Inter, IBM_Plex_Mono, Playfair_Display } from "next/font/google";
 import "./globals.css";
 import { MissionModeProvider } from "@/components/MissionModeContext";
@@ -24,14 +25,19 @@ export const metadata: Metadata = {
   description: "Astronaut Health Monitoring Console",
 };
 
+const themeBoot = `(function(){try{if(localStorage.getItem("aahms_theme")==="dark")document.documentElement.dataset.theme="dark";}catch(e){}})();`;
+
 export default function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`dark ${inter.variable} ${plexMono.variable} ${display.variable}`}>
+    <html lang="en" className={`${inter.variable} ${plexMono.variable} ${display.variable}`} suppressHydrationWarning>
       <body className="antialiased" suppressHydrationWarning>
+        <Script id="theme-boot" strategy="beforeInteractive">
+          {themeBoot}
+        </Script>
         <MissionModeProvider>
           <MissionTelemetryProvider>
             <SyncProvider>{children}</SyncProvider>

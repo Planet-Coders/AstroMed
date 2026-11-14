@@ -129,6 +129,10 @@ export function EcgMonitor({
     };
 
     // The grid never changes, so paint it once per size and blit it each frame.
+    let paintedPaper = "";
+    const ecgColor = (name: string, fallback: string) =>
+      getComputedStyle(document.documentElement).getPropertyValue(name).trim() || fallback;
+
     const paintGrid = () => {
       const c = document.createElement("canvas");
       c.width = w * dpr;
@@ -137,18 +141,22 @@ export function EcgMonitor({
       if (!g) return;
       g.setTransform(dpr, 0, 0, dpr, 0, 0);
       const pxPerMm = w / (SWEEP_SECONDS * 25);
-      g.fillStyle = "#0a1120";
+      const paper = ecgColor("--ecg-paper", "#f6f1e6");
+      paintedPaper = paper;
+      g.fillStyle = paper;
       g.fillRect(0, 0, w, h);
       g.lineWidth = 1;
+      const gridStrong = ecgColor("--ecg-grid-strong", "rgba(15,143,91,0.22)");
+      const gridSoft = ecgColor("--ecg-grid", "rgba(15,143,91,0.08)");
       for (let i = 0, x = 0; x <= w; i++, x = i * pxPerMm) {
-        g.strokeStyle = i % 5 === 0 ? "rgba(61,220,151,0.16)" : "rgba(61,220,151,0.055)";
+        g.strokeStyle = i % 5 === 0 ? gridStrong : gridSoft;
         g.beginPath();
         g.moveTo(Math.round(x) + 0.5, 0);
         g.lineTo(Math.round(x) + 0.5, h);
         g.stroke();
       }
       for (let i = 0, y = h / 2; y <= h; i++, y = h / 2 + i * pxPerMm) {
-        g.strokeStyle = i % 5 === 0 ? "rgba(61,220,151,0.16)" : "rgba(61,220,151,0.055)";
+        g.strokeStyle = i % 5 === 0 ? gridStrong : gridSoft;
         for (const yy of i === 0 ? [y] : [y, h - y]) {
           g.beginPath();
           g.moveTo(0, Math.round(yy) + 0.5);
@@ -161,7 +169,8 @@ export function EcgMonitor({
     };
 
     const drawGrid = () => {
-      if (!grid) paintGrid();
+      const paper = ecgColor("--ecg-paper", "#f6f1e6");
+      if (!grid || paper !== paintedPaper) paintGrid();
       if (grid) ctx.drawImage(grid, 0, 0, w, h);
       return gridPxPerMm;
     };
@@ -180,7 +189,9 @@ export function EcgMonitor({
 
       const pxPerMm = drawGrid();
       const mvToPx = pxPerMm * 10 * 0.85; // ~10 mm/mV, scaled to fit
-      const color = params.current.irregular ? "#ff7a7a" : "#3ddc97";
+      const color = params.current.irregular
+        ? ecgColor("--ecg-alert", "#d63c3c")
+        : ecgColor("--ecg-trace", "#0f8f5b");
       ctx.strokeStyle = color;
       ctx.lineWidth = 1.6;
       ctx.lineJoin = "round";
@@ -211,7 +222,7 @@ export function EcgMonitor({
       }
 
       // Lead and sweep settings in the corner, as bedside monitors show them
-      ctx.fillStyle = "rgba(201,210,227,0.55)";
+      ctx.fillStyle = ecgColor("--ecg-label", "rgba(107,100,88,0.85)");
       ctx.font = "10px ui-monospace, monospace";
       ctx.fillText("II   25 mm/s   10 mm/mV", 6, 12);
 
