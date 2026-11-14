@@ -1,7 +1,6 @@
 import type { RiskLevel } from "@/lib/risk";
 import { getOutboxUser, queueHealth } from "@/lib/outbox";
 import { CHECK_LIMITS, GLUCOSE_REF, GLUCOSE_CREW_AVG, GLUCOSE_LANDING_CHANGE } from "@/lib/selfCheckThresholds";
-import { dayKey } from "@/lib/monitoring/days";
 
 /**
  * Daily Self-Check: the indicators the crew measures themselves each morning, with
@@ -20,7 +19,7 @@ export type SelfCheckValues = {
   mood: Mood | null;
   sleepHours: number | null;
   fasting: boolean;
-  /** Total fluid logged today, in mL. */
+  /** Self-reported fluid in the last 24 hours, in mL. */
   fluidMl: number | null;
   /** Urine colour on the 8-shade chart: 1 pale straw … 8 dark brown. */
   urineColor: number | null;
@@ -120,9 +119,9 @@ export const STEPS: StepInfo[] = [
     title: "Hydration",
     unit: "mL",
     howTo: [
-      "Enter fluid you drank today (UTC) that you haven't logged yet. Drink bags, rehydrated food and coffee count.",
+      "Add up what you drank in the last 24 hours. Drink bags, rehydrated food and coffee count.",
       "Compare your most recent urine colour with the 8-shade chart (1 pale straw … 8 dark).",
-      "Enter either or both. Follow-up checks add new fluid to today's total.",
+      "Enter either or both. You can log additional water from a low fluid intake alert in My monitoring.",
     ],
     whySpace:
       "Fluid shifts dull thirst in weightlessness, and calcium lost from bone raises kidney-stone risk. NASA's renal stone evidence report names relative dehydration as a main driver; a NASA study found crew producing over 2.5 L of urine a day appeared to minimise the risk (NTRS 20240012429, 20000020539).",
@@ -241,7 +240,7 @@ export function assessHydration(fluidMl: number | null, urineColor: number | nul
       level: "RED",
       advice: darkRed
         ? "Urine colour is outside the alert range. Follow your hydration plan and contact the CMO."
-        : "Your logged fluid is below today's target so far. Follow your hydration plan and log your intake as the day progresses.",
+        : "Your reported fluid intake is below target. Follow your hydration plan and log additional water in My monitoring.",
     };
   if ((fluidMl != null && fluidMl < CHECK_LIMITS.hydrationLow.amber) || (urineColor != null && urineColor >= CHECK_LIMITS.urineDark.amber))
     return {
@@ -306,32 +305,16 @@ export type StoredCheck = {
   at: number;
   items: ItemResult[];
   values?: Partial<SelfCheckValues> & {
-    /** New fluid logged with this check. Older reports only have a 24-hour snapshot. */
+    /** Additional fluid recorded by the previous version of Daily Check. */
     fluidAddedMl?: number | null;
   };
 };
-
-const HYDRATION_KEY = "aahms_selfcheck_fluid_today";
-
-export function getLoggedFluid(userId: string, at: number): number | null {
-  try {
-    const all = JSON.parse(localStorage.getItem(HYDRATION_KEY) ?? "{}") as Record<string, { day: string; total: number }>;
-    return all[userId]?.day === dayKey(at) ? all[userId].total : null;
-  } catch {
-    return null;
-  }
-}
 
 export function saveLatestCheck(check: StoredCheck) {
   try {
     const all = JSON.parse(localStorage.getItem(KEY) ?? "{}") as Record<string, StoredCheck>;
     all[check.userId] = check;
     localStorage.setItem(KEY, JSON.stringify(all));
-    if (check.values?.fluidAddedMl != null && check.values.fluidMl != null) {
-      const hydration = JSON.parse(localStorage.getItem(HYDRATION_KEY) ?? "{}");
-      hydration[check.userId] = { day: dayKey(check.at), total: check.values.fluidMl };
-      localStorage.setItem(HYDRATION_KEY, JSON.stringify(hydration));
-    }
   } catch {
     /* storage unavailable */
   }

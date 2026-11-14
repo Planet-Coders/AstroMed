@@ -10,7 +10,6 @@ import {
   STEPS,
   URINE_COLORS,
   assessAll,
-  getLoggedFluid,
   overallLevel,
   saveLatestCheck,
   type Mood,
@@ -53,8 +52,6 @@ export function DailySelfCheck({ userId, userName, onDone, onReviewAlerts }: {
   const [fluid, setFluid] = useState("");
   const [urine, setUrine] = useState<number | null>(null);
   const [savedResults, setSavedResults] = useState<ReturnType<typeof assessAll>>([]);
-  const [loggedFluid, setLoggedFluid] = useState<number | null>(null);
-  const fluidAddedMl = num(fluid, RANGE.fluidMl);
   const values: SelfCheckValues = {
     systolic: num(raw.sys, RANGE.systolic),
     diastolic: num(raw.dia, RANGE.diastolic),
@@ -63,29 +60,23 @@ export function DailySelfCheck({ userId, userName, onDone, onReviewAlerts }: {
     mood,
     sleepHours: num(sleep, RANGE.sleepHours),
     fasting,
-    fluidMl: fluidAddedMl == null ? null : (loggedFluid ?? 0) + fluidAddedMl,
+    fluidMl: num(fluid, RANGE.fluidMl),
     urineColor: urine,
   };
   const results = step === STEPS.length ? savedResults : assessAll(values);
   const overall = overallLevel(results);
   const n = STEPS.length;
 
-  const goToStep = (next: number) => {
-    if (STEPS[next]?.id === "hydration") setLoggedFluid(getLoggedFluid(userId, Date.now()));
-    setStep(next);
-  };
-
   const finish = (skipHydration = false) => {
     const at = Date.now();
-    const added = skipHydration ? null : fluidAddedMl;
     const completed = {
       ...values,
-      fluidMl: added == null ? null : (getLoggedFluid(userId, at) ?? 0) + added,
+      fluidMl: skipHydration ? null : values.fluidMl,
       urineColor: skipHydration ? null : urine,
     };
     const items = assessAll(completed);
     if (Object.values(completed).some((value) => typeof value === "number")) {
-      saveLatestCheck({ userId, at, items, values: { ...completed, fluidAddedMl: added } });
+      saveLatestCheck({ userId, at, items, values: completed });
     }
     setSavedResults(items);
     setStep(n);
@@ -216,7 +207,7 @@ export function DailySelfCheck({ userId, userName, onDone, onReviewAlerts }: {
     (info.id === "glucose" && raw.glucose && values.glucose == null) ||
     (info.id === "temperature" && raw.temp && values.temperature == null) ||
     (info.id === "sleep" && sleep && values.sleepHours == null) ||
-    (info.id === "hydration" && fluid && fluidAddedMl == null);
+    (info.id === "hydration" && fluid && values.fluidMl == null);
 
   function skipStep() {
     if (info.id === "hydration") return finish(true);
@@ -225,7 +216,7 @@ export function DailySelfCheck({ userId, userName, onDone, onReviewAlerts }: {
     if (info.id === "temperature") setRaw({ ...raw, temp: "" });
     if (info.id === "mood") setMood(null);
     if (info.id === "sleep") setSleep("");
-    goToStep(step + 1);
+    setStep(step + 1);
   }
 
   return (
@@ -321,24 +312,9 @@ export function DailySelfCheck({ userId, userName, onDone, onReviewAlerts }: {
           {info.id === "hydration" && (
             <>
               <label className="mc-label">
-                New fluid to log (mL)
+                Fluid in the last 24 h (mL)
                 <input inputMode="numeric" value={fluid} onChange={(e) => setFluid(e.target.value)} placeholder="2400" className={`${inputCls} mt-1.5`} autoFocus />
               </label>
-              <p className="text-xs text-mc-label">
-                {(loggedFluid ?? 0).toLocaleString()} mL logged on this device today (UTC).
-              </p>
-              <div className="flex flex-wrap gap-2">
-                {[250, 500].map((ml) => (
-                  <button
-                    key={ml}
-                    type="button"
-                    onClick={() => setFluid(String((Number(fluid) || 0) + ml))}
-                    className="min-h-9 rounded-md border border-mc-line-strong px-3 text-xs text-mc-soft hover:text-white"
-                  >
-                    + {ml} mL
-                  </button>
-                ))}
-              </div>
               <div>
                 <p className="mc-label">Most recent urine colour</p>
                 <div className="mt-1.5 grid grid-cols-8 gap-1.5" role="radiogroup" aria-label="Urine colour">
@@ -388,7 +364,7 @@ export function DailySelfCheck({ userId, userName, onDone, onReviewAlerts }: {
           </div>
 
           <div className="mt-auto flex items-center justify-between gap-2 pt-2">
-            <button type="button" onClick={() => goToStep(step - 1)} className="min-h-11 rounded-md px-3 text-sm text-mc-muted hover:text-white">
+            <button type="button" onClick={() => setStep(step - 1)} className="min-h-11 rounded-md px-3 text-sm text-mc-muted hover:text-white">
               ← Back
             </button>
             <div className="flex gap-2">
@@ -401,7 +377,7 @@ export function DailySelfCheck({ userId, userName, onDone, onReviewAlerts }: {
               </button>
               <button
                 type="button"
-                onClick={() => (step === n - 1 ? finish() : goToStep(step + 1))}
+                onClick={() => (step === n - 1 ? finish() : setStep(step + 1))}
                 disabled={Boolean(typo)}
                 className="min-h-11 rounded-md border border-mc-nasa-edge bg-mc-nasa px-5 text-sm font-semibold text-white disabled:opacity-50"
               >

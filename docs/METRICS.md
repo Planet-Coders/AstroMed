@@ -85,9 +85,9 @@ The thresholds shown are AstroMed demo defaults.
 
 ## Hydration
 
-**What:** Total newly logged fluid intake for each UTC day. Earlier 24-hour reports are shown as snapshots.
+**What:** The latest 24-hour fluid report and any water logged after it from the low fluid intake alert.
 
-**Data source in the app:** Daily self-check, hydration step (self-report).
+**Data source in the app:** Daily self-check and the low fluid intake alert in My monitoring.
 
 **Why:** Relative dehydration, together with calcium released from bone, raises urine supersaturation and kidney-stone risk in flight. A NASA study found long-duration crew producing more than 2.5 L of urine a day appeared to minimise stone risk, while lower volumes raised it, so a daily intake target near 2–2.5 L is tracked.
 
@@ -261,7 +261,7 @@ The thresholds shown are AstroMed demo defaults.
 
 - **Threshold** rules compare the average daily value over the window with the amber and red limits.
 - **Latest** rules compare the last applicable reading in the window. A missed recheck leaves an existing alert open.
-- **Fluid intake** adds entries within the same UTC day. Older 24-hour snapshots are used on days without new-style fluid entries.
+- **Fluid intake** uses the latest 24-hour Daily Check snapshot plus water logged after it from the low fluid intake alert. A new snapshot replaces the previous total.
 - **Trend** rules compare the window's average with the window before it, as a % change.
 - **Missing-data** rules count hours since the last value against the metric's expected cadence. A metric that has never reported shows *No data yet* instead of alerting.
 - Rules are checked whenever a crew member's monitoring is viewed (crew console, oversight dashboard). An alert opens when a rule fires, updates while it keeps firing, re-opens if it escalates from amber to red, and resolves automatically when the value is back within limits.

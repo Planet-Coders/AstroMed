@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { METRIC, formatValue } from "@/lib/monitoring/catalog";
 import type { Rule } from "@/lib/monitoring/engine";
 import { ruleText } from "./MonitoringPanel";
@@ -36,11 +36,13 @@ export function AlertsPanel({
   alerts,
   rules,
   canResolve,
+  canLogWater,
   onChanged,
 }: {
   alerts: AlertView[];
   rules: Rule[];
   canResolve: boolean;
+  canLogWater: boolean;
   onChanged: () => void;
 }) {
   const [show, setShow] = useState<"active" | "resolved">("active");
@@ -71,31 +73,66 @@ export function AlertsPanel({
         <p className="text-sm text-mc-label">{show === "active" ? "No active alerts." : "No alerts resolved in the last 30 days."}</p>
       )}
       {list.map((a) => (
-        <AlertCard key={a.id} alert={a} rule={rules.find((r) => r.id === a.ruleId)} canResolve={canResolve} onChanged={onChanged} />
+        <AlertCard
+          key={a.id}
+          alert={a}
+          rule={rules.find((r) => r.id === a.ruleId)}
+          canResolve={canResolve}
+          canLogWater={canLogWater && a.ruleId === "hydration_low" && a.status !== "RESOLVED"}
+          onChanged={(waterResolved) => {
+            if (waterResolved) setShow("resolved");
+            onChanged();
+          }}
+        />
       ))}
     </div>
   );
 }
 
-function AlertCard({ alert: a, rule, canResolve, onChanged }: { alert: AlertView; rule?: Rule; canResolve: boolean; onChanged: () => void }) {
+function AlertCard({ alert: a, rule, canResolve, canLogWater, onChanged }: {
+  alert: AlertView;
+  rule?: Rule;
+  canResolve: boolean;
+  canLogWater: boolean;
+  onChanged: (waterResolved?: boolean) => void;
+}) {
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [showWater, setShowWater] = useState(false);
+  const [water, setWater] = useState("");
+  const pendingWater = useRef<{ entryId: string; amountMl: number } | null>(null);
   const m = METRIC[a.metric];
+  const customAmount = Number(water);
+  const validAmount = Number.isInteger(customAmount) && customAmount >= 1 && customAmount <= 8000;
+  const actionButton = "min-h-9 rounded-md border border-mc-line-strong px-3 text-xs font-medium text-mc-soft hover:text-white disabled:opacity-40";
 
-  const act = async (action: "note" | "acknowledge" | "resolve") => {
+  const act = async (action: "note" | "acknowledge" | "resolve" | "log-water", amountMl?: number) => {
+    if (busy) return;
+    if (amountMl !== undefined && pendingWater.current?.amountMl !== amountMl) {
+      pendingWater.current = { entryId: crypto.randomUUID(), amountMl };
+    }
     setBusy(true);
     setError("");
     try {
       const res = await fetch(`/api/alerts/${a.id}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action, note }),
+        body: JSON.stringify(action === "log-water" ? { action, ...pendingWater.current } : { action, note }),
       });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error ?? `Request failed (${res.status})`);
-      setNote("");
-      onChanged();
+      if (!res.ok) {
+        if (res.status === 409) onChanged();
+        throw new Error(data.error ?? `Request failed (${res.status})`);
+      }
+      if (action === "log-water") {
+        pendingWater.current = null;
+        setWater("");
+        setShowWater(false);
+      } else {
+        setNote("");
+      }
+      onChanged(action === "log-water" && data.alert?.status === "RESOLVED");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Something went wrong");
     } finally {
@@ -193,8 +230,36 @@ function AlertCard({ alert: a, rule, canResolve, onChanged }: { alert: AlertView
           >
             Add note
           </button>
+          {canLogWater && (
+            <button type="button" className={actionButton} disabled={busy} aria-expanded={showWater} onClick={() => setShowWater(!showWater)}>
+              Log water
+            </button>
+          )}
         </div>
-        {error && <p className="text-xs text-mc-red">{error}</p>}
+        {canLogWater && showWater && (
+          <form
+            className="flex flex-wrap items-end gap-2 rounded-md border border-mc-line bg-mc-inset p-3"
+            onSubmit={(event) => {
+              event.preventDefault();
+              if (validAmount) void act("log-water", customAmount);
+            }}
+          >
+            {[250, 500].map((ml) => (
+              <button key={ml} type="button" disabled={busy} className={actionButton} onClick={() => void act("log-water", ml)}>
+                Add {ml} mL
+              </button>
+            ))}
+            <label className="mc-label">
+              Custom amount (mL)
+              <input
+                type="number" min={1} max={8000} step={1} value={water} onChange={(event) => setWater(event.target.value)}
+                className="mt-1 block min-h-9 w-28 rounded-md border border-mc-line-strong bg-mc-panel px-2 text-sm text-foreground"
+              />
+            </label>
+            <button type="submit" className={actionButton} disabled={busy || !validAmount}>Add amount</button>
+          </form>
+        )}
+        {error && <p role="alert" className="text-xs text-mc-red">{error}</p>}
       </div>
     </article>
   );

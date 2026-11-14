@@ -33,7 +33,7 @@ lines.push(
   "",
   "- **Threshold** rules compare the average daily value over the window with the amber and red limits.",
   "- **Latest** rules compare the last applicable reading in the window. A missed recheck leaves an existing alert open.",
-  "- **Fluid intake** adds entries within the same UTC day. Older 24-hour snapshots are used on days without new-style fluid entries.",
+  "- **Fluid intake** uses the latest 24-hour Daily Check snapshot plus water logged after it from the low fluid intake alert. A new snapshot replaces the previous total.",
   "- **Trend** rules compare the window's average with the window before it, as a % change.",
   "- **Missing-data** rules count hours since the last value against the metric's expected cadence. A metric that has never reported shows *No data yet* instead of alerting.",
   "- Rules are checked whenever a crew member's monitoring is viewed (crew console, oversight dashboard). An alert opens when a rule fires, updates while it keeps firing, re-opens if it escalates from amber to red, and resolves automatically when the value is back within limits.",

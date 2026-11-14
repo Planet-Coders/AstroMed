@@ -9,7 +9,7 @@ type Report = { at: number; data: unknown };
 /** Old checks stored formatted results for readings other than sleep and hydration. */
 export function selfCheckSamples(reports: Report[]): Sample[] {
   const samples: Sample[] = [];
-  const fluids = new Map<string, Sample>();
+  const latestSnapshot = new Map<string, number>();
   const addedFluids = new Map<string, Sample>();
 
   for (const { at, data } of reports) {
@@ -60,12 +60,45 @@ export function selfCheckSamples(reports: Report[]): Sample[] {
     } else {
       const snapshot = raw("fluidMl", fluid ? Number(fluid[1]) : null);
       if (snapshot == null) continue;
-      const current = fluids.get(day);
-      if (!current || at > current.at) fluids.set(day, { metric: "hydration", value: snapshot, at, fromSelfCheck: true });
+      latestSnapshot.set(day, Math.max(at, latestSnapshot.get(day) ?? -Infinity));
+      push("hydration", snapshot);
     }
   }
 
-  // A legacy rolling 24-hour snapshot may overlap the portions entered for this UTC day.
-  for (const [day, sample] of addedFluids) fluids.set(day, sample);
-  return [...samples, ...fluids.values()];
+  // Keep previous Daily Check totals as history. A newer 24-hour check replaces them.
+  for (const [day, sample] of addedFluids) {
+    if ((latestSnapshot.get(day) ?? -Infinity) < sample.at) samples.push(sample);
+  }
+  return samples;
+}
+
+/** A new 24-hour snapshot already accounts for water logged before it. */
+export function addLoggedWater(snapshots: Sample[], portions: { at: number; value: number }[]): Sample[] {
+  const events = [
+    ...snapshots.map((s) => ({ at: s.at, snapshot: s })),
+    ...portions.map((p) => ({ at: p.at, portion: p.value })),
+  ].sort((a, b) => a.at - b.at || Number("snapshot" in a) - Number("snapshot" in b));
+  const history = new Map<number, Sample>();
+  const window = 86_400_000;
+  let baseline: Sample | undefined;
+  const water: typeof portions = [];
+  let head = 0;
+  let total = 0;
+  for (const event of events) {
+    if ("snapshot" in event) {
+      baseline = event.snapshot;
+      water.length = 0;
+      head = 0;
+      total = 0;
+      history.set(event.at, baseline);
+      continue;
+    }
+    const cutoff = event.at - window;
+    while (head < water.length && water[head].at <= cutoff) total -= water[head++].value;
+    water.push({ at: event.at, value: event.portion });
+    total += event.portion;
+    const reported = baseline && baseline.at > cutoff ? baseline.value : 0;
+    history.set(event.at, { metric: "hydration", at: event.at, value: reported + total });
+  }
+  return [...history.values()];
 }

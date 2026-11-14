@@ -145,7 +145,7 @@ model MetricSample {
   metric     String
   value      Float
   recordedAt DateTime
-  /// "log" (crew console), "self-report" or "synthetic".
+  /// "log" (crew console), "self-report", "alert-water" or "synthetic".
   source     String
   synthetic  Boolean  @default(false)
   detail     Json?

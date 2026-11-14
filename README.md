@@ -36,9 +36,9 @@ Six guided steps:
 - **Body temperature** (°C)
 - **Mood** (5 faces)
 - **Sleep** (pre-filled from the sleep log)
-- **Hydration** (new fluid to log in mL and the most recent urine colour on an 8-shade chart)
+- **Hydration** (fluid in the last 24 hours in mL and the most recent urine colour on an 8-shade chart)
 
-Results turn green, amber or red as they're typed, with follow-up guidance. Open **My monitoring** from flagged results to follow synced alerts. Repeat the check any time, skip readings you didn't retake and add only fluid you haven't logged yet. Monitoring adds those entries into a total for each UTC day.
+Results turn green, amber or red as they're typed, with follow-up guidance. Open **My monitoring** from flagged results to follow synced alerts. On a **Low fluid intake** alert, use **Log water** to add 250 mL, 500 mL or a custom amount after the last check. A fresh 24-hour reading replaces the prior total.
 
 ### Body map + five hazards
 - An anatomical astronaut figure with a clickable status point per body system.

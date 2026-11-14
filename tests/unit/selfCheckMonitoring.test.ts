@@ -2,10 +2,32 @@ import { describe, expect, it } from "vitest";
 import { assessBp } from "@/lib/selfCheck";
 import { DEFAULT_RULES, ruleKind } from "@/lib/monitoring/catalog";
 import { awaitingReading, dailySeries, evaluateRules, planAlertChanges, type ActiveAlert } from "@/lib/monitoring/engine";
-import { selfCheckSamples } from "@/lib/monitoring/selfCheckSamples";
+import { addLoggedWater, selfCheckSamples } from "@/lib/monitoring/selfCheckSamples";
 
 const morning = Date.parse("2026-11-14T07:00:00Z");
 const evening = Date.parse("2026-11-14T18:00:00Z");
+
+it("adds water after the last snapshot and uses a newer 24-hour total as the baseline", () => {
+  const samples = selfCheckSamples([
+    { at: morning, data: { values: { fluidMl: 1400 } } },
+    { at: evening, data: { values: { fluidMl: 1900 } } },
+  ]);
+  const history = addLoggedWater(samples, [
+    { at: morning + 1, value: 500 },
+    { at: evening + 1, value: 250 },
+  ]);
+  expect(history.map((sample) => sample.value)).toEqual([1400, 1900, 1900, 2150]);
+});
+
+it("does not carry a snapshot or added water beyond its 24-hour window into a new entry", () => {
+  const snapshots = selfCheckSamples([{ at: morning, data: { values: { fluidMl: 1300 } } }]);
+  const history = addLoggedWater(snapshots, [
+    { at: morning + 1, value: 500 },
+    { at: morning + 86_400_002, value: 250 },
+  ]);
+  expect(history.map((sample) => sample.value)).toEqual([1300, 1800, 250]);
+});
+
 const rules = DEFAULT_RULES.map((rule) => ({ ...rule, enabled: true }));
 const assess = (reports: Parameters<typeof selfCheckSamples>[0], now = evening) =>
   evaluateRules(rules, selfCheckSamples(reports), now);
