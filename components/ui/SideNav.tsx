@@ -162,13 +162,13 @@ export function SideNav({
                           collapsed ? "h-9 w-9 justify-center px-0" : "w-full px-3"
                         } ${
                           on
-                            ? "bg-[#13223f] text-white shadow-[inset_0_1px_0_0_rgba(255,255,255,0.06)] border border-[#1e345e]/80"
-                            : "border border-transparent text-mc-muted hover:bg-white/[0.04] hover:text-foreground"
+                            ? "bg-mc-select text-mc-on-select border border-mc-select"
+                            : "border border-transparent text-mc-muted hover:bg-mc-raised hover:text-foreground"
                         }`}
                       >
                         {on && (
                           <span
-                            className={`absolute rounded-r bg-mc-select shadow-[0_0_8px_rgba(76,141,255,0.8)] ${
+                            className={`absolute rounded-r bg-mc-cyan ${
                               collapsed ? "left-0 top-1.5 bottom-1.5 w-1" : "left-0 top-1.5 bottom-1.5 w-1"
                             }`}
                           />
@@ -176,7 +176,7 @@ export function SideNav({
 
                         <span
                           className={`transition-colors duration-150 ${
-                            on ? "text-mc-cyan" : "text-mc-label group-hover:text-mc-soft"
+                            on ? "text-mc-on-select" : "text-mc-label group-hover:text-mc-soft"
                           }`}
                         >
                           <NavIcon id={tab.id} />
@@ -187,7 +187,7 @@ export function SideNav({
                         )}
 
                         {!collapsed && tab.badge != null && (
-                          <span className="rounded-full bg-[#182c4f] border border-mc-link/30 px-2 py-0.5 font-mono text-[10px] font-semibold text-mc-link shadow-xs">
+                          <span className={`rounded-full border px-2 py-0.5 font-mono text-[10px] font-semibold shadow-xs ${on ? "border-black/15 bg-black/10 text-mc-on-select" : "border-mc-line bg-mc-raised text-mc-link"}`}>
                             {tab.badge}
                           </span>
                         )}
@@ -222,19 +222,19 @@ export function SideNav({
                         collapsed ? "h-9 w-9 justify-center px-0" : "w-full px-3"
                       } ${
                         on
-                          ? "bg-[#13223f] text-white shadow-[inset_0_1px_0_0_rgba(255,255,255,0.06)] border border-[#1e345e]/80"
-                          : "border border-transparent text-mc-muted hover:bg-white/[0.04] hover:text-foreground"
+                          ? "bg-mc-select text-mc-on-select border border-mc-select"
+                          : "border border-transparent text-mc-muted hover:bg-mc-raised hover:text-foreground"
                       }`}
                     >
                       {on && (
-                        <span className="absolute left-0 top-1.5 bottom-1.5 w-1 rounded-r bg-mc-select shadow-[0_0_8px_rgba(76,141,255,0.8)]" />
+                        <span className="absolute left-0 top-1.5 bottom-1.5 w-1 rounded-r bg-mc-cyan" />
                       )}
-                      <span className={on ? "text-mc-cyan" : "text-mc-label group-hover:text-mc-soft"}>
+                      <span className={on ? "text-mc-on-select" : "text-mc-label group-hover:text-mc-soft"}>
                         <NavIcon id={tab.id} />
                       </span>
                       {!collapsed && <span className="flex-1 truncate text-left">{tab.label}</span>}
                       {!collapsed && tab.badge != null && (
-                        <span className="rounded-full bg-[#182c4f] border border-mc-link/30 px-2 py-0.5 font-mono text-[10px] font-semibold text-mc-link">
+                        <span className={`rounded-full border px-2 py-0.5 font-mono text-[10px] font-semibold ${on ? "border-black/15 bg-black/10 text-mc-on-select" : "border-mc-line bg-mc-raised text-mc-link"}`}>
                           {tab.badge}
                         </span>
                       )}
@@ -249,7 +249,7 @@ export function SideNav({
   };
 
   const sidebarContent = (
-    <div className="flex h-full w-full flex-col bg-[#070c17] text-foreground select-none">
+    <div className="flex h-full w-full flex-col bg-mc-bg text-foreground select-none">
       {/* Brand Header */}
       {collapsed ? (
         /* Collapsed Header: single centered AstroMed emblem that acts as the expand button without clashing */
@@ -266,7 +266,7 @@ export function SideNav({
               <ellipse cx="18" cy="18" rx="15" ry="6" fill="none" stroke="#FFFFFF" strokeOpacity=".55" transform="rotate(-24 18 18)" />
               <path d="M7 19h6l2-5 3 9 2.5-6H29" fill="none" stroke="#FFFFFF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
-            <span className="absolute -bottom-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-[#0b1528] border border-mc-nasa-edge/70 text-[9px] text-mc-cyan group-hover:scale-110 transition-transform">
+            <span className="absolute -bottom-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-mc-panel border border-mc-line-strong text-[9px] text-mc-link group-hover:scale-110 transition-transform">
               <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
                 <polyline points="9 18 15 12 9 6" />
               </svg>
@@ -286,8 +286,8 @@ export function SideNav({
             </div>
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-1.5">
-                <span className="text-[14px] font-bold tracking-[0.05em] text-white">AstroMed</span>
-                <span className="rounded bg-mc-nasa-edge/20 px-1 py-0.2 font-mono text-[9px] font-semibold text-mc-cyan border border-mc-nasa-edge/40">
+                <span className="text-[14px] font-bold tracking-[0.05em] text-foreground">AstroMed</span>
+                <span className="rounded bg-mc-raised px-1 py-0.2 font-mono text-[9px] font-semibold text-mc-link border border-mc-line-strong">
                   EDGE
                 </span>
               </div>
@@ -300,7 +300,7 @@ export function SideNav({
             type="button"
             onClick={() => setCollapsed(true)}
             title="Collapse sidebar"
-            className="hidden h-7 w-7 items-center justify-center rounded border border-mc-line-strong text-mc-label hover:bg-mc-raised hover:text-white transition-colors lg:flex"
+            className="hidden h-7 w-7 items-center justify-center rounded border border-mc-line-strong text-mc-label hover:bg-mc-raised hover:text-foreground transition-colors lg:flex"
             aria-label="Collapse sidebar"
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -315,7 +315,7 @@ export function SideNav({
             <button
               type="button"
               onClick={onMobileClose}
-              className="flex h-7 w-7 items-center justify-center rounded border border-mc-line-strong text-mc-label hover:bg-mc-raised hover:text-white lg:hidden"
+              className="flex h-7 w-7 items-center justify-center rounded border border-mc-line-strong text-mc-label hover:bg-mc-raised hover:text-foreground lg:hidden"
               aria-label="Close sidebar"
             >
               ✕
@@ -330,13 +330,13 @@ export function SideNav({
           type="button"
           onClick={() => handleSelect("check")}
           title="Daily Self-Check"
-          className={`flex items-center gap-2 rounded-lg border text-xs font-semibold text-white shadow-xs transition-colors duration-150 ${
+          className={`flex items-center gap-2 rounded-lg border text-xs font-semibold shadow-xs transition-colors duration-150 ${
             collapsed
-              ? "h-9 w-9 justify-center border-mc-line-strong bg-mc-panel hover:border-mc-select/50 hover:bg-[#162442]"
-              : "h-9 w-full px-3 border-mc-line-strong bg-gradient-to-r from-mc-panel to-[#111c33] hover:border-mc-select/50 hover:bg-[#162442]"
-          } ${active === "check" ? "border-mc-select ring-1 ring-mc-select/50 bg-[#162442]" : ""}`}
+              ? "h-9 w-9 justify-center border-mc-line-strong bg-mc-panel text-foreground hover:border-mc-line-strong hover:bg-mc-raised"
+              : "h-9 w-full px-3 border-mc-line-strong bg-mc-panel text-foreground hover:bg-mc-raised"
+          } ${active === "check" ? "border-mc-select bg-mc-select text-mc-on-select" : ""}`}
         >
-          <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded bg-mc-select/25 text-[11px] font-bold text-mc-cyan">
+          <span className={`flex h-4 w-4 shrink-0 items-center justify-center rounded text-[11px] font-bold ${active === "check" ? "bg-black/10 text-mc-on-select" : "bg-mc-raised text-mc-link"}`}>
             +
           </span>
           {!collapsed && <span className="truncate">Daily Self-Check</span>}
@@ -347,10 +347,10 @@ export function SideNav({
       {renderNavList()}
 
       {/* User Dock & Latency Footer (like Antigravity Settings Dock) */}
-      <div className="shrink-0 border-t border-mc-line bg-[#060a13] p-2.5">
+      <div className="shrink-0 border-t border-mc-line bg-mc-bg p-2.5">
         <div className={`flex items-center gap-2.5 ${collapsed ? "justify-center" : ""}`}>
           <div
-            className="relative flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#121c32] border border-mc-line-strong font-mono text-[11px] font-bold text-mc-link shadow-inner cursor-pointer"
+            className="relative flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-mc-raised border border-mc-line-strong font-mono text-[11px] font-bold text-mc-link shadow-inner cursor-pointer"
             title={`${user?.name ?? "Astronaut"} (${user?.callsign ?? user?.role ?? "Crew"})`}
             onClick={() => {
               if (collapsed) setCollapsed(false);
@@ -358,13 +358,13 @@ export function SideNav({
           >
             {initials}
             <span
-              className={`absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-[#060a13] ${statusDotClass}`}
+              className={`absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-mc-bg ${statusDotClass}`}
             />
           </div>
 
           {!collapsed && (
             <div className="min-w-0 flex-1">
-              <div className="truncate text-xs font-semibold text-white">
+              <div className="truncate text-xs font-semibold text-foreground">
                 {user?.name ?? "Astronaut"}
               </div>
               <div className="truncate text-[10px] text-mc-label">
@@ -382,7 +382,7 @@ export function SideNav({
                 window.location.assign("/login");
               }}
               title="Sign out"
-              className="flex h-7 w-7 items-center justify-center rounded text-mc-label hover:bg-mc-raised hover:text-white transition-colors"
+              className="flex h-7 w-7 items-center justify-center rounded text-mc-label hover:bg-mc-raised hover:text-foreground transition-colors"
               aria-label="Sign out"
             >
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -423,7 +423,7 @@ export function SideNav({
       {mobileOpen && (
         <div className="fixed inset-0 z-50 flex lg:hidden">
           <div
-            className="fixed inset-0 bg-black/75 backdrop-blur-xs transition-opacity"
+            className="fixed inset-0 bg-[#3a342c]/45 backdrop-blur-xs transition-opacity"
             onClick={onMobileClose}
             aria-hidden="true"
           />

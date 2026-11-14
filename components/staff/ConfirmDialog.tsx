@@ -65,7 +65,7 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
       {children}
       {open && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-[#3a342c]/45 p-4"
           onMouseDown={(e) => {
             if (e.target === e.currentTarget) close(false);
           }}
@@ -101,7 +101,7 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
               <button
                 type="button"
                 onClick={() => close(false)}
-                className="min-h-9 rounded-md border border-mc-line-strong px-4 text-xs font-medium text-mc-muted hover:text-white"
+                className="min-h-9 rounded-md border border-mc-line-strong px-4 text-xs font-medium text-mc-muted hover:text-foreground"
               >
                 Cancel
               </button>
@@ -110,8 +110,8 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
                 type="button"
                 disabled={blocked}
                 onClick={() => close(true)}
-                className={`min-h-9 rounded-md px-4 text-xs font-semibold text-white disabled:opacity-40 ${
-                  open.danger ? "bg-mc-red/80 hover:bg-mc-red" : "bg-mc-nasa hover:bg-mc-nasa-edge"
+                className={`min-h-9 rounded-md px-4 text-xs font-semibold disabled:opacity-40 ${
+                  open.danger ? "bg-mc-red text-white hover:bg-mc-red/80" : "bg-mc-select text-mc-on-select hover:bg-mc-soft"
                 }`}
               >
                 {open.confirmLabel}

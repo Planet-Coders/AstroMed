@@ -35,8 +35,8 @@ type AdminUser = {
 const input =
   "min-h-10 w-full rounded-md border border-mc-line-strong bg-mc-inset px-3 text-sm text-foreground placeholder:text-mc-label focus:border-mc-select focus:outline-none";
 const primary =
-  "min-h-10 rounded-md bg-mc-nasa px-4 text-sm font-semibold text-white hover:bg-mc-nasa-edge disabled:opacity-50";
-const ghost = "min-h-9 rounded-md border border-mc-line-strong px-3 text-xs font-medium text-mc-muted hover:text-white";
+  "min-h-10 rounded-md bg-mc-select px-4 text-sm font-semibold text-mc-on-select hover:bg-mc-soft disabled:opacity-50";
+const ghost = "min-h-9 rounded-md border border-mc-line-strong px-3 text-xs font-medium text-mc-muted hover:text-foreground";
 
 const ROLE_LABEL: Record<Role, string> = {
   SUPER_ADMIN: "Super admin",
@@ -124,7 +124,7 @@ export function AdminConsole({ user }: { user: { id: string; name: string; role:
 
   return (
     <ConfirmProvider>
-    <div className="flex min-h-screen flex-col bg-mc-bg font-sans text-foreground">
+    <div className="flex min-h-screen flex-col font-sans text-foreground">
       <StaffHeader user={user} active="/admin" subtitle="Super admin · mission groups & accounts" />
       <main className="mx-auto flex w-full max-w-[1200px] flex-col gap-5 p-4 md:p-6">
         <TabBar tabs={tabs} active={tab} onChange={setTab} />
@@ -487,10 +487,10 @@ function GroupChecks({ groups, value, onToggle }: { groups: Group[]; value: stri
           <label
             key={g.id}
             className={`flex min-h-9 cursor-pointer items-center gap-2 rounded-md border px-3 text-xs ${
-              on ? "border-mc-select bg-[#0f1a30] text-white" : "border-mc-line-strong text-mc-muted"
+              on ? "border-mc-select bg-mc-select text-mc-on-select" : "border-mc-line-strong text-mc-muted"
             }`}
           >
-            <input type="checkbox" className="accent-[#4c8dff]" checked={on} onChange={() => onToggle(g.id)} />
+            <input type="checkbox" className="accent-mc-select" checked={on} onChange={() => onToggle(g.id)} />
             <span className="font-mono">{g.code}</span>
           </label>
         );
@@ -801,7 +801,7 @@ function EditRow({ u, groups, self, run, onDone }: { u: AdminUser; groups: Group
   };
 
   return (
-    <tr className="bg-[#0f1a30]">
+    <tr className="bg-mc-raised">
       <td className="py-2 pr-2">
         <div className="flex gap-1.5">
           <input aria-label="Name" className={cell} value={name} onChange={(e) => setName(e.target.value)} />
@@ -980,7 +980,7 @@ function RulesTab({ run }: { run: Run }) {
                     <input
                       type="checkbox"
                       aria-label={`${r.label} enabled`}
-                      className="h-4 w-4 accent-[#4c8dff]"
+                      className="h-4 w-4 accent-mc-select"
                       checked={r.enabled}
                       onChange={() => void save(r, { enabled: !r.enabled }, `${r.label} ${r.enabled ? "switched off" : "switched on"}`)}
                     />

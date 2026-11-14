@@ -290,21 +290,21 @@ export function PVTTest() {
         <button
           type="button"
           onClick={() => setSound((s) => !s)}
-          className="rounded border border-mc-line-strong px-2 py-1 font-mono text-[11px] text-mc-label hover:text-white"
+          className="rounded border border-mc-line-strong px-2 py-1 font-mono text-[11px] text-mc-label hover:text-foreground"
         >
           {sound ? "🔊 sound on" : "🔇 sound off"}
         </button>
       }
     >
-      <p className="mb-3 text-xs text-slate-400">
-        Psychomotor vigilance test, a standard fatigue check on the ISS. Tap <span className="text-emerald-300">green beacons</span> as
-        fast as you can{focusMode && <>; leave <span className="text-red-300">red decoys</span> alone</>}.
-        {pvtSlowdown && <span className="ml-2 text-amber-400">ppCO₂ slowdown active</span>}
+      <p className="mb-3 text-xs text-mc-muted">
+        Psychomotor vigilance test, a standard fatigue check on the ISS. Tap <span className="text-mc-green">green beacons</span> as
+        fast as you can{focusMode && <>; leave <span className="text-mc-red">red decoys</span> alone</>}.
+        {pvtSlowdown && <span className="ml-2 text-mc-amber">ppCO₂ slowdown active</span>}
       </p>
 
       {phase !== "running" && phase !== "countdown" && (
         <div className="mb-3 flex flex-wrap items-center gap-2 text-xs">
-          <span className="text-slate-400">Duration</span>
+          <span className="text-mc-muted">Duration</span>
           {DURATIONS.map((m) => (
             <button
               key={m}
@@ -312,20 +312,20 @@ export function PVTTest() {
               onClick={() => setMinutes(m)}
               aria-pressed={minutes === m}
               className={`rounded-md border px-3 py-1.5 font-mono transition ${
-                minutes === m ? "border-cyan-500 bg-cyan-500/15 text-cyan-200" : "border-cyan-900/50 text-slate-400 hover:border-cyan-700"
+                minutes === m ? "border-mc-select bg-mc-select text-mc-on-select" : "border-mc-line-strong text-mc-muted hover:border-mc-cyan"
               }`}
             >
               {m} min
             </button>
           ))}
-          <label className="ml-2 flex items-center gap-1.5 text-slate-400">
-            <input type="checkbox" checked={focusMode} onChange={(e) => setFocusMode(e.target.checked)} className="accent-cyan-500" />
+          <label className="ml-2 flex items-center gap-1.5 text-mc-muted">
+            <input type="checkbox" checked={focusMode} onChange={(e) => setFocusMode(e.target.checked)} className="accent-mc-cyan" />
             Decoys
           </label>
           <button
             type="button"
             onClick={start}
-            className="ml-auto rounded-md border border-emerald-500/60 bg-emerald-500/15 px-4 py-1.5 font-medium text-emerald-200 hover:bg-emerald-500/25"
+            className="ml-auto rounded-md border border-mc-green/50 bg-mc-green/10 px-4 py-1.5 font-medium text-mc-green hover:bg-mc-green/20"
           >
             {phase === "done" ? "Play again" : "Start mission"}
           </button>
@@ -346,23 +346,23 @@ export function PVTTest() {
         onClick={() => {
           if (phase === "running") setStats((s) => ({ ...s, strays: s.strays + 1 }));
         }}
-        className={`pvt-arena relative mb-4 h-72 w-full select-none overflow-hidden rounded-lg border-2 border-cyan-900/50 ${
+        className={`pvt-arena relative mb-4 h-72 w-full select-none overflow-hidden rounded-lg border-2 border-mc-line-strong ${
           shaking ? "pvt-shake" : ""
         }`}
       >
         <div className="pvt-stars" aria-hidden />
 
         {phase === "idle" && (
-          <div className="flex h-full flex-col items-center justify-center gap-2 px-6 text-center text-sm text-slate-400">
+          <div className="flex h-full flex-col items-center justify-center gap-2 px-6 text-center text-sm text-mc-muted">
             <span className="text-3xl">🛰️</span>
             <p>Lock onto each green beacon before it fades. Fast locks build a combo multiplier.</p>
-            <p className="text-xs text-slate-500">Every {LEVEL_SECONDS} s the beacons get faster and smaller. Personal best: {best.toLocaleString()}</p>
+            <p className="text-xs text-mc-label">Every {LEVEL_SECONDS} s the beacons get faster and smaller. Personal best: {best.toLocaleString()}</p>
           </div>
         )}
 
         {phase === "countdown" && (
           <div className="flex h-full items-center justify-center">
-            <span key={count} className="pvt-count font-mono text-6xl text-cyan-200">
+            <span key={count} className="pvt-count font-mono text-6xl text-mc-link">
               {count}
             </span>
           </div>
@@ -393,7 +393,7 @@ export function PVTTest() {
             key={p.id}
             style={{ left: `calc((100% - 80px) * ${p.x} + 10px)`, top: `calc((100% - 60px) * ${p.y})` }}
             className={`pvt-pop pointer-events-none absolute font-mono text-sm font-semibold ${
-              p.tone === "good" ? "text-emerald-300" : p.tone === "bad" ? "text-red-400" : "text-cyan-300"
+              p.tone === "good" ? "text-mc-green" : p.tone === "bad" ? "text-mc-red" : "text-mc-link"
             }`}
           >
             {p.text}
@@ -401,7 +401,7 @@ export function PVTTest() {
         ))}
 
         {banner && (
-          <div className="pvt-pop pointer-events-none absolute inset-x-0 top-6 text-center font-mono text-lg tracking-widest text-amber-300">
+          <div className="pvt-pop pointer-events-none absolute inset-x-0 top-6 text-center font-mono text-lg tracking-widest text-mc-amber">
             {banner}
           </div>
         )}
@@ -413,21 +413,21 @@ export function PVTTest() {
               e.stopPropagation();
               finish();
             }}
-            className="absolute bottom-2 right-2 rounded border border-red-500/40 bg-black/30 px-2 py-1 text-[11px] text-red-300 hover:bg-red-500/10"
+            className="absolute bottom-2 right-2 rounded border border-mc-red/40 bg-mc-panel px-2 py-1 text-[11px] text-mc-red hover:bg-mc-red/10"
           >
             End
           </button>
         )}
 
         {phase === "done" && (
-          <div className="absolute inset-0 overflow-y-auto bg-[#060b16]/90 p-4 text-sm">
+          <div className="absolute inset-0 overflow-y-auto bg-mc-panel/95 p-4 text-sm">
             <div className="flex flex-wrap items-baseline justify-between gap-2">
               <p className={`text-lg font-semibold ${v.tone}`}>{v.label}</p>
-              <p className="font-mono text-slate-300">
-                {stats.score.toLocaleString()} pts {stats.score >= best && stats.score > 0 && <span className="text-amber-300">★ new best</span>}
+              <p className="font-mono text-foreground">
+                {stats.score.toLocaleString()} pts {stats.score >= best && stats.score > 0 && <span className="text-mc-amber">★ new best</span>}
               </p>
             </div>
-            <p className="mt-1 text-xs text-slate-400">{v.advice}</p>
+            <p className="mt-1 text-xs text-mc-muted">{v.advice}</p>
             <div className="mt-3 grid grid-cols-3 gap-2 font-mono text-xs sm:grid-cols-6">
               <Hud label="Mean RT" value={n ? `${Math.round(mean)} ms` : "—"} />
               <Hud label="Fastest" value={n ? `${Math.round(fastest)} ms` : "—"} />
@@ -441,7 +441,7 @@ export function PVTTest() {
         )}
       </div>
 
-      <p className="text-[11px] text-slate-500">
+      <p className="text-[11px] text-mc-label">
         Lapse = a beacon tapped slower than {LAPSE_MS} ms or missed entirely. Results feed the co-pilot, body map and daily missions.
       </p>
     </Card>
@@ -452,7 +452,7 @@ function Hud({ label, value, highlight }: { label: string; value: string; highli
   return (
     <div className={`rounded-md border px-2 py-1.5 ${highlight ? "border-amber-400/50 bg-amber-400/10" : "border-mc-line bg-mc-inset"}`}>
       <div className="text-[10px] uppercase tracking-wider text-mc-label">{label}</div>
-      <div className={highlight ? "text-amber-200" : "text-slate-100"}>{value}</div>
+      <div className={highlight ? "text-mc-amber" : "text-foreground"}>{value}</div>
     </div>
   );
 }
@@ -476,10 +476,10 @@ function RtChart({ hits }: { hits: number[] }) {
             width={bw * 0.7}
             y={h - (t / max) * h}
             height={(t / max) * h}
-            className={t > LAPSE_MS ? "fill-red-400/80" : t < 300 ? "fill-emerald-400/80" : "fill-cyan-400/70"}
+            className={t > LAPSE_MS ? "fill-mc-red" : t < 300 ? "fill-mc-green" : "fill-mc-cyan"}
           />
         ))}
-        <line x1={0} x2={w} y1={lapseY} y2={lapseY} className="stroke-amber-300/70" strokeDasharray="6 4" strokeWidth={1.5} />
+        <line x1={0} x2={w} y1={lapseY} y2={lapseY} className="stroke-mc-amber" strokeDasharray="6 4" strokeWidth={1.5} />
       </svg>
     </div>
   );

@@ -38,7 +38,7 @@ export function CrewOverview({
             aria-pressed={selected}
             className={`flex flex-col gap-2 rounded-lg border px-4 py-3.5 text-left transition ${
               selected
-                ? "border-mc-select bg-[#0f1a30]"
+                ? "border-mc-cyan bg-mc-raised"
                 : "border-mc-line bg-mc-panel hover:border-mc-line-strong"
             }`}
           >
