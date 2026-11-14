@@ -39,7 +39,7 @@ function UpdateForm({ submitLabel, onSubmit }: { submitLabel: string; onSubmit: 
     >
       <label className="block text-xs text-mc-muted">
         Pain right now: <span className={`font-mono ${pain >= 7 ? "text-mc-red" : pain >= 1 ? "text-mc-amber" : "text-mc-green"}`}>{pain}/10</span>
-        <input type="range" min={0} max={10} value={pain} onChange={(e) => setPain(Number(e.target.value))} className="mt-1 w-full accent-cyan-500" />
+        <input type="range" min={0} max={10} value={pain} onChange={(e) => setPain(Number(e.target.value))} className="mt-1 w-full accent-mc-cyan" />
       </label>
       <label className="block text-xs text-mc-muted">
         What happened / how it looks
@@ -77,7 +77,7 @@ function UpdateForm({ submitLabel, onSubmit }: { submitLabel: string; onSubmit: 
           // eslint-disable-next-line @next/next/no-img-element -- local data URL preview
           <img src={photo} alt="Injury photo preview" className="h-14 w-14 rounded object-cover" />
         )}
-        <button type="submit" className="ml-auto rounded-md border border-cyan-500/60 bg-cyan-500/15 px-4 py-1.5 text-sm text-cyan-100 hover:bg-cyan-500/25">
+        <button type="submit" className="ml-auto rounded-md border border-mc-select bg-mc-select px-4 py-1.5 text-sm text-mc-on-select hover:bg-mc-soft">
           {submitLabel}
         </button>
       </div>
@@ -94,7 +94,7 @@ function FirstAid({ type }: { type: InjuryType }) {
         <ol className="mt-2 space-y-1.5">
           {t.steps.map((s, i) => (
             <li key={s} className="flex gap-2 text-sm leading-relaxed text-mc-soft">
-              <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-cyan-500/15 font-mono text-[11px] text-cyan-200">
+              <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-mc-raised font-mono text-[11px] text-mc-link">
                 {i + 1}
               </span>
               {s}
@@ -124,10 +124,10 @@ export function NewInjuryPanel({
   const [type, setType] = useState<InjuryType>("cut");
   return (
     <div className="flex flex-col gap-4">
-      <div className="rounded-lg border border-cyan-500/40 bg-cyan-500/10 p-4">
+      <div className="rounded-lg border border-mc-line-strong bg-mc-raised p-4">
         <div className="flex items-baseline justify-between gap-2">
           <h3 className="text-xl font-semibold">Report injury</h3>
-          <button type="button" onClick={onCancel} className="text-xs text-mc-label hover:text-white">
+          <button type="button" onClick={onCancel} className="text-xs text-mc-label hover:text-foreground">
             Cancel
           </button>
         </div>
@@ -160,7 +160,7 @@ export function NewInjuryPanel({
               aria-pressed={type === k}
               onClick={() => setType(k)}
               className={`rounded-md border px-2 py-2 text-left text-xs transition ${
-                type === k ? "border-cyan-400 bg-cyan-500/15 text-white" : "border-mc-line bg-mc-inset text-mc-soft hover:border-mc-line-strong"
+                type === k ? "border-mc-select bg-mc-select text-mc-on-select" : "border-mc-line bg-mc-inset text-mc-soft hover:border-mc-line-strong"
               }`}
             >
               <span className="mr-1">{INJURY_TYPES[k].icon}</span>

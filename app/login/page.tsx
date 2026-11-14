@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { WarpScene } from "@/components/login/WarpScene";
 import { LoadingScreen } from "@/components/LoadingScreen";
 import { AstroMedMark } from "@/components/AstroMedMark";
+import { ThemeToggle } from "@/components/ThemeToggle";
 import { LOGIN_IMAGES, toImage, type NasaImage } from "@/lib/nasaImages";
 
 const MISSION_EPOCH = Date.UTC(2026, 0, 15);
@@ -156,10 +157,10 @@ export default function LoginPage() {
   }
 
   const inputClass =
-    "mt-1.5 w-full rounded-lg border border-white/15 bg-white/5 px-3.5 py-3 text-sm text-white placeholder:text-slate-400/60 transition focus:border-[#fc3d21]/70 focus:bg-white/10 focus:outline-none";
+    "mt-1.5 w-full rounded-lg border border-mc-line-strong bg-mc-inset px-3.5 py-3 text-sm text-foreground placeholder:text-mc-label transition focus:border-mc-cyan focus:bg-mc-panel focus:outline-none";
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-[#02040b] text-white">
+    <div className="relative min-h-screen overflow-hidden bg-background text-foreground">
       <WarpScene warp={launching} planet={false} heartbeat={false} cruise={0.35} />
 
       <div
@@ -189,9 +190,8 @@ export default function LoginPage() {
             />
           </div>
         ))}
-        {/* Darken for legibility: strong at the bottom-left text, lighter at the top */}
-        <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(2,4,11,0.55)_0%,rgba(2,4,11,0.25)_35%,rgba(2,4,11,0.7)_75%,rgba(2,4,11,0.95)_100%)]" />
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_50%_45%,transparent_35%,rgba(2,4,11,0.6)_100%)]" />
+        <div className="theme-photo-veil absolute inset-0" />
+        <div className="theme-photo-veil-radial absolute inset-0" />
       </div>
 
       {/* Top bar */}
@@ -202,18 +202,19 @@ export default function LoginPage() {
       >
         <div className="flex items-center gap-3">
           <AstroMedMark className="h-11 w-11" />
-          <span className="hidden font-mono text-[10px] uppercase tracking-[0.25em] text-white/70 sm:inline">
+          <span className="hidden font-mono text-[10px] uppercase tracking-[0.25em] text-mc-muted sm:inline">
             AstroMed · Edge AI
           </span>
         </div>
-        <div className="flex items-center gap-6 font-mono text-[10px] uppercase tracking-[0.2em] text-white/70">
+        <div className="flex items-center gap-6 font-mono text-[10px] uppercase tracking-[0.2em] text-mc-muted">
           <span className="hidden md:inline">
             <MissionClock />
           </span>
+          <ThemeToggle />
           <button
             type="button"
             onClick={() => setPanelOpen(true)}
-            className="min-h-10 rounded-full border border-white/25 px-4 text-[11px] font-semibold tracking-[0.15em] text-white hover:border-white/60"
+            className="min-h-10 rounded-full border border-mc-select bg-mc-select px-4 text-[11px] font-semibold tracking-[0.15em] text-mc-on-select hover:bg-mc-soft"
           >
             Sign in
           </button>
@@ -236,7 +237,7 @@ export default function LoginPage() {
           >
             <span
               className={`rounded-full transition-all ${
-                i === slide ? "h-3.5 w-3.5 border-2 border-white" : "h-1.5 w-1.5 bg-white/50 hover:bg-white"
+                i === slide ? "h-3.5 w-3.5 border-2 border-mc-select bg-mc-cyan" : "h-1.5 w-1.5 bg-mc-label/50 hover:bg-mc-select"
               }`}
             />
           </button>
@@ -245,7 +246,7 @@ export default function LoginPage() {
 
       {/* Photo credit */}
       <p
-        className={`pointer-events-none fixed bottom-3 left-4 right-4 z-10 text-center font-mono text-[11px] leading-relaxed text-white/80 [text-shadow:0_1px_6px_rgba(0,0,0,0.9)] transition-opacity md:bottom-5 md:left-auto md:right-6 md:max-w-sm md:text-right ${
+        className={`pointer-events-none fixed bottom-3 left-4 right-4 z-10 text-center font-mono text-[11px] leading-relaxed text-mc-muted transition-opacity md:bottom-5 md:left-auto md:right-6 md:max-w-sm md:text-right ${
           launching ? "opacity-0" : ""
         }`}
       >
@@ -263,29 +264,29 @@ export default function LoginPage() {
       >
         {!booting && (
           <>
-            <p className="hero-in font-mono text-[11px] font-semibold uppercase tracking-[0.2em] text-white/80 sm:tracking-[0.35em]">
+            <p className="hero-in font-mono text-[11px] font-semibold uppercase tracking-[0.2em] text-mc-muted sm:tracking-[0.35em]">
               Mars transit · Crew health · 2026
             </p>
             <h1 className="mt-4 leading-none">
               <span className="hero-in block font-display text-[clamp(2.4rem,6vw,4.8rem)] italic [animation-delay:120ms]">
-                <span className="text-[#fc3d21]">Healthy</span> <span className="whitespace-nowrap text-white">all the way to</span>
+                <span className="text-mc-link">Healthy</span> <span className="whitespace-nowrap text-foreground">all the way to</span>
               </span>
-              <span className="hero-in -mt-2 block text-[clamp(5rem,19vw,15rem)] font-black tracking-tight text-white [animation-delay:220ms] [text-shadow:0_0_40px_rgba(255,255,255,0.35),0_0_120px_rgba(125,180,255,0.35)]">
+              <span className="hero-in -mt-2 block text-[clamp(5rem,19vw,15rem)] font-black tracking-tight text-foreground [animation-delay:220ms]">
                 MARS
               </span>
             </h1>
             <div className="hero-in mt-6 flex w-full max-w-5xl flex-col items-center justify-between gap-6 text-left [animation-delay:380ms] md:flex-row md:items-end">
-              <p className="max-w-md text-[13px] leading-relaxed text-white/75">
+              <p className="max-w-md text-[13px] leading-relaxed text-mc-muted">
                 Twenty light-minutes from Earth, there is no ground surgeon on call. AstroMed watches every heartbeat,
                 breath and dose on board, and an on-device AI co-pilot answers the crew even when the link to Earth is down.
               </p>
               <button
                 type="button"
                 onClick={() => setPanelOpen(true)}
-                className="group flex min-h-11 items-center gap-3 font-mono text-[11px] font-semibold uppercase tracking-[0.3em] text-white"
+                className="group flex min-h-11 items-center gap-3 font-mono text-[11px] font-semibold uppercase tracking-[0.3em] text-foreground"
               >
                 Take a small step
-                <span className="h-px w-10 bg-white transition-all group-hover:w-16" />
+                <span className="h-px w-10 bg-mc-select transition-all group-hover:w-16" />
               </button>
             </div>
           </>
@@ -295,7 +296,7 @@ export default function LoginPage() {
       {/* Sign-in panel slides in from the right */}
       <aside
         aria-hidden={!panelOpen}
-        className={`fixed inset-y-0 right-0 z-30 flex w-full max-w-md flex-col justify-center border-l border-white/10 bg-[#050913] p-8 md:bg-[#050913]/90 shadow-[-30px_0_80px_rgba(0,0,0,0.6)] transition-transform duration-500 ease-out md:p-12 ${
+        className={`fixed inset-y-0 right-0 z-30 flex w-full max-w-md flex-col justify-center border-l border-mc-line bg-mc-panel p-8 shadow-[-30px_0_80px_rgba(60,50,20,0.12)] transition-transform duration-500 ease-out md:p-12 ${
           panelOpen && !launching ? "translate-x-0" : "translate-x-full"
         }`}
       >
@@ -304,19 +305,19 @@ export default function LoginPage() {
           onClick={() => setPanelOpen(false)}
           aria-label="Close sign in"
           tabIndex={panelOpen ? 0 : -1}
-          className="absolute right-6 top-6 flex h-10 w-10 items-center justify-center rounded-full border border-white/20 text-white/70 hover:text-white"
+          className="absolute right-6 top-6 flex h-10 w-10 items-center justify-center rounded-full border border-mc-line-strong text-mc-muted hover:text-foreground"
         >
           ✕
         </button>
-        <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.35em] text-[#fc3d21]">Crew access</p>
+        <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.35em] text-mc-link">Crew access</p>
         <h2 className="mt-3 font-display text-4xl italic">
-          Welcome <span className="text-white/60">aboard</span>
+          Welcome <span className="text-mc-muted">aboard</span>
         </h2>
-        <p className="mt-2 text-sm text-white/60">Sign in to the mission console.</p>
+        <p className="mt-2 text-sm text-mc-muted">Sign in to the mission console.</p>
 
         <form onSubmit={onSubmit} className="mt-8">
-          {error && <p className="mb-4 text-sm text-red-300">{error}</p>}
-          <label className="block text-xs text-white/70">
+          {error && <p className="mb-4 text-sm text-mc-red">{error}</p>}
+          <label className="block text-xs text-mc-muted">
             Email
             <input
               ref={emailRef}
@@ -328,7 +329,7 @@ export default function LoginPage() {
               className={inputClass}
             />
           </label>
-          <label className="mt-4 block text-xs text-white/70">
+          <label className="mt-4 block text-xs text-mc-muted">
             Password
             <input
               type="password"
@@ -343,11 +344,11 @@ export default function LoginPage() {
             type="submit"
             disabled={launching}
             tabIndex={panelOpen ? 0 : -1}
-            className="mt-8 flex min-h-12 w-full items-center justify-center gap-3 rounded-full bg-[#fc3d21] text-sm font-semibold uppercase tracking-[0.2em] text-white transition hover:bg-[#ff5a3f] disabled:opacity-70"
+            className="mt-8 flex min-h-12 w-full items-center justify-center gap-3 rounded-full bg-mc-select text-sm font-semibold uppercase tracking-[0.2em] text-mc-on-select transition hover:bg-mc-soft disabled:opacity-70"
           >
             {launching ? "Launching…" : "Launch console"}
           </button>
-          <p className="mt-6 text-center text-[11px] text-white/40">Demo build · any crew email signs in · admin and oversight need their password</p>
+          <p className="mt-6 text-center text-[11px] text-mc-label">Demo build · any crew email signs in · admin and oversight need their password</p>
         </form>
       </aside>
 

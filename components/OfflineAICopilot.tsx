@@ -148,7 +148,7 @@ export function OfflineAICopilot({
         <button
           type="button"
           onClick={() => setChatOpen(true)}
-          className="min-h-11 rounded-md border border-mc-nasa-edge bg-mc-nasa text-sm font-semibold text-white"
+          className="min-h-11 rounded-md border border-mc-select bg-mc-select text-sm font-semibold text-mc-on-select"
         >
           Ask the co-pilot
         </button>
@@ -156,7 +156,7 @@ export function OfflineAICopilot({
           type="button"
           onClick={voice.isListening ? voice.stop : voice.supported ? voice.start : voice.runPromptFallback}
           className={`min-h-11 rounded-md border text-sm font-medium ${
-            voice.isListening ? "border-mc-red/60 bg-mc-red/10 text-mc-red" : "border-mc-line-strong text-mc-soft hover:text-white"
+            voice.isListening ? "border-mc-red/60 bg-mc-red/10 text-mc-red" : "border-mc-line-strong text-mc-soft hover:text-foreground"
           }`}
         >
           {voice.isListening ? "Stop listening" : voice.supported ? "Voice check-in" : "Type a check-in"}
@@ -172,14 +172,14 @@ export function OfflineAICopilot({
       {/* 3. Data link */}
       <section className="flex items-center justify-between gap-3 rounded-lg border border-mc-line bg-mc-panel px-5 py-3.5">
         <p className="text-[13px] text-mc-soft">
-          <span className="font-mono text-white">{unsyncedCount}</span> records waiting
+          <span className="font-mono text-foreground">{unsyncedCount}</span> records waiting
           <span className={isOnline ? "text-mc-label" : "text-mc-amber"}>{isOnline ? " · online" : " · no link"}</span>
         </p>
         <button
           type="button"
           onClick={() => void syncNow()}
           disabled={isSyncing || unsyncedCount === 0}
-          className="whitespace-nowrap rounded-md border border-mc-nasa-edge px-3 py-1.5 text-xs font-semibold text-[#b5d2ff] disabled:opacity-40"
+          className="whitespace-nowrap rounded-md border border-mc-line-strong px-3 py-1.5 text-xs font-semibold text-mc-link disabled:opacity-40"
         >
           {isSyncing ? "Syncing…" : "Sync to Earth"}
         </button>

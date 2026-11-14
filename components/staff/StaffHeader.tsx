@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import type { Role } from "@prisma/client";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 const LINKS: { href: string; label: string; roles: Role[] }[] = [
   { href: "/admin", label: "Admin console", roles: ["SUPER_ADMIN"] },
@@ -39,7 +40,7 @@ export function StaffHeader({
             href={l.href}
             aria-current={active === l.href ? "page" : undefined}
             className={`flex min-h-8 items-center rounded-md px-3 text-xs ${
-              active === l.href ? "bg-mc-nasa font-semibold text-white" : "font-medium text-mc-muted hover:text-white"
+              active === l.href ? "bg-mc-select font-semibold text-mc-on-select" : "font-medium text-mc-muted hover:text-foreground"
             }`}
           >
             {l.label}
@@ -52,13 +53,14 @@ export function StaffHeader({
           <div className="font-medium">{user.name}</div>
           <div className="font-mono text-[11px] text-mc-label">{user.role === "SUPER_ADMIN" ? "SUPER ADMIN" : "OVERSIGHT"}</div>
         </div>
+        <ThemeToggle />
         <button
           type="button"
           onClick={async () => {
             await fetch("/api/auth/logout", { method: "POST" }).catch(() => {});
             window.location.assign("/login");
           }}
-          className="min-h-9 rounded-md border border-mc-line-strong px-3 text-xs font-medium text-mc-muted hover:text-white"
+          className="min-h-9 rounded-md border border-mc-line-strong px-3 text-xs font-medium text-mc-muted hover:text-foreground"
         >
           Sign out
         </button>
