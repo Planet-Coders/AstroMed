@@ -145,7 +145,7 @@ model MetricSample {
   metric     String
   value      Float
   recordedAt DateTime
-  /// "log" (crew console), "self-report" or "synthetic".
+  /// "log" (crew console), "self-report", "alert-water" or "synthetic".
   source     String
   synthetic  Boolean  @default(false)
   detail     Json?
@@ -157,7 +157,7 @@ model MetricSample {
 model AlertRule {
   id         String   @id
   metric     String
-  /// "threshold" (window average), "trend" (% change vs the previous window) or "missing" (hours since last value).
+  /// "threshold" (window average), "latest" (most recent reading), "trend" (% change) or "missing" (hours since last value).
   kind       String
   /// "above" or "below".
   comparator String

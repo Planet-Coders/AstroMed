@@ -1,34 +1,33 @@
 "use client";
 
-import { METRIC, type MetricId } from "@/lib/monitoring/catalog";
-import type { DailyPoint, Rule } from "@/lib/monitoring/engine";
+import { METRIC, formatValue, type MetricId } from "@/lib/monitoring/catalog";
+import { crosses, type DailyPoint, type Rule } from "@/lib/monitoring/engine";
+import { worstRisk } from "@/lib/risk";
 
 const W = 320;
 const H = 120;
 const PAD = { l: 34, r: 6, t: 8, b: 18 };
 
 /**
- * Daily bars for one metric, coloured against its threshold rule, with the amber and red
+ * Daily bars for one metric, coloured against its rules, with the amber and red
  * lines drawn across. Days with no data show as a dashed empty slot, never as zero.
  */
-export function MetricChart({ metric, series, rule }: { metric: MetricId; series: DailyPoint[]; rule?: Rule }) {
+export function MetricChart({ metric, series, rules }: { metric: MetricId; series: DailyPoint[]; rules: Rule[] }) {
   const m = METRIC[metric];
   const vals = series.map((p) => p.value).filter((v): v is number => v != null);
-  const lines = rule && rule.enabled ? [rule.amber, rule.red] : [];
-  const top = Math.max(...vals, ...lines, 1) * 1.12;
+  const lines = rules.flatMap((r) => [
+    { id: `${r.id}:amber`, threshold: r.amber, color: "var(--color-mc-amber)" },
+    { id: `${r.id}:red`, threshold: r.red, color: "var(--color-mc-red)" },
+  ]);
+  const top = Math.max(...vals, ...lines.map((line) => line.threshold), 1) * 1.12;
   const innerW = W - PAD.l - PAD.r;
   const innerH = H - PAD.t - PAD.b;
   const y = (v: number) => PAD.t + innerH - (v / top) * innerH;
   const slot = innerW / series.length;
   const bar = Math.max(2, slot * 0.68);
 
-  const levelOf = (v: number) => {
-    if (!rule || !rule.enabled) return "GREEN";
-    const past = (t: number) => (rule.comparator === "above" ? v >= t : v < t);
-    return past(rule.red) ? "RED" : past(rule.amber) ? "YELLOW" : "GREEN";
-  };
   const fill = { GREEN: "var(--color-mc-green)", YELLOW: "var(--color-mc-amber)", RED: "var(--color-mc-red)" };
-  const ticks = [0, top / 2, top].map((t) => Math.round(t * 10 ** m.decimals) / 10 ** m.decimals);
+  const ticks = [...new Set([0, top / 2, top].map((t) => Number(t.toFixed(m.decimals))))];
   const label = (d: string) => d.slice(5).replace("-", "/");
   const missingDays = series.filter((p) => p.value == null).length;
 
@@ -56,20 +55,17 @@ export function MetricChart({ metric, series, rule }: { metric: MetricId; series
             </rect>
           );
         }
-        const lv = levelOf(p.value);
+        const value = p.value;
+        const lv = worstRisk(rules.map((rule) => crosses(value, rule) ?? "GREEN"));
         return (
           <rect key={p.date} x={x} y={y(p.value)} width={bar} height={Math.max(1, PAD.t + innerH - y(p.value))} rx="1" fill={fill[lv]} fillOpacity={lv === "GREEN" ? 0.55 : 0.9}>
-            <title>{`${p.date}: ${p.value.toFixed(m.decimals)} ${m.unit}`}</title>
+            <title>{`${p.date}: ${formatValue(metric, value)}`}</title>
           </rect>
         );
       })}
-      {rule && rule.enabled &&
-        ([
-          [rule.amber, "var(--color-mc-amber)"],
-          [rule.red, "var(--color-mc-red)"],
-        ] as const).map(([t, c]) => (
-          <line key={t} x1={PAD.l} x2={W - PAD.r} y1={y(t)} y2={y(t)} stroke={c} strokeWidth="1" strokeDasharray="4 3" />
-        ))}
+      {lines.map(({ id, threshold, color }) => (
+        <line key={id} x1={PAD.l} x2={W - PAD.r} y1={y(threshold)} y2={y(threshold)} stroke={color} strokeWidth="1" strokeDasharray="4 3" />
+      ))}
       {[0, Math.floor(series.length / 2), series.length - 1].map((i) => (
         <text key={i} x={PAD.l + i * slot + slot / 2} y={H - 5} textAnchor="middle" fontSize="8" fill="var(--color-mc-label)" fontFamily="var(--font-plex-mono)">
           {label(series[i].date)}

@@ -1,13 +1,6 @@
 import type { RiskLevel } from "@/lib/risk";
 import { getOutboxUser, queueHealth } from "@/lib/outbox";
-import inspiration4 from "@/lib/data/inspiration4.json";
-
-// Real crew data from NASA OSDR (SpaceX Inspiration4, OSD-575): the lab's fasting glucose
-// reference range and the crew's pre-flight average set the glucose thresholds below.
-const I4_GLUCOSE = inspiration4.analytes.find((a) => a.key === "glucose")!;
-const GLUCOSE_REF = (I4_GLUCOSE.ref ?? [70, 99]) as [number, number];
-const GLUCOSE_CREW_AVG = Math.round(I4_GLUCOSE.preflightMean);
-const GLUCOSE_LANDING_CHANGE = I4_GLUCOSE.changePct;
+import { CHECK_LIMITS, GLUCOSE_REF, GLUCOSE_CREW_AVG, GLUCOSE_LANDING_CHANGE } from "@/lib/selfCheckThresholds";
 
 /**
  * Daily Self-Check: the indicators the crew measures themselves each morning, with
@@ -24,10 +17,9 @@ export type SelfCheckValues = {
   glucose: number | null; // mg/dL
   temperature: number | null; // °C
   mood: Mood | null;
-  moodNote: string;
   sleepHours: number | null;
   fasting: boolean;
-  /** Fluid drunk in the last 24 h, mL (self-report). */
+  /** Self-reported fluid in the last 24 hours, in mL. */
   fluidMl: number | null;
   /** Urine colour on the 8-shade chart: 1 pale straw … 8 dark brown. */
   urineColor: number | null;
@@ -65,7 +57,7 @@ export const STEPS: StepInfo[] = [
     ],
     whySpace:
       "Without gravity, blood and fluid shift toward the head. Blood pressure and heart workload change in the first weeks, and stress, radiation and inactivity raise long-term cardiovascular risk.",
-    normal: "Below 130 / 85 mmHg",
+    normal: "95 to under 130 systolic · 60 to under 85 diastolic (mmHg)",
     hazard: "Gravity · Hostile environment",
   },
   {
@@ -93,7 +85,7 @@ export const STEPS: StepInfo[] = [
     ],
     whySpace:
       "Core body temperature runs about 1 °C higher in space, and exercise heats you more because sweat doesn't evaporate. The immune system also weakens in flight, so a fever matters sooner.",
-    normal: "36.1–37.5 °C",
+    normal: "36.0 to under 37.6 °C",
     hazard: "Hostile environment · Isolation",
   },
   {
@@ -103,7 +95,6 @@ export const STEPS: StepInfo[] = [
     howTo: [
       "Take one slow breath and think about the last 24 hours as a whole.",
       "Pick the face that matches how you feel. There is no wrong answer.",
-      "Optionally add a word or two. Only you and the CMO can see it.",
     ],
     whySpace:
       "Isolation, confinement, a 20-minute delay to home and a heavy workload wear on mood. Tracking it daily catches a downward trend early, before it affects sleep, teamwork or safety.",
@@ -128,9 +119,9 @@ export const STEPS: StepInfo[] = [
     title: "Hydration",
     unit: "mL",
     howTo: [
-      "Add up what you drank in the last 24 hours: drink bags, rehydrated food and coffee count. One drink bag is about 250 mL.",
-      "Check the colour of your first urine of the day against the 8-shade chart (1 pale straw … 8 dark).",
-      "Enter both. A guess is fine; the trend over days matters most.",
+      "Add up what you drank in the last 24 hours. Drink bags, rehydrated food and coffee count.",
+      "Compare your most recent urine colour with the 8-shade chart (1 pale straw … 8 dark).",
+      "Enter either or both. You can log additional water from a low fluid intake alert in My monitoring.",
     ],
     whySpace:
       "Fluid shifts dull thirst in weightlessness, and calcium lost from bone raises kidney-stone risk. NASA's renal stone evidence report names relative dehydration as a main driver; a NASA study found crew producing over 2.5 L of urine a day appeared to minimise the risk (NTRS 20240012429, 20000020539).",
@@ -147,39 +138,37 @@ export const MOODS: { value: Mood; face: string; label: string }[] = [
   { value: 5, face: "😄", label: "Great" },
 ];
 
-export function assessBp(sys: number, dia: number): Omit<ItemResult, "id" | "label" | "display"> {
-  if (sys >= 160 || dia >= 100 || sys < 85)
-    return {
-      level: "RED",
-      advice:
-        sys < 85
-          ? "Low blood pressure. Lie down, drink 500 mL of fluid with salt tablets, and recheck in 15 minutes. Call the CMO if you feel faint."
-          : "Very high. Rest 10 minutes and recheck. If still this high, or with headache, chest pain or vision change, call the CMO now.",
-    };
-  if (sys >= 130 || dia >= 85 || sys < 95)
-    return {
-      level: "YELLOW",
-      advice:
-        sys < 95
-          ? "On the low side. Hydrate and stand up slowly; recheck tomorrow."
-          : "Above target. Recheck after 5 minutes of rest. Cut salty snacks, keep exercise on plan, and recheck tomorrow.",
-    };
+export function assessBp(sys: number | null, dia: number | null): Omit<ItemResult, "id" | "label" | "display"> {
+  const { systolicHigh, systolicLow, diastolicHigh, diastolicLow } = CHECK_LIMITS;
+  const high = (limit: "amber" | "red") =>
+    (sys != null && sys >= systolicHigh[limit]) || (dia != null && dia >= diastolicHigh[limit]);
+  const low = (limit: "amber" | "red") =>
+    (sys != null && sys < systolicLow[limit]) || (dia != null && dia < diastolicLow[limit]);
+  if (high("red") || low("red")) {
+    return { level: "RED", advice: "Blood pressure is outside the alert range. Recheck after resting and contact the CMO." };
+  }
+  if (high("amber") || low("amber")) {
+    return { level: "YELLOW", advice: "Blood pressure is outside the target range. Recheck after 5 minutes of rest." };
+  }
+  if (sys == null || dia == null) {
+    return { level: "GREEN", advice: "Enter both numbers to assess the full blood pressure reading." };
+  }
   return { level: "GREEN", advice: "In range. Keep up hydration and daily exercise." };
 }
 
 export function assessGlucose(g: number, fasting: boolean): Omit<ItemResult, "id" | "label" | "display"> {
   if (g < GLUCOSE_REF[0])
     return {
-      level: g < 54 ? "RED" : "YELLOW",
+      level: g < CHECK_LIMITS.glucoseLow.red ? "RED" : "YELLOW",
       advice: `Low. Take 15 g of fast sugar (juice pouch or glucose tabs), wait 15 minutes and recheck. Tell the CMO if it stays under ${GLUCOSE_REF[0]} or you feel shaky or confused.`,
     };
-  const high = fasting ? [GLUCOSE_REF[1] + 1, 126] : [140, 200];
-  if (g >= high[1])
+  const high = fasting ? CHECK_LIMITS.glucoseFastingHigh : CHECK_LIMITS.glucoseAfterMealHigh;
+  if (g >= high.red)
     return {
       level: "RED",
       advice: "High. Drink water, recheck in 2 hours, and report to the CMO. Note recent meals and medicines.",
     };
-  if (g >= high[0])
+  if (g >= high.amber)
     return {
       level: "YELLOW",
       advice: "Slightly high. Keep resistance exercise on plan (muscle use lowers sugar) and recheck tomorrow fasting.",
@@ -191,19 +180,19 @@ export function assessGlucose(g: number, fasting: boolean): Omit<ItemResult, "id
 }
 
 export function assessTemperature(t: number): Omit<ItemResult, "id" | "label" | "display"> {
-  if (t >= 38.5 || t < 35)
+  if (t >= CHECK_LIMITS.temperatureHigh.red || t < CHECK_LIMITS.temperatureLow.red)
     return {
       level: "RED",
       advice:
-        t < 35
+        t < CHECK_LIMITS.temperatureLow.red
           ? "Too low. Recheck the reading, warm up with layers and a warm drink, and call the CMO if it stays below 35 °C."
           : "Fever. Rest, hydrate, take paracetamol if not allergic, isolate from crew if possible and call the CMO.",
     };
-  if (t >= 37.6 || t < 36)
+  if (t >= CHECK_LIMITS.temperatureHigh.amber || t < CHECK_LIMITS.temperatureLow.amber)
     return {
       level: "YELLOW",
       advice:
-        t < 36
+        t < CHECK_LIMITS.temperatureLow.amber
           ? "A bit low. Recheck after 15 minutes."
           : "Slightly raised. Normal right after exercise in space; recheck after 30 minutes of rest.",
     };
@@ -211,13 +200,13 @@ export function assessTemperature(t: number): Omit<ItemResult, "id" | "label" | 
 }
 
 export function assessMood(m: Mood): Omit<ItemResult, "id" | "label" | "display"> {
-  if (m === 1)
+  if (m < CHECK_LIMITS.moodLow.red)
     return {
       level: "RED",
       advice:
         "Thank you for being honest. Talk to the CMO today, and book a private conference with the ground psychologist. You are not alone out here.",
     };
-  if (m === 2)
+  if (m < CHECK_LIMITS.moodLow.amber)
     return {
       level: "YELLOW",
       advice:
@@ -227,13 +216,13 @@ export function assessMood(m: Mood): Omit<ItemResult, "id" | "label" | "display"
 }
 
 export function assessSleep(h: number): Omit<ItemResult, "id" | "label" | "display"> {
-  if (h < 5)
+  if (h < CHECK_LIMITS.sleepLow.red)
     return {
       level: "RED",
       advice:
         "Severe sleep debt. Avoid EVA and critical tasks today if possible, take a 20-minute nap, and talk to the CMO about tonight's sleep plan.",
     };
-  if (h < 7)
+  if (h < CHECK_LIMITS.sleepLow.amber)
     return {
       level: "YELLOW",
       advice: "Short sleep. No caffeine after midday, dim the lights 1 hour before bed, and use eye mask and earplugs.",
@@ -244,26 +233,35 @@ export function assessSleep(h: number): Omit<ItemResult, "id" | "label" | "displ
 export const URINE_COLORS = ["#f8f4c4", "#f4ec9c", "#efe07a", "#e8cf55", "#dcb83b", "#c99a2a", "#ad7a1f", "#86571a"];
 
 export function assessHydration(fluidMl: number | null, urineColor: number | null): Omit<ItemResult, "id" | "label" | "display"> {
-  const lowRed = fluidMl != null && fluidMl < 1500;
-  const darkRed = urineColor != null && urineColor >= 6;
+  const lowRed = fluidMl != null && fluidMl < CHECK_LIMITS.hydrationLow.red;
+  const darkRed = urineColor != null && urineColor >= CHECK_LIMITS.urineDark.red;
   if (lowRed || darkRed)
     return {
       level: "RED",
-      advice:
-        "Dehydrated. Drink 500 mL now and another 250 mL every hour until urine is pale, and tell the CMO if you have flank pain, dizziness or very dark urine.",
+      advice: darkRed
+        ? "Urine colour is outside the alert range. Follow your hydration plan and contact the CMO."
+        : "Your reported fluid intake is below target. Follow your hydration plan and log additional water in My monitoring.",
     };
-  if ((fluidMl != null && fluidMl < 2000) || (urineColor != null && urineColor >= 4))
+  if ((fluidMl != null && fluidMl < CHECK_LIMITS.hydrationLow.amber) || (urineColor != null && urineColor >= CHECK_LIMITS.urineDark.amber))
     return {
       level: "YELLOW",
       advice: "Below target. Keep a drink bag in reach and aim for at least 2,000–2,500 mL today; recheck urine colour this evening.",
     };
-  return { level: "GREEN", advice: "Well hydrated. Keep it up, it protects your kidneys from stones." };
+  return { level: "GREEN", advice: "In range for the values entered." };
 }
 
 export function assessAll(v: SelfCheckValues): ItemResult[] {
   const out: ItemResult[] = [];
-  if (v.systolic != null && v.diastolic != null)
-    out.push({ id: "bp", label: "Blood pressure", display: `${v.systolic}/${v.diastolic} mmHg`, ...assessBp(v.systolic, v.diastolic) });
+  if (v.systolic != null || v.diastolic != null) {
+    const assessment = assessBp(v.systolic, v.diastolic);
+    const complete = v.systolic != null && v.diastolic != null;
+    if (complete || assessment.level !== "GREEN") {
+      const display = complete
+        ? `${v.systolic}/${v.diastolic} mmHg`
+        : v.systolic != null ? `${v.systolic} mmHg systolic` : `${v.diastolic} mmHg diastolic`;
+      out.push({ id: "bp", label: "Blood pressure", display, ...assessment });
+    }
+  }
   if (v.glucose != null)
     out.push({
       id: "glucose",
@@ -298,11 +296,6 @@ export function overallLevel(items: ItemResult[]): RiskLevel {
   return "GREEN";
 }
 
-/** Live colour while typing, so the astronaut sees the meaning immediately. */
-export function stepLevel(id: StepId, v: SelfCheckValues): RiskLevel | null {
-  return assessAll(v).find((i) => i.id === id)?.level ?? null;
-}
-
 // --- Persistence: the latest check per user is cached for the co-pilot prompt.
 
 const KEY = "aahms_selfcheck_latest";
@@ -311,8 +304,10 @@ export type StoredCheck = {
   userId: string;
   at: number;
   items: ItemResult[];
-  /** Raw self-reported values the server turns into metric samples (hydration). */
-  values?: { fluidMl: number | null; urineColor: number | null; sleepHours: number | null };
+  values?: Partial<SelfCheckValues> & {
+    /** Additional fluid recorded by the previous version of Daily Check. */
+    fluidAddedMl?: number | null;
+  };
 };
 
 export function saveLatestCheck(check: StoredCheck) {

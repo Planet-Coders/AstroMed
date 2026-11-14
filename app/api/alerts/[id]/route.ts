@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { badRequest, readableMember, requireRole } from "@/lib/authz";
 import { audit } from "@/lib/audit";
-import { ALERT_INCLUDE } from "@/lib/monitoring/server";
+import { ALERT_INCLUDE, logAlertWater } from "@/lib/monitoring/server";
 import { str } from "@/lib/validate";
 
 type Ctx = { params: Promise<{ id: string }> };
@@ -24,8 +24,21 @@ export async function POST(request: Request, { params }: Ctx) {
   if (!alert || (!own && !staff)) return NextResponse.json({ error: "Alert not found" }, { status: 404 });
 
   const body = await request.json().catch(() => ({}));
-  const action = body.action;
-  const note = str(body.note, 1000);
+  const action = body?.action;
+  if (action === "log-water") {
+    if (!own || user.role !== "ASTRONAUT" || alert.ruleId !== "hydration_low") {
+      return NextResponse.json({ error: "Water can only be logged on your own low fluid intake alert" }, { status: 403 });
+    }
+    const { amountMl, entryId } = body;
+    if (!Number.isInteger(amountMl) || amountMl < 1 || amountMl > 8000) return badRequest("Enter a whole amount from 1 to 8,000 mL");
+    if (typeof entryId !== "string" || !/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/.test(entryId)) {
+      return badRequest("Invalid water entry ID");
+    }
+    const updated = await logAlertWater(user, id, amountMl, entryId);
+    if (!updated) return NextResponse.json({ error: "This hydration alert is no longer active, or this entry was already used" }, { status: 409 });
+    return NextResponse.json({ alert: updated });
+  }
+  const note = str(body?.note, 1000);
   if (!["note", "acknowledge", "resolve"].includes(action)) return badRequest("Unknown action");
   if (action === "note" && !note) return badRequest("Write a note first");
   if (action === "resolve" && !staff) {
