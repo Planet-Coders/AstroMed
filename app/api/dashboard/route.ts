@@ -10,7 +10,8 @@ export async function GET() {
   }
 
   const users = await prisma.user.findMany({
-    where: session.role === "COMMANDER" ? { role: "ASTRONAUT" } : { role: "ASTRONAUT", crewId: session.crewId },
+    // Astronauts only ever get their own record; the commander sees every crew.
+    where: session.role === "COMMANDER" ? { role: "ASTRONAUT" } : { role: "ASTRONAUT", id: session.userId },
     orderBy: [{ crewId: "asc" }, { name: "asc" }],
   });
 

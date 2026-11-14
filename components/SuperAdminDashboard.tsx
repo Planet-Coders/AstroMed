@@ -105,10 +105,11 @@ export function SuperAdminDashboard({ user }: { user: SessionUser }) {
   const members: CrewMemberView[] = useMemo(() => {
     if (!data) return [];
     const flat = data.crews.flatMap((c) => c.members);
+    // Astronauts see only themselves; the commander sees every crew.
     const filtered =
       user.role === "COMMANDER"
         ? flat
-        : flat.filter((m) => m.user.crewId === user.crewId);
+        : flat.filter((m) => m.user.id === user.userId);
     return filtered.map((m) => ({
       id: m.user.id,
       name: m.user.name,
@@ -139,7 +140,7 @@ export function SuperAdminDashboard({ user }: { user: SessionUser }) {
     () =>
       (data?.crews ?? [])
         .flatMap((c) => c.members)
-        .filter((m) => user.role === "COMMANDER" || m.user.crewId === user.crewId)
+        .filter((m) => user.role === "COMMANDER" || m.user.id === user.userId)
         .map((m) => ({
           name: m.user.name,
           callsign: m.user.callsign,
@@ -163,7 +164,7 @@ export function SuperAdminDashboard({ user }: { user: SessionUser }) {
   const missions = useHealthMissions(user.userId);
 
   const tabs = [
-    { id: "telemetry", label: "Crew vitals" },
+    { id: "telemetry", label: user.role === "COMMANDER" ? "Crew vitals" : "My vitals" },
     { id: "body", label: "Body map" },
     { id: "check", label: "Daily check" },
     ...(user.role === "ASTRONAUT" ? [{ id: "monitoring", label: "My monitoring" }] : []),
@@ -198,6 +199,7 @@ export function SuperAdminDashboard({ user }: { user: SessionUser }) {
       <SyncEngine />
       <MissionHeader
         crewRisks={crewRisks}
+        selfOnly={user.role !== "COMMANDER"}
         mission={
           data?.group
             ? `${data.group.code} · ${data.group.destination ?? data.group.name}`
@@ -214,6 +216,7 @@ export function SuperAdminDashboard({ user }: { user: SessionUser }) {
 
           {tab === "telemetry" && (
             <>
+              {user.role === "COMMANDER" && (
               <CrewOverview
                 members={
                   data?.crews.find((c) => c.crewId === homeCrew)
@@ -223,6 +226,7 @@ export function SuperAdminDashboard({ user }: { user: SessionUser }) {
                 selectedId={selectedId}
                 onSelect={setSelectedId}
               />
+              )}
               {user.role === "COMMANDER" &&
                 data?.crews
                   .filter((c) => c.crewId !== homeCrew)
