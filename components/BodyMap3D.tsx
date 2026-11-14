@@ -6,6 +6,7 @@ import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import type { RiskLevel } from "@/lib/risk";
 import { riskLabel } from "@/lib/risk";
 import type { RegionId, RegionStatus } from "@/lib/bodyMap";
+import { BODY_JOINTS, BODY_MODEL_SCALE } from "@/lib/bodyModelJoints";
 
 type Figure = "male" | "female";
 
@@ -13,16 +14,124 @@ const LEVEL_HEX: Record<RiskLevel, number> = { GREEN: 0x3ddc97, YELLOW: 0xf5b82e
 const LEVEL_CSS: Record<RiskLevel, string> = { GREEN: "#3ddc97", YELLOW: "#f5b82e", RED: "#ff5d5d" };
 const HOLO = 0x38e8ff;
 
-/** Where each body system's hotspot sits on the 3D figure, and which side its callout goes. */
-const ANCHORS: Record<RegionId, { pos: [number, number, number]; side: "left" | "right" }> = {
-  brain: { pos: [0, 1.71, 0.05], side: "right" },
-  eyes: { pos: [-0.035, 1.655, 0.1], side: "left" },
-  lungs: { pos: [-0.085, 1.33, 0.085], side: "left" },
-  heart: { pos: [0.045, 1.29, 0.1], side: "right" },
-  blood: { pos: [-0.275, 1.13, 0.02], side: "left" },
-  musculoskeletal: { pos: [0.105, 0.66, 0.075], side: "right" },
-  reproductive: { pos: [0, 0.875, 0.1], side: "right" },
+/** Which side of the figure each body system's callout sits on. */
+const SIDES: Record<RegionId, "left" | "right"> = {
+  brain: "right",
+  eyes: "left",
+  lungs: "left",
+  heart: "right",
+  blood: "left",
+  musculoskeletal: "right",
+  reproductive: "right",
 };
+
+type V3 = readonly [number, number, number];
+type JointName = keyof (typeof BODY_JOINTS)["male"];
+
+/** Landmarks of the figure, in metres, taken from the model's joints. */
+function landmarks(figure: Figure) {
+  const J = BODY_JOINTS[figure];
+  const k = J["head-2"][1] / BODY_JOINTS.male["head-2"][1]; // overall size against the male figure
+  const j = (name: JointName, side = 1) => new THREE.Vector3(J[name][0] * side, J[name][1], J[name][2]);
+  const chest = j("spine-1");
+  const brain = new THREE.Vector3(0, J.head[1] + 0.088 * k, 0.012);
+  const heart = new THREE.Vector3(0.024 * k, chest.y - 0.035 * k, 0.045 * k);
+  const pelvis = j("pelvis");
+  return { J, k, j, chest, brain, heart, pelvis };
+}
+
+/** Where each body system's hotspot sits on the 3D figure. */
+function anchorPositions(figure: Figure): Record<RegionId, V3> {
+  const { J, k, j, chest, brain, heart, pelvis } = landmarks(figure);
+  const forearm = j("l-elbow", -1).lerp(j("l-hand", -1), 0.45);
+  const thigh = j("l-upper-leg").lerp(j("l-knee"), 0.5);
+  return {
+    brain: [0, brain.y + 0.01, 0.07 * k],
+    eyes: [-J["l-eye"][0], J["l-eye"][1], J["l-eye"][2] + 0.005],
+    lungs: [-0.085 * k, chest.y + 0.005, 0.09 * k],
+    heart: [heart.x + 0.01, heart.y, 0.11 * k],
+    blood: [forearm.x, forearm.y, forearm.z + 0.02],
+    musculoskeletal: [thigh.x, thigh.y, thigh.z + 0.06 * k],
+    reproductive: [0, pelvis.y - 0.045 * k, 0.1 * k],
+  };
+}
+
+type BodyModel = { quads: Uint16Array; male: Float32Array; female: Float32Array };
+let bodyModelPromise: Promise<BodyModel> | null = null;
+
+/** The anatomical surface mesh (public/models/body.bin, see scripts/bake-body-model.py). */
+function loadBodyModel(): Promise<BodyModel> {
+  bodyModelPromise ??= fetch("/models/body.bin")
+    .then((r) => {
+      if (!r.ok) throw new Error(`body model ${r.status}`);
+      return r.arrayBuffer();
+    })
+    .then((buf) => {
+      const [n, q] = new Uint32Array(buf, 0, 2);
+      if (buf.byteLength !== 8 + n * 12 + q * 8) throw new Error("body model is damaged");
+      const read = (offset: number) => Float32Array.from(new Int16Array(buf, offset, n * 3), (v) => v / BODY_MODEL_SCALE);
+      return { male: read(8), female: read(8 + n * 6), quads: new Uint16Array(buf, 8 + n * 12, q * 4) };
+    })
+    .catch((e) => {
+      bodyModelPromise = null;
+      throw e;
+    });
+  return bodyModelPromise;
+}
+
+/** Surface geometry plus the quad edges, so the wireframe follows the real mesh flow. */
+function bodyModelGeometry(model: BodyModel, figure: Figure) {
+  const { quads } = model;
+  const surface = new THREE.BufferGeometry();
+  surface.setAttribute("position", new THREE.BufferAttribute(model[figure], 3));
+  const tris = new Uint16Array((quads.length / 4) * 6);
+  const edges: number[] = [];
+  const seen = new Set<number>();
+  for (let i = 0, t = 0; i < quads.length; i += 4) {
+    const a = quads[i], b = quads[i + 1], c = quads[i + 2], d = quads[i + 3];
+    tris[t++] = a; tris[t++] = b; tris[t++] = c;
+    tris[t++] = a; tris[t++] = c; tris[t++] = d;
+    for (const [u, w] of [[a, b], [b, c], [c, d], [d, a]]) {
+      const key = u < w ? u * 65536 + w : w * 65536 + u;
+      if (!seen.has(key)) {
+        seen.add(key);
+        edges.push(u, w);
+      }
+    }
+  }
+  surface.setIndex(new THREE.BufferAttribute(tris, 1));
+  surface.computeVertexNormals();
+  const wire = new THREE.BufferGeometry();
+  wire.setAttribute("position", surface.getAttribute("position"));
+  wire.setAttribute("normal", surface.getAttribute("normal"));
+  wire.setIndex(new THREE.BufferAttribute(Uint16Array.from(edges), 1));
+  return { surface, wire };
+}
+
+/** Mesh lines that fade where the surface turns away, so only the near side reads clearly. */
+function wireMaterial(color: number, opacity: number) {
+  return new THREE.ShaderMaterial({
+    uniforms: { uColor: { value: new THREE.Color(color) }, uOpacity: { value: opacity } },
+    vertexShader: `
+      varying float vFacing;
+      void main() {
+        vec4 mv = modelViewMatrix * vec4(position, 1.0);
+        vFacing = dot(normalize(normalMatrix * normal), normalize(-mv.xyz));
+        gl_Position = projectionMatrix * mv;
+      }`,
+    fragmentShader: `
+      uniform vec3 uColor; uniform float uOpacity;
+      varying float vFacing;
+      void main() {
+        float front = smoothstep(-0.15, 0.25, vFacing);
+        float rim = 1.0 - clamp(vFacing, 0.0, 1.0);
+        gl_FragColor = vec4(uColor, uOpacity * (0.12 + front * (0.55 + rim * 0.9)));
+      }`,
+    transparent: true,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+  });
+}
 
 /** Small line icons for the callouts. */
 function RegionIcon({ id }: { id: RegionId }) {
@@ -90,7 +199,7 @@ export function canUseWebGL(): boolean {
 }
 
 /** Rim-lit translucent "hologram" surface. */
-function holoMaterial(color: number, strength = 1) {
+function holoMaterial(color: number, strength = 1, side: THREE.Side = THREE.DoubleSide) {
   return new THREE.ShaderMaterial({
     uniforms: { uColor: { value: new THREE.Color(color) }, uStrength: { value: strength } },
     vertexShader: `
@@ -111,7 +220,7 @@ function holoMaterial(color: number, strength = 1) {
     transparent: true,
     depthWrite: false,
     blending: THREE.AdditiveBlending,
-    side: THREE.DoubleSide,
+    side,
   });
 }
 
@@ -134,86 +243,13 @@ function glowTexture() {
 /** A capsule running from a to b. */
 function limb(a: THREE.Vector3, b: THREE.Vector3, r: number) {
   const len = a.distanceTo(b);
-  const geo = new THREE.CapsuleGeometry(r, Math.max(len - r * 0.6, 0.001), 8, 18);
+  const geo = new THREE.CapsuleGeometry(r, Math.max(len - r * 0.6, 0.001), 6, 12);
   const mid = a.clone().add(b).multiplyScalar(0.5);
   const dir = b.clone().sub(a).normalize();
   const q = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir);
   geo.applyQuaternion(q);
   geo.translate(mid.x, mid.y, mid.z);
   return geo;
-}
-
-function lathe(profile: Array<[number, number]>, depth: number, segments = 28) {
-  const geo = new THREE.LatheGeometry(profile.map(([r, y]) => new THREE.Vector2(r, y)), segments);
-  geo.scale(1, 1, depth);
-  return geo;
-}
-
-/** The figure built from simple solids, in metres (feet at y = 0). */
-function bodyGeometries(figure: Figure) {
-  const f = figure === "female";
-  const sh = f ? 0.175 : 0.2; // shoulder half-width
-  const hip = f ? 0.105 : 0.09;
-  const v = (x: number, y: number, z = 0) => new THREE.Vector3(x, y, z);
-  const geos: THREE.BufferGeometry[] = [];
-
-  const head = new THREE.SphereGeometry(0.105, 28, 20);
-  head.scale(0.88, 1.15, 0.98);
-  head.translate(0, 1.665, 0.005);
-  geos.push(head);
-  geos.push(limb(v(0, 1.56), v(0, 1.47), f ? 0.042 : 0.05)); // neck
-
-  // Torso from waist to shoulders, slightly flattened front to back.
-  geos.push(
-    lathe(
-      f
-        ? [[0.0, 0.96], [0.115, 0.97], [0.105, 1.07], [0.12, 1.18], [0.15, 1.28], [0.155, 1.36], [0.15, 1.43], [0.1, 1.47], [0.045, 1.49], [0, 1.49]]
-        : [[0.0, 0.96], [0.135, 0.97], [0.14, 1.07], [0.15, 1.18], [0.17, 1.28], [0.18, 1.36], [0.175, 1.43], [0.11, 1.48], [0.05, 1.5], [0, 1.5]],
-      0.62
-    )
-  );
-  // Pelvis
-  geos.push(
-    lathe(
-      f
-        ? [[0, 0.8], [0.1, 0.81], [0.16, 0.86], [0.17, 0.92], [0.13, 0.98], [0, 0.99]]
-        : [[0, 0.8], [0.1, 0.81], [0.15, 0.86], [0.155, 0.92], [0.14, 0.98], [0, 0.99]],
-      0.68
-    )
-  );
-  if (f) {
-    for (const s of [-1, 1]) {
-      const b = new THREE.SphereGeometry(0.06, 20, 14);
-      b.scale(1, 0.9, 0.8);
-      b.translate(s * 0.07, 1.3, 0.075);
-      geos.push(b);
-    }
-  }
-  for (const s of [-1, 1]) {
-    const shoulder = v(s * sh, 1.42);
-    const elbow = v(s * (sh + 0.07), 1.15, -0.01);
-    const wrist = v(s * (sh + 0.12), 0.9, 0.02);
-    const j = new THREE.SphereGeometry(0.058, 18, 14);
-    j.translate(shoulder.x, shoulder.y, 0);
-    geos.push(j);
-    geos.push(limb(shoulder, elbow, f ? 0.04 : 0.047));
-    geos.push(limb(elbow, wrist, f ? 0.033 : 0.038));
-    const hand = new THREE.SphereGeometry(0.045, 16, 12);
-    hand.scale(0.7, 1.5, 0.45);
-    hand.translate(wrist.x + s * 0.01, wrist.y - 0.075, wrist.z);
-    geos.push(hand);
-
-    const hipJ = v(s * hip, 0.86);
-    const knee = v(s * (hip + 0.02), 0.48, 0.01);
-    const ankle = v(s * (hip + 0.03), 0.08);
-    geos.push(limb(hipJ, knee, f ? 0.068 : 0.072));
-    geos.push(limb(knee, ankle, f ? 0.048 : 0.052));
-    const foot = new THREE.SphereGeometry(0.05, 16, 10);
-    foot.scale(0.8, 0.5, 2);
-    foot.translate(ankle.x, 0.035, 0.06);
-    geos.push(foot);
-  }
-  return geos;
 }
 
 type Props = {
@@ -279,69 +315,182 @@ export function BodyMap3D({ figure, regions, activeId, dimmed, onPick }: Props) 
     const disposables: Array<{ dispose: () => void }> = [];
     const track = <T extends { dispose: () => void }>(x: T) => (disposables.push(x), x);
 
-    // Body: translucent rim-lit skin plus a wireframe mesh, like a hologram.
+    // Body: the anatomical surface as a rim-lit shell with its mesh lines, like a hologram.
     const body = new THREE.Group();
     scene.add(body);
-    const skin = track(holoMaterial(HOLO, 0.55));
-    const wire = track(new THREE.LineBasicMaterial({ color: HOLO, transparent: true, opacity: 0.12, blending: THREE.AdditiveBlending, depthWrite: false }));
-    for (const g of bodyGeometries(figure)) {
-      track(g);
-      body.add(new THREE.Mesh(g, skin));
-      const w = track(new THREE.WireframeGeometry(g));
-      body.add(new THREE.LineSegments(w, wire));
-    }
+    let disposed = false;
+    loadBodyModel()
+      .then((model) => {
+        if (disposed) return;
+        const { surface, wire } = bodyModelGeometry(model, figure);
+        track(surface);
+        track(wire);
+        const skin = new THREE.Mesh(surface, track(holoMaterial(HOLO, 0.5, THREE.FrontSide)));
+        const back = new THREE.Mesh(surface, track(holoMaterial(HOLO, 0.16, THREE.BackSide)));
+        const lines = new THREE.LineSegments(wire, track(wireMaterial(HOLO, 0.2)));
+        skin.renderOrder = back.renderOrder = lines.renderOrder = -1;
+        body.add(back, skin, lines);
+      })
+      .catch(() => {
+        // Without the surface mesh the skeleton and organs below still show.
+      });
+
+    const { J, k, j, chest, brain: brainAt, heart: heartAt, pelvis } = landmarks(figure);
+    const v = (x: number, y: number, z = 0) => new THREE.Vector3(x, y, z);
+    const ellipsoid = (r: number, sx: number, sy: number, sz: number, at: THREE.Vector3, seg = 20) => {
+      const g = new THREE.SphereGeometry(r, seg, Math.round(seg * 0.75));
+      g.scale(sx, sy, sz);
+      g.translate(at.x, at.y, at.z);
+      return g;
+    };
+    const tube = (pts: THREE.Vector3[], r: number, seg = 24) => new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), seg, r, 6);
 
     // Organs and bones tinted by each system's status.
-    const organMats: Partial<Record<RegionId, THREE.ShaderMaterial[]>> = {};
+    const organMats: Partial<Record<RegionId, THREE.ShaderMaterial>> = {};
     const organ = (id: RegionId, geo: THREE.BufferGeometry, strength = 1.6) => {
-      const m = track(holoMaterial(LEVEL_HEX[levelsRef.current[id] ?? "GREEN"], strength));
-      (organMats[id] ??= []).push(m);
+      const base = (organMats[id] ??= track(holoMaterial(LEVEL_HEX[levelsRef.current[id] ?? "GREEN"], 1)));
+      // One colour per system, but each part keeps its own brightness.
+      const m = track(base.clone());
+      m.uniforms.uColor = base.uniforms.uColor;
+      m.uniforms.uStrength.value = strength;
       track(geo);
       const mesh = new THREE.Mesh(geo, m);
       body.add(mesh);
       return mesh;
     };
-    const brain = new THREE.SphereGeometry(0.075, 24, 16);
-    brain.scale(0.95, 0.8, 1.1);
-    brain.translate(0, 1.705, -0.005);
-    organ("brain", brain);
+
+    // Brain: two hemispheres, a cerebellum and the brain stem.
+    for (const s of [-1, 1]) organ("brain", ellipsoid(0.07 * k, 0.5, 0.78, 1.08, v(s * 0.031 * k, brainAt.y, brainAt.z)), 1.05);
+    organ("brain", ellipsoid(0.034 * k, 1.3, 0.75, 0.9, v(0, brainAt.y - 0.05 * k, brainAt.z - 0.045 * k), 14), 1.3);
+    organ("brain", limb(v(0, brainAt.y - 0.04 * k, brainAt.z - 0.012 * k), v(0, J.neck[1] + 0.03 * k, -0.02 * k), 0.009 * k), 1.3);
+    for (const s of [-1, 1]) organ("eyes", ellipsoid(0.0125 * k, 1, 1, 1, v(s * J["l-eye"][0], J["l-eye"][1], J["l-eye"][2] - 0.012 * k), 12), 2.6);
+
+    // Lungs taper towards the top and curve around the heart; windpipe between them.
     for (const s of [-1, 1]) {
-      const eye = new THREE.SphereGeometry(0.014, 12, 10);
-      eye.translate(s * 0.035, 1.655, 0.085);
-      organ("eyes", eye, 2.4);
-      const lung = new THREE.SphereGeometry(0.07, 20, 16);
-      lung.scale(0.8, 1.4, 0.75);
-      lung.translate(s * 0.075, 1.32, 0.02);
-      organ("lungs", lung, 1.2);
-      const kidney = new THREE.SphereGeometry(0.028, 12, 10);
-      kidney.scale(0.7, 1.2, 0.7);
-      kidney.translate(s * 0.065, 1.06, -0.04);
-      organ("reproductive", kidney, 1);
+      const lung = new THREE.SphereGeometry(0.068 * k, 22, 18);
+      const pos = lung.getAttribute("position");
+      for (let i = 0; i < pos.count; i++) {
+        const t = pos.getY(i) / (0.068 * k); // -1 bottom .. 1 top
+        const taper = 1 - 0.38 * Math.max(0, t) - 0.08 * Math.max(0, -t);
+        pos.setX(i, pos.getX(i) * taper);
+        pos.setZ(i, pos.getZ(i) * (1 - 0.3 * Math.max(0, t)));
+      }
+      lung.scale(0.82, 1.65, 0.95);
+      lung.computeVertexNormals();
+      lung.translate(s * 0.074 * k, chest.y - 0.012 * k, -0.002);
+      organ("lungs", lung, 1.05);
+      organ("lungs", tube([v(0, chest.y + 0.075 * k, 0.012), v(s * 0.02 * k, chest.y + 0.045 * k, 0.008), v(s * 0.05 * k, chest.y + 0.02 * k, 0.004)], 0.006 * k, 10), 1.5);
     }
-    const heart = new THREE.SphereGeometry(0.045, 20, 16);
-    heart.scale(0.9, 1.1, 0.85);
-    heart.rotateZ(-0.4);
-    heart.translate(0.03, 1.29, 0.055);
-    const heartMesh = organ("heart", heart, 2.2);
-    const pelvisOrgan = new THREE.SphereGeometry(0.04, 16, 12);
-    pelvisOrgan.scale(1, 0.8, 0.8);
-    pelvisOrgan.translate(0, 0.88, 0.04);
-    organ("reproductive", pelvisOrgan, 1.4);
-    // Skeleton: spine and both femurs (the femur glows like the reference image).
-    const v = (x: number, y: number, z = 0) => new THREE.Vector3(x, y, z);
-    organ("musculoskeletal", limb(v(0, 1.47, -0.04), v(0, 0.9, -0.04), 0.012), 1.4);
-    const hip = figure === "female" ? 0.105 : 0.09;
-    for (const s of [-1, 1]) {
-      organ("musculoskeletal", limb(v(s * hip, 0.84), v(s * (hip + 0.02), 0.5, 0.01), 0.018), 2);
-      organ("musculoskeletal", limb(v(s * (hip + 0.02), 0.46, 0.01), v(s * (hip + 0.03), 0.1), 0.014), 1.6);
+    organ("lungs", limb(v(0, chest.y + 0.075 * k, 0.012), v(0, J.neck[1] + 0.02 * k, 0.03 * k), 0.0085 * k), 1.4);
+
+    // Heart, tilted with its tip to the left.
+    const heartGeo = new THREE.SphereGeometry(0.042 * k, 20, 16);
+    {
+      const pos = heartGeo.getAttribute("position");
+      for (let i = 0; i < pos.count; i++) {
+        const t = pos.getY(i) / (0.042 * k);
+        const taper = 1 - 0.42 * Math.max(0, -t);
+        pos.setX(i, pos.getX(i) * taper);
+        pos.setZ(i, pos.getZ(i) * taper);
+      }
+      heartGeo.scale(0.95, 1.2, 0.85);
+      heartGeo.rotateZ(0.55);
+      heartGeo.computeVertexNormals();
     }
-    // Arteries (blood): a line down each arm and leg.
+    const heartMesh = organ("heart", heartGeo, 2.3);
+    heartMesh.position.copy(heartAt);
+
+    // Kidneys and the pelvic organs.
+    const loin = j("spine-3");
+    for (const s of [-1, 1]) organ("reproductive", ellipsoid(0.027 * k, 0.72, 1.3, 0.7, v(s * 0.062 * k, loin.y + 0.03 * k, -0.035 * k), 12), 1.1);
+    organ("reproductive", ellipsoid(0.038 * k, 1.05, 0.8, 0.85, v(0, pelvis.y - 0.05 * k, 0.045 * k), 16), 1.4);
+
+    // Skeleton. Bones follow the model's own joints.
+    const BONE = 0.72; // overall bone brightness, so the skeleton sits inside the body rather than over it
+    const bone = (a: THREE.Vector3, b: THREE.Vector3, r: number, strength = 1.5, knob = 1.45) => {
+      organ("musculoskeletal", limb(a, b, r), strength * BONE);
+      for (const end of [a, b]) organ("musculoskeletal", ellipsoid(r * knob, 1, 1, 1, end, 10), strength * BONE);
+    };
+    // Spine: a column of vertebrae along the back.
+    const spineCurve = new THREE.CatmullRomCurve3([
+      v(0, J.head[1] - 0.005, -0.012 * k),
+      v(0, J.neck[1], -0.03 * k),
+      v(0, chest.y + 0.04 * k, -0.07 * k),
+      v(0, J["spine-2"][1], -0.078 * k),
+      v(0, J["spine-3"][1], -0.055 * k),
+      v(0, J["spine-4"][1] - 0.01 * k, -0.045 * k),
+      v(0, pelvis.y - 0.05 * k, -0.07 * k),
+    ]);
+    for (let i = 0; i < 26; i++) {
+      const t = i / 25;
+      organ("musculoskeletal", ellipsoid((0.0085 + 0.0065 * Math.min(1, t * 1.4)) * k, 1.25, 0.62, 1, spineCurve.getPoint(t), 10), 1.1);
+    }
+    // Rib cage: ribs sweep from the spine round to the breastbone, sloping down at the front.
+    const ribTop = chest.y + 0.085 * k;
+    for (let i = 0; i < 10; i++) {
+      const t = i / 9;
+      const y = ribTop - t * 0.235 * k;
+      const a = (0.062 + 0.068 * Math.sin(Math.min(1, t * 1.25) * Math.PI * 0.62)) * k; // half width
+      const b = (0.05 + 0.04 * Math.sin(Math.min(1, t * 1.2) * Math.PI * 0.6)) * k; // half depth
+      const sweep = i < 7 ? 0.93 : 0.93 - (i - 6) * 0.13; // lower ribs stop short of the front
+      for (const s of [-1, 1]) {
+        const pts: THREE.Vector3[] = [];
+        for (let n = 0; n <= 12; n++) {
+          const th = (n / 12) * Math.PI * sweep;
+          pts.push(v(s * a * Math.sin(th), y - 0.045 * k * (1 - Math.cos(th)) * 0.5 - (n / 12) * 0.012 * k, -0.012 * k - b * Math.cos(th)));
+        }
+        organ("musculoskeletal", tube(pts, 0.0042 * k, 20), 0.95);
+      }
+    }
+    bone(v(0, ribTop - 0.035 * k, 0.03 * k), v(0, ribTop - 0.19 * k, 0.068 * k), 0.008 * k, 1.3, 1.1); // breastbone
+    // Pelvis: hip blades, sacrum and the front arch.
     for (const s of [-1, 1]) {
-      const sh = figure === "female" ? 0.175 : 0.2;
-      const pts = [v(0, 1.4, 0.02), v(s * sh, 1.42, 0.02), v(s * (sh + 0.07), 1.15, 0.02), v(s * (sh + 0.12), 0.9, 0.04)];
-      organ("blood", new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 24, 0.008, 6), 2.2);
-      const leg = [v(0, 1.0, 0.03), v(s * hip, 0.86, 0.04), v(s * (hip + 0.02), 0.48, 0.03), v(s * (hip + 0.03), 0.1, 0.02)];
-      organ("blood", new THREE.TubeGeometry(new THREE.CatmullRomCurve3(leg), 24, 0.008, 6), 2.2);
+      const hipJ = j("l-upper-leg", s);
+      organ(
+        "musculoskeletal",
+        tube([v(s * 0.02 * k, pelvis.y + 0.02 * k, -0.07 * k), v(s * 0.09 * k, pelvis.y + 0.075 * k, -0.045 * k), v(s * 0.135 * k, pelvis.y + 0.07 * k, 0.01), v(s * 0.115 * k, pelvis.y + 0.03 * k, 0.055 * k), v(hipJ.x * 0.9, hipJ.y + 0.01, 0.03 * k), v(s * 0.035 * k, hipJ.y - 0.06 * k, 0.05 * k), v(0, hipJ.y - 0.055 * k, 0.058 * k)], 0.0085 * k, 40),
+        1.4
+      );
+      organ("musculoskeletal", tube([v(s * 0.02 * k, pelvis.y - 0.03 * k, -0.07 * k), v(s * 0.075 * k, hipJ.y - 0.03 * k, -0.03 * k), v(s * 0.05 * k, hipJ.y - 0.085 * k, 0.015 * k), v(s * 0.02 * k, hipJ.y - 0.07 * k, 0.05 * k)], 0.0075 * k, 24), 1.2);
+    }
+    for (const s of [-1, 1]) {
+      const sh = j("l-shoulder", s), el = j("l-elbow", s), wr = j("l-hand", s), hd = j("l-hand-2", s);
+      const hipJ = j("l-upper-leg", s), kn = j("l-knee", s), an = j("l-ankle", s);
+      bone(j("l-clavicle", s), v(sh.x * 0.93, sh.y + 0.012 * k, sh.z), 0.0062 * k, 1.4, 1.2); // collarbone
+      organ("musculoskeletal", ellipsoid(0.03 * k, 1, 1.25, 0.35, v(sh.x * 0.62, sh.y - 0.055 * k, -0.085 * k), 12), 0.9); // shoulder blade
+      bone(sh, el, 0.0105 * k, 1.6); // humerus
+      const fore = wr.clone().sub(el).normalize();
+      const across = new THREE.Vector3().crossVectors(fore, v(0, 0, 1)).normalize().multiplyScalar(0.011 * k);
+      bone(el.clone().add(across), wr.clone().add(across), 0.0062 * k, 1.5, 1.4); // radius
+      bone(el.clone().sub(across), wr.clone().sub(across), 0.0058 * k, 1.5, 1.4); // ulna
+      const palm = hd.clone().sub(wr).normalize();
+      for (let f = -2; f <= 2; f++) {
+        const spread = across.clone().multiplyScalar(f * 0.85);
+        const a = wr.clone().addScaledVector(palm, 0.02 * k).addScaledVector(spread, 0.6);
+        organ("musculoskeletal", limb(a, wr.clone().addScaledVector(palm, (0.15 - Math.abs(f) * 0.012) * k).addScaledVector(spread, 1.6), 0.0032 * k), 1.3);
+      }
+      // Thigh bone with its neck angling in to the hip socket (it glows brightest, as the callout points here).
+      const troch = v(hipJ.x + s * 0.045 * k, hipJ.y - 0.035 * k, hipJ.z - 0.005);
+      bone(hipJ, troch, 0.011 * k, 2, 1.5);
+      bone(troch, kn, 0.0135 * k, 2.4, 1.6);
+      organ("musculoskeletal", ellipsoid(0.019 * k, 1, 1.1, 0.6, v(kn.x, kn.y + 0.005, kn.z + 0.042 * k), 12), 1.6); // kneecap
+      bone(v(kn.x - s * 0.004, kn.y - 0.02 * k, kn.z), v(an.x - s * 0.006, an.y + 0.01, an.z), 0.0115 * k, 1.7, 1.55); // shin bone
+      bone(v(kn.x + s * 0.03 * k, kn.y - 0.035 * k, kn.z - 0.012 * k), v(an.x + s * 0.024 * k, an.y + 0.005, an.z - 0.008 * k), 0.0052 * k, 1.3, 1.3); // fibula
+      const f1 = j("l-foot-1", s), f2 = j("l-foot-2", s);
+      organ("musculoskeletal", ellipsoid(0.022 * k, 0.9, 0.8, 1.5, v(an.x, an.y - 0.04 * k, an.z - 0.02 * k), 12), 1.3); // heel
+      for (let f = -2; f <= 2; f++) {
+        organ("musculoskeletal", limb(v(an.x + f * 0.006 * k, an.y - 0.02 * k, an.z + 0.02 * k), v(f1.x + f * 0.017 * k, f1.y + 0.012 * k, f1.z + (f2.z - f1.z) * (0.8 - Math.abs(f - 1) * 0.08)), 0.0036 * k), 1.3);
+      }
+    }
+    // Blood: the aorta arching off the heart, with arteries to the head, arms and legs.
+    const arch = v(0.012 * k, heartAt.y + 0.075 * k, 0.02 * k);
+    organ("blood", tube([heartAt.clone().add(v(0, 0.03 * k, 0)), arch, v(-0.012 * k, heartAt.y + 0.04 * k, -0.035 * k), v(-0.006 * k, J["spine-2"][1], -0.04 * k), v(0, J["spine-4"][1], -0.02 * k)], 0.0075 * k, 32), 2);
+    for (const s of [-1, 1]) {
+      const sh = j("l-shoulder", s), el = j("l-elbow", s), wr = j("l-hand", s), hd = j("l-hand-2", s);
+      const hipJ = j("l-upper-leg", s), kn = j("l-knee", s), an = j("l-ankle", s);
+      organ("blood", tube([arch, v(s * 0.022 * k, J.neck[1] - 0.01, 0.025 * k), v(s * 0.034 * k, J.head[1] - 0.01, 0.03 * k), v(s * 0.045 * k, brainAt.y - 0.02 * k, 0.035 * k)], 0.0042 * k, 20), 2);
+      organ("blood", tube([arch, v(sh.x * 0.55, sh.y + 0.005, 0.03 * k), v(sh.x * 0.96, sh.y - 0.03 * k, 0.012 * k), el.clone().add(v(-s * 0.012 * k, 0, 0.014 * k)), wr.clone().add(v(-s * 0.006 * k, 0, 0.01 * k)), hd.clone().lerp(wr, -0.6)], 0.0044 * k, 40), 2.1);
+      organ("blood", tube([v(0, J["spine-4"][1], -0.02 * k), v(hipJ.x * 0.6, hipJ.y + 0.01, 0.03 * k), hipJ.clone().lerp(kn, 0.5).add(v(-s * 0.025 * k, 0, 0.03 * k)), kn.clone().add(v(-s * 0.006 * k, 0, -0.03 * k)), an.clone().add(v(-s * 0.014 * k, 0.03 * k, -0.006 * k)), j("l-foot-1", s).add(v(0, 0.03 * k, -0.02 * k))], 0.005 * k, 48), 2.1);
     }
 
     // Platform rings under the feet.
@@ -361,9 +510,9 @@ export function BodyMap3D({ figure, regions, activeId, dimmed, onPick }: Props) 
     rings.add(arc);
     rings.position.y = 0.005;
 
-    // Scan plane sweeping up and down.
-    const scanG = track(new THREE.PlaneGeometry(1.0, 0.006));
-    const scanM = track(new THREE.MeshBasicMaterial({ color: HOLO, transparent: true, opacity: 0.5, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }));
+    // Scan ring sweeping up and down the body.
+    const scanG = track(new THREE.RingGeometry(0.4, 0.405, 96));
+    const scanM = track(new THREE.MeshBasicMaterial({ color: HOLO, transparent: true, opacity: 0.45, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }));
     const scan = new THREE.Mesh(scanG, scanM);
     scan.rotation.x = -Math.PI / 2;
     scene.add(scan);
@@ -371,10 +520,11 @@ export function BodyMap3D({ figure, regions, activeId, dimmed, onPick }: Props) 
     // Hotspots: glowing sprites coloured by status.
     const tex = track(glowTexture());
     const sprites = new Map<RegionId, THREE.Sprite>();
-    for (const id of Object.keys(ANCHORS) as RegionId[]) {
+    const anchors = anchorPositions(figure);
+    for (const id of Object.keys(anchors) as RegionId[]) {
       const m = track(new THREE.SpriteMaterial({ map: tex, color: LEVEL_HEX[levelsRef.current[id] ?? "GREEN"], transparent: true, depthTest: false, blending: THREE.AdditiveBlending }));
       const s = new THREE.Sprite(m);
-      s.position.set(...ANCHORS[id].pos);
+      s.position.set(...anchors[id]);
       s.userData.id = id;
       s.renderOrder = 10;
       body.add(s);
@@ -429,9 +579,8 @@ export function BodyMap3D({ figure, regions, activeId, dimmed, onPick }: Props) 
       heartMesh.scale.setScalar(beat);
 
       // Recolour organs and hotspots when a status changes.
-      for (const [id, mats] of Object.entries(organMats) as Array<[RegionId, THREE.ShaderMaterial[]]>) {
-        const c = LEVEL_HEX[levelsRef.current[id] ?? "GREEN"];
-        for (const m of mats) m.uniforms.uColor.value.setHex(c);
+      for (const [id, m] of Object.entries(organMats) as Array<[RegionId, THREE.ShaderMaterial]>) {
+        m.uniforms.uColor.value.setHex(LEVEL_HEX[levelsRef.current[id] ?? "GREEN"]);
       }
 
       // Callouts: project each hotspot to the screen and draw a leader line to its label.
@@ -450,7 +599,7 @@ export function BodyMap3D({ figure, regions, activeId, dimmed, onPick }: Props) 
         tmp.project(camera);
         const x = (tmp.x * 0.5 + 0.5) * w;
         const y = (-tmp.y * 0.5 + 0.5) * h;
-        (ANCHORS[id].side === "left" ? labelsLeft : labelsRight).push([id, x, y, facing]);
+        (SIDES[id] === "left" ? labelsLeft : labelsRight).push([id, x, y, facing]);
       }
       const place = (list: Array<[RegionId, number, number, boolean]>, side: "left" | "right") => {
         list.sort((a, b) => a[2] - b[2]);
@@ -492,6 +641,7 @@ export function BodyMap3D({ figure, regions, activeId, dimmed, onPick }: Props) 
     tick();
 
     return () => {
+      disposed = true;
       cancelAnimationFrame(raf);
       ro.disconnect();
       renderer.domElement.removeEventListener("pointerdown", onDown);
@@ -552,8 +702,8 @@ export function BodyMap3D({ figure, regions, activeId, dimmed, onPick }: Props) 
             onClick={() => onPick(r.id)}
             aria-pressed={on}
             aria-label={`${r.name}: ${riskLabel(r.level)}`}
-            className={`absolute left-0 top-0 flex w-[min(34%,200px)] items-center gap-2 rounded-lg border px-2 py-1.5 text-left backdrop-blur-sm transition-[background-color,border-color,opacity] ${
-              ANCHORS[r.id].side === "right" ? "flex-row-reverse text-right" : ""
+            className={`absolute left-0 top-0 flex w-[min(31%,180px)] items-center gap-2 rounded-lg border px-2 py-1.5 text-left backdrop-blur-sm transition-[background-color,border-color,opacity] ${
+              SIDES[r.id] === "right" ? "flex-row-reverse text-right" : ""
             } ${on ? "border-white/70 bg-white/10" : "border-cyan-400/25 bg-[#06121f]/70 hover:border-cyan-300/60"} ${dimmed(r.id) ? "!opacity-25" : ""}`}
             style={{ visibility: "hidden" }}
           >
