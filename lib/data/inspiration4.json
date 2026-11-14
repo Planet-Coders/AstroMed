@@ -1,0 +1,622 @@
+{
+ "source": "NASA OSDR: SpaceX Inspiration4 (3-day orbital flight, 2021), 4 crew. CBC: OSD-569 (LSDS-7_Complete_Blood_Count_CBC_TRANSFORMED.csv). CMP: OSD-575 (LSDS-8_Comprehensive_Metabolic_Panel_CMP_TRANSFORMED.csv).",
+ "crew": 4,
+ "timepoints": [
+  "L-92",
+  "L-44",
+  "L-3",
+  "R+1",
+  "R+45",
+  "R+82",
+  "R+194"
+ ],
+ "analytes": [
+  {
+   "key": "glucose",
+   "label": "Glucose",
+   "unit": "mg/dL",
+   "study": "OSD-575",
+   "regions": [
+    "blood"
+   ],
+   "ref": [
+    65.0,
+    99.0
+   ],
+   "timeline": [
+    {
+     "t": "L-92",
+     "mean": 82.25,
+     "n": 4
+    },
+    {
+     "t": "L-44",
+     "mean": 74.25,
+     "n": 4
+    },
+    {
+     "t": "L-3",
+     "mean": 69.5,
+     "n": 4
+    },
+    {
+     "t": "R+1",
+     "mean": 93.25,
+     "n": 4
+    },
+    {
+     "t": "R+45",
+     "mean": 51.75,
+     "n": 4
+    },
+    {
+     "t": "R+82",
+     "mean": 82.0,
+     "n": 4
+    },
+    {
+     "t": "R+194",
+     "mean": 82.0,
+     "n": 4
+    }
+   ],
+   "preflightMean": 75.33,
+   "preflightMin": 56.0,
+   "preflightMax": 100.0,
+   "returnMean": 93.25,
+   "changePct": 23.8
+  },
+  {
+   "key": "calcium",
+   "label": "Calcium",
+   "unit": "mg/dL",
+   "study": "OSD-575",
+   "regions": [
+    "musculoskeletal"
+   ],
+   "ref": [
+    8.6,
+    10.3
+   ],
+   "timeline": [
+    {
+     "t": "L-92",
+     "mean": 9.8,
+     "n": 4
+    },
+    {
+     "t": "L-44",
+     "mean": 10.03,
+     "n": 4
+    },
+    {
+     "t": "L-3",
+     "mean": 9.65,
+     "n": 4
+    },
+    {
+     "t": "R+1",
+     "mean": 9.53,
+     "n": 4
+    },
+    {
+     "t": "R+45",
+     "mean": 9.57,
+     "n": 4
+    },
+    {
+     "t": "R+82",
+     "mean": 9.95,
+     "n": 4
+    },
+    {
+     "t": "R+194",
+     "mean": 9.57,
+     "n": 4
+    }
+   ],
+   "preflightMean": 9.82,
+   "preflightMin": 9.3,
+   "preflightMax": 10.3,
+   "returnMean": 9.53,
+   "changePct": -3.1
+  },
+  {
+   "key": "alk_phos",
+   "label": "Alkaline phosphatase (bone turnover)",
+   "unit": "U/L",
+   "study": "OSD-575",
+   "regions": [
+    "musculoskeletal"
+   ],
+   "ref": [
+    36.0,
+    130.0
+   ],
+   "timeline": [
+    {
+     "t": "L-92",
+     "mean": 53.75,
+     "n": 4
+    },
+    {
+     "t": "L-44",
+     "mean": 55.25,
+     "n": 4
+    },
+    {
+     "t": "L-3",
+     "mean": 49.75,
+     "n": 4
+    },
+    {
+     "t": "R+1",
+     "mean": 56.5,
+     "n": 4
+    },
+    {
+     "t": "R+45",
+     "mean": 55.5,
+     "n": 4
+    },
+    {
+     "t": "R+82",
+     "mean": 54.5,
+     "n": 4
+    },
+    {
+     "t": "R+194",
+     "mean": 54.0,
+     "n": 4
+    }
+   ],
+   "preflightMean": 52.92,
+   "preflightMin": 31.0,
+   "preflightMax": 78.0,
+   "returnMean": 56.5,
+   "changePct": 6.8
+  },
+  {
+   "key": "creatinine",
+   "label": "Creatinine (kidney)",
+   "unit": "mg/dL",
+   "study": "OSD-575",
+   "regions": [
+    "musculoskeletal"
+   ],
+   "ref": [
+    0.6,
+    1.35
+   ],
+   "timeline": [
+    {
+     "t": "L-92",
+     "mean": 1.05,
+     "n": 4
+    },
+    {
+     "t": "L-44",
+     "mean": 1.02,
+     "n": 4
+    },
+    {
+     "t": "L-3",
+     "mean": 1.14,
+     "n": 4
+    },
+    {
+     "t": "R+1",
+     "mean": 1.03,
+     "n": 4
+    },
+    {
+     "t": "R+45",
+     "mean": 1.04,
+     "n": 4
+    },
+    {
+     "t": "R+82",
+     "mean": 1.02,
+     "n": 4
+    },
+    {
+     "t": "R+194",
+     "mean": 1.18,
+     "n": 4
+    }
+   ],
+   "preflightMean": 1.07,
+   "preflightMin": 0.83,
+   "preflightMax": 1.37,
+   "returnMean": 1.03,
+   "changePct": -4.0
+  },
+  {
+   "key": "potassium",
+   "label": "Potassium",
+   "unit": "mmol/L",
+   "study": "OSD-575",
+   "regions": [
+    "heart"
+   ],
+   "ref": [
+    3.5,
+    5.3
+   ],
+   "timeline": [
+    {
+     "t": "L-92",
+     "mean": 4.1,
+     "n": 4
+    },
+    {
+     "t": "L-44",
+     "mean": 3.98,
+     "n": 4
+    },
+    {
+     "t": "L-3",
+     "mean": 3.67,
+     "n": 4
+    },
+    {
+     "t": "R+1",
+     "mean": 3.73,
+     "n": 4
+    },
+    {
+     "t": "R+45",
+     "mean": 4.6,
+     "n": 4
+    },
+    {
+     "t": "R+82",
+     "mean": 3.98,
+     "n": 4
+    },
+    {
+     "t": "R+194",
+     "mean": 4.08,
+     "n": 4
+    }
+   ],
+   "preflightMean": 3.92,
+   "preflightMin": 3.3,
+   "preflightMax": 4.6,
+   "returnMean": 3.73,
+   "changePct": -4.9
+  },
+  {
+   "key": "sodium",
+   "label": "Sodium",
+   "unit": "mmol/L",
+   "study": "OSD-575",
+   "regions": [
+    "heart",
+    "brain"
+   ],
+   "ref": [
+    135.0,
+    146.0
+   ],
+   "timeline": [
+    {
+     "t": "L-92",
+     "mean": 140.0,
+     "n": 4
+    },
+    {
+     "t": "L-44",
+     "mean": 139.75,
+     "n": 4
+    },
+    {
+     "t": "L-3",
+     "mean": 141.0,
+     "n": 4
+    },
+    {
+     "t": "R+1",
+     "mean": 138.0,
+     "n": 4
+    },
+    {
+     "t": "R+45",
+     "mean": 138.25,
+     "n": 4
+    },
+    {
+     "t": "R+82",
+     "mean": 139.75,
+     "n": 4
+    },
+    {
+     "t": "R+194",
+     "mean": 138.25,
+     "n": 4
+    }
+   ],
+   "preflightMean": 140.25,
+   "preflightMin": 138.0,
+   "preflightMax": 143.0,
+   "returnMean": 138.0,
+   "changePct": -1.6
+  },
+  {
+   "key": "wbc",
+   "label": "White blood cells",
+   "unit": "×10³/µL",
+   "study": "OSD-569",
+   "regions": [
+    "blood"
+   ],
+   "ref": [
+    3.8,
+    10.8
+   ],
+   "timeline": [
+    {
+     "t": "L-92",
+     "mean": 7.3,
+     "n": 4
+    },
+    {
+     "t": "L-44",
+     "mean": 6.65,
+     "n": 4
+    },
+    {
+     "t": "L-3",
+     "mean": 8.65,
+     "n": 4
+    },
+    {
+     "t": "R+1",
+     "mean": 6.4,
+     "n": 4
+    },
+    {
+     "t": "R+45",
+     "mean": 6.47,
+     "n": 4
+    },
+    {
+     "t": "R+82",
+     "mean": 6.73,
+     "n": 4
+    },
+    {
+     "t": "R+194",
+     "mean": 6.75,
+     "n": 4
+    }
+   ],
+   "preflightMean": 7.53,
+   "preflightMin": 5.4,
+   "preflightMax": 10.6,
+   "returnMean": 6.4,
+   "changePct": -15.0
+  },
+  {
+   "key": "lymphocytes",
+   "label": "Lymphocytes",
+   "unit": "cells/µL",
+   "study": "OSD-569",
+   "regions": [
+    "blood"
+   ],
+   "ref": [
+    850.0,
+    3900.0
+   ],
+   "timeline": [
+    {
+     "t": "L-92",
+     "mean": 3243.0,
+     "n": 4
+    },
+    {
+     "t": "L-44",
+     "mean": 1884.25,
+     "n": 4
+    },
+    {
+     "t": "L-3",
+     "mean": 2910.75,
+     "n": 4
+    },
+    {
+     "t": "R+1",
+     "mean": 1855.25,
+     "n": 4
+    },
+    {
+     "t": "R+45",
+     "mean": 2334.25,
+     "n": 4
+    },
+    {
+     "t": "R+82",
+     "mean": 2356.5,
+     "n": 4
+    },
+    {
+     "t": "R+194",
+     "mean": 2319.75,
+     "n": 4
+    }
+   ],
+   "preflightMean": 2679.33,
+   "preflightMin": 1613.0,
+   "preflightMax": 6826.0,
+   "returnMean": 1855.25,
+   "changePct": -30.8
+  },
+  {
+   "key": "hemoglobin",
+   "label": "Hemoglobin",
+   "unit": "g/dL",
+   "study": "OSD-569",
+   "regions": [
+    "blood",
+    "lungs"
+   ],
+   "ref": [
+    13.2,
+    17.1
+   ],
+   "timeline": [
+    {
+     "t": "L-92",
+     "mean": 14.38,
+     "n": 4
+    },
+    {
+     "t": "L-44",
+     "mean": 14.68,
+     "n": 4
+    },
+    {
+     "t": "L-3",
+     "mean": 14.07,
+     "n": 4
+    },
+    {
+     "t": "R+1",
+     "mean": 14.2,
+     "n": 4
+    },
+    {
+     "t": "R+45",
+     "mean": 14.47,
+     "n": 4
+    },
+    {
+     "t": "R+82",
+     "mean": 14.5,
+     "n": 4
+    },
+    {
+     "t": "R+194",
+     "mean": 14.15,
+     "n": 4
+    }
+   ],
+   "preflightMean": 14.38,
+   "preflightMin": 11.5,
+   "preflightMax": 17.0,
+   "returnMean": 14.2,
+   "changePct": -1.2
+  },
+  {
+   "key": "hematocrit",
+   "label": "Hematocrit",
+   "unit": "%",
+   "study": "OSD-569",
+   "regions": [
+    "lungs"
+   ],
+   "ref": [
+    38.5,
+    50.0
+   ],
+   "timeline": [
+    {
+     "t": "L-92",
+     "mean": 43.27,
+     "n": 4
+    },
+    {
+     "t": "L-44",
+     "mean": 43.88,
+     "n": 4
+    },
+    {
+     "t": "L-3",
+     "mean": 42.75,
+     "n": 4
+    },
+    {
+     "t": "R+1",
+     "mean": 42.42,
+     "n": 4
+    },
+    {
+     "t": "R+45",
+     "mean": 43.42,
+     "n": 4
+    },
+    {
+     "t": "R+82",
+     "mean": 43.23,
+     "n": 4
+    },
+    {
+     "t": "R+194",
+     "mean": 42.12,
+     "n": 4
+    }
+   ],
+   "preflightMean": 43.3,
+   "preflightMin": 35.9,
+   "preflightMax": 50.0,
+   "returnMean": 42.42,
+   "changePct": -2.0
+  },
+  {
+   "key": "platelets",
+   "label": "Platelets",
+   "unit": "×10³/µL",
+   "study": "OSD-569",
+   "regions": [
+    "blood"
+   ],
+   "ref": [
+    140.0,
+    400.0
+   ],
+   "timeline": [
+    {
+     "t": "L-92",
+     "mean": 183.47,
+     "n": 4
+    },
+    {
+     "t": "L-44",
+     "mean": 259.5,
+     "n": 4
+    },
+    {
+     "t": "L-3",
+     "mean": 290.25,
+     "n": 4
+    },
+    {
+     "t": "R+1",
+     "mean": 269.5,
+     "n": 4
+    },
+    {
+     "t": "R+45",
+     "mean": 289.25,
+     "n": 4
+    },
+    {
+     "t": "R+82",
+     "mean": 261.25,
+     "n": 4
+    },
+    {
+     "t": "R+194",
+     "mean": 224.5,
+     "n": 4
+    }
+   ],
+   "preflightMean": 244.41,
+   "preflightMin": 12.9,
+   "preflightMax": 367.0,
+   "returnMean": 269.5,
+   "changePct": 10.3
+  }
+ ]
+}
