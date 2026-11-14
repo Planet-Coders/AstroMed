@@ -166,10 +166,10 @@ export function BodyMap({
   const openInjury = injuries.find((i) => i.id === injuryId) ?? null;
   const activeInjuries = injuries.filter((i) => !i.healed);
 
-  // 3D figure by default; the flat 2D figure is kept for placing injuries and for browsers without WebGL.
+  // The body map is always 3D. The flat figure is only used behind the scenes to place an injury
+  // and for browsers without WebGL.
   const webgl = useSyncExternalStore(noopSubscribe, canUseWebGL, () => false);
-  const [view, setView] = useState<"3d" | "2d">("3d");
-  const show3d = webgl && view === "3d" && !placing;
+  const show3d = webgl && !placing;
 
   return (
     <Card title={`Body map · ${name}`}>
@@ -221,21 +221,6 @@ export function BodyMap({
             </button>
           ))}
         </div>
-        {webgl && (
-          <div className="flex overflow-hidden rounded-md border border-mc-line-strong text-xs" role="group" aria-label="Body view">
-            {(["3d", "2d"] as const).map((v) => (
-              <button
-                key={v}
-                type="button"
-                aria-pressed={view === v}
-                onClick={() => setView(v)}
-                className={`px-3 py-1.5 font-mono uppercase transition ${view === v ? "bg-cyan-500/20 text-cyan-100" : "text-mc-muted hover:bg-mc-raised"}`}
-              >
-                {v}
-              </button>
-            ))}
-          </div>
-        )}
         <button
           type="button"
           onClick={() => {
