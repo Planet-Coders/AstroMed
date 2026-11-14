@@ -1,4 +1,6 @@
-# AAHMS · Autonomous Astronaut Health Monitoring System
+# AstroMed · Astronaut Health Monitoring Console
+
+**Live demo:** https://astro-med-ashy.vercel.app
 
 A NASA Space Apps Challenge prototype: a self-assessment health console for astronauts on long missions. Our scenario is the MTV-1 Mars transit, 20 light-minutes from Earth.
 
@@ -10,7 +12,7 @@ On the ground, a **super admin** sets up mission groups and crew accounts, and *
 
 ## How it meets the challenge
 
-| Challenge asks for | AAHMS |
+| Challenge asks for | AstroMed |
 |---|---|
 | Astronauts assess their own health | Each crew member signs in to their own console, takes a guided **Daily self-check**, and sees their own vitals |
 | Indicators: blood pressure, heart rate, blood sugar, temperature, sleep, mood | All six, plus HRV, SpO₂, radiation dose, cabin CO₂, exercise and a reaction-time test |
@@ -44,10 +46,11 @@ Results turn green, amber or red as they're typed, with advice, and readings a d
 - Injury and period tracking are built in.
 - The **RIDGE** strip shows a live status for each hazard. Picking one highlights the body systems it affects.
 
-### Crew vitals
+### My vitals / Crew vitals
+- Each astronaut sees **only their own** vitals (tab **My vitals**). The crew commander (callsign CDR) sees their whole crew, and ground control sees every crew (tab **Crew vitals**). This is enforced on the server: `/api/dashboard` only returns the records the signed-in user may see.
 - Big heart rate, SpO₂ and HRV tiles.
 - A realistic Lead II ECG: PQRST beats, HRV-driven rhythm and a monitor sweep. It turns irregular in the arrhythmia scenario.
-- 24 h HRV trend, plus per-crew baselines and a crew overview.
+- 24 h HRV trend, plus per-crew baselines (and a crew overview for the commander and ground control).
 
 ### Health missions
 - Four daily core missions: self-check, exercise plan, 7 h sleep and the reaction-time test. Reviewing the body map is a bonus.
@@ -78,8 +81,9 @@ Results turn green, amber or red as they're typed, with advice, and readings a d
 |---|---|---|
 | **Super admin** | `/admin` | Create, edit and delete mission groups; create astronaut and oversight accounts; move astronauts between groups; assign groups to oversight; read every group in `/oversight` |
 | **Oversight** (flight surgeon / mission control) | `/oversight` | Read the astronauts in their assigned groups only, including their AI conversations |
-| **Commander** | Console | Sees all crews on the console, as before |
-| **Astronaut** | Console | Their own health console; belongs to one mission group |
+| **Commander** (ground control) | Console | Sees every crew on the console |
+| **Astronaut, crew commander** (callsign `CDR`) | Console | Their own console plus every member of their own crew |
+| **Astronaut** | Console | Only their own health console and data; belongs to one mission group |
 
 Every admin and oversight API checks the role on the server, from the database. An oversight user asking for a group or astronaut outside their assignment gets a 404.
 
@@ -157,21 +161,23 @@ For the full AI co-pilot, use Chrome or Edge 113+ on a computer with a WebGPU-ca
 
 ### Demo accounts
 
-Seeded crew share the password **`aahms2025`**. In demo mode, any password works for crew.
+**Live demo (https://astro-med-ashy.vercel.app):** every account below uses the password **`password`**. This is a hackathon demo setting: change these passwords before any real use.
+
+**Fresh local seed:** crew get **`aahms2025`**, and admin/oversight get `SEED_ADMIN_PASSWORD` / `SEED_OVERSIGHT_PASSWORD` (or the defaults in `prisma/seed.ts`). In demo mode, any password works for crew.
 
 | Email | Role |
 |---|---|
 | `admin@aahms.demo` | Super admin: `/admin` creates mission groups, astronaut and oversight accounts |
 | `surgeon@aahms.demo` | Oversight (flight surgeon): `/oversight` reads MTV-1 (and SIM-1 after `db:synthetic`), including AI co-pilot chats |
 | `sim-normal@aahms.demo` … `sim-spe@aahms.demo` | SYNTHETIC test astronauts in SIM-1, one per profile |
-| `ground@aahms.demo` | Commander, sees all crews |
-| `john@aahms.demo` | Astronaut EV1 (MTV-1) |
-| `vance@aahms.demo` | Astronaut CDR (MTV-1) |
+| `ground@aahms.demo` | Commander (ground control), sees every crew |
+| `vance@aahms.demo` | Crew commander CDR (MTV-1), sees the whole MTV-1 crew |
+| `john@aahms.demo` | Astronaut EV1 (MTV-1), sees only himself |
 | `cho@aahms.demo`, `silva@aahms.demo`, `reyes@aahms.demo`, `park@aahms.demo`, `okonkwo@aahms.demo` | Other crew |
 
 ## Five-minute demo script
 1. Sign in as `john@aahms.demo`.
-2. **Crew vitals:** follow the "Morning self-check due" banner and do the check. Try BP `165/102` to see a red result and the CMO alert.
+2. **My vitals:** follow the "Morning self-check due" banner and do the check. Try BP `165/102` to see a red result and the CMO alert.
 3. **Body map:** click the regions, then pick **G** (Gravity) in the hazards strip to see which systems it affects.
 4. **Missions:** use the **Go** buttons to finish the exercise plan (log 46 min), sleep (22:30 → 06:00) and **Beacon Lock**. The ring hits 4/4 and the patches unlock.
 5. Switch **Demo → Solar particle event** and watch radiation, the body map and the assessment react.
@@ -180,6 +186,24 @@ Seeded crew share the password **`aahms2025`**. In demo mode, any password works
 8. **Ground side:** sign out and sign in as `admin@aahms.demo`. Create a mission group and an astronaut in it, and tick the group for the flight surgeon on **Oversight accounts**.
 9. Sign in as that astronaut and ask the co-pilot something, then sign in as `surgeon@aahms.demo`. Open the group, click the astronaut and check **AI conversations** and **Health logs**. MTV-2 isn't listed, because the surgeon isn't assigned to it.
 10. **Monitoring:** still as the surgeon, open **SIM-1**. Sim Dropout shows missing data; open Sim Rising HR's **Monitoring** tab for the trend, then **Alerts** on Sim Dehydrated: open **Why this alerted**, add a note and **Acknowledge**, then **Resolve**. As `admin@aahms.demo`, change a threshold in **Alert rules** and see it in the audit log.
+
+## Deployment (Vercel + Neon)
+
+The live demo runs on **Vercel** with a **Neon** PostgreSQL database.
+
+1. Create a Neon database and copy its connection string.
+2. Locally, put it in `.env` as `DATABASE_URL`, then run `npx prisma migrate deploy`, `npm run db:seed` and (optionally) `npm run db:synthetic`. `tsx` doesn't read `.env` by itself, so export the variables in your shell first.
+3. In Vercel, import the GitHub repo (Next.js is detected) and set **Environment Variables**: `DATABASE_URL` (the Neon URL), `SESSION_SECRET` (a new random string, e.g. `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`) and `DEMO_MODE=false`.
+4. Deploy. Every push to `main` redeploys.
+
+Never commit `.env` or the database URL: secrets live only in `.env` and in Vercel's settings.
+
+## Changes in AstroMed
+
+- Renamed the app to **AstroMed** (browser title, login page, headers, logo).
+- **Crew privacy:** astronauts see only their own dashboard; the crew commander (CDR) sees their crew; ground control sees every crew. Enforced on the server.
+- Removed the **Space / Earth** buttons from the console header (the console always runs in space mode).
+- Deployed to Vercel with a Neon database (see above).
 
 ## Tech stack
 - **Next.js 16** (App Router, built with webpack), **React 19**, TypeScript, **Tailwind CSS v4**
