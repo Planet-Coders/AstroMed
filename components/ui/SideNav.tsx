@@ -47,6 +47,13 @@ const ICONS: Record<string, ReactNode> = {
       <path d="M12 9v4l2.5 2.5M10 2h4" />
     </svg>
   ),
+  spacecat: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="h-[18px] w-[18px] shrink-0" aria-hidden>
+      <path d="M5 11V4l4 3h6l4-3v7" />
+      <path d="M5 11a7 7 0 0 0 14 0" />
+      <path d="M9.5 12h.01M14.5 12h.01M11 15h2" />
+    </svg>
+  ),
   queue: (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="h-[18px] w-[18px] shrink-0" aria-hidden>
       <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
@@ -76,6 +83,10 @@ const SECTIONS = [
   {
     title: "Operations & Sync",
     ids: ["queue"],
+  },
+  {
+    title: "Crew Morale",
+    ids: ["spacecat"],
   },
 ];
 

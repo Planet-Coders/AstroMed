@@ -30,6 +30,8 @@ import { getLatestCheck } from "@/lib/selfCheck";
 import { reportRoutineDay } from "@/lib/routineLog";
 import { MonitoringView } from "./monitoring/MonitoringView";
 import { NasaOsdrPanel } from "./NasaOsdrPanel";
+import { SpaceCatView } from "./spacecat/SpaceCatView";
+import { FloatingCat } from "./spacecat/FloatingCat";
 import { useMissionTelemetry } from "@/components/MissionTelemetryProvider";
 
 type DashboardResponse = {
@@ -183,6 +185,7 @@ export function SuperAdminDashboard({ user }: { user: SessionUser }) {
     { id: "habitat", label: "Habitat & routine" },
     { id: "pvt", label: "Cognitive test" },
     { id: "queue", label: "Sync queue", badge: unsyncedCount || undefined },
+    { id: "spacecat", label: "Space cat" },
   ];
 
   // The crew shown first: the astronaut's own group, or MTV-1 for the commander.
@@ -335,6 +338,14 @@ export function SuperAdminDashboard({ user }: { user: SessionUser }) {
                 )}
                 {tab === "pvt" && <PVTTest />}
                 {tab === "queue" && <StoreForwardQueue />}
+                {tab === "spacecat" && (
+                  <SpaceCatView
+                    userId={user.userId}
+                    name={user.name}
+                    heartRate={selectedId === user.userId ? selectedHr : undefined}
+                    onGo={setTab}
+                  />
+                )}
               </main>
 
               <div className="min-w-0">
@@ -359,6 +370,7 @@ export function SuperAdminDashboard({ user }: { user: SessionUser }) {
             </div>
           </div>
         </div>
+        <FloatingCat userId={user.userId} hidden={tab === "spacecat"} onOpen={() => setTab("spacecat")} />
         <CopilotFloatingLauncher />
       </div>
     </CopilotProvider>

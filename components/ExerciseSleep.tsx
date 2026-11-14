@@ -1,6 +1,16 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useState, useSyncExternalStore } from "react";
+import {
+  getAutoEvery,
+  getNextAt,
+  requestCatSay,
+  setAutoEvery,
+  subscribeAutoEvery,
+  subscribeNextAt,
+} from "@/lib/voiceReminder";
+
+const autoEveryNow = getAutoEvery;
 import { Card } from "./ui/Card";
 import { CircularProgress } from "./ui/CircularProgress";
 import { useMissionTelemetry } from "@/components/MissionTelemetryProvider";
@@ -29,13 +39,11 @@ function suggestedBedtime(wake: string, targetHours: number) {
   return `${String(Math.floor(mins / 60)).padStart(2, "0")}:${String(mins % 60).padStart(2, "0")}`;
 }
 
-export function ExerciseSleep() {
+/** The spoken exercise and sleep reminder, shared by this card and the floating space cat. */
+export function useReminderText() {
   const { routine, exerciseMinutes, exerciseTarget, sleepHours, sleepTarget } = useMissionTelemetry();
-  const exPct = (exerciseMinutes / exerciseTarget) * 100;
-  const sleepPct = (sleepHours / sleepTarget) * 100;
   const bedtime = suggestedBedtime(routine.sleep.wake, sleepTarget);
-
-  const reminderText = useCallback(() => {
+  const text = useCallback(() => {
     const left = Math.max(0, exerciseTarget - exerciseMinutes);
     const behind = routine.byType.filter((t) => t.done < t.target);
     const exercisePart =
@@ -51,12 +59,24 @@ export function ExerciseSleep() {
         : "Sleep is on target.";
     return `${exercisePart} ${sleepPart}`;
   }, [exerciseMinutes, exerciseTarget, routine.byType, sleepHours, sleepTarget, bedtime]);
+  return { text, exerciseDone: exerciseMinutes >= exerciseTarget };
+}
+
+export function ExerciseSleep() {
+  const { routine, exerciseMinutes, exerciseTarget, sleepHours, sleepTarget } = useMissionTelemetry();
+  const exPct = (exerciseMinutes / exerciseTarget) * 100;
+  const sleepPct = (sleepHours / sleepTarget) * 100;
+  const bedtime = suggestedBedtime(routine.sleep.wake, sleepTarget);
+  const { text: reminderText, exerciseDone: done } = useReminderText();
 
   const [lastReminder, setLastReminder] = useState<string | null>(null);
   const speak = useCallback(() => {
     const text = reminderText();
     setLastReminder(text);
-    if ("speechSynthesis" in window) {
+    if (autoEveryNow() > 0) {
+      // The floating space cat is on screen: let it say the reminder.
+      requestCatSay(text);
+    } else if ("speechSynthesis" in window) {
       window.speechSynthesis.cancel();
       const u = new SpeechSynthesisUtterance(text);
       u.rate = 0.95;
@@ -64,28 +84,9 @@ export function ExerciseSleep() {
     }
   }, [reminderText]);
 
-  // Repeating reminders while there is still exercise left, like the station's timeline alerts.
-  const [autoEvery, setAutoEvery] = useState(0);
-  const [nextAt, setNextAt] = useState<string | null>(null);
-  const speakRef = useRef(speak);
-  useEffect(() => {
-    speakRef.current = speak;
-  }, [speak]);
-  const done = exerciseMinutes >= exerciseTarget;
-  useEffect(() => {
-    if (!autoEvery || done) return;
-    const ms = autoEvery * 60_000;
-    const schedule = () => setNextAt(new Date(Date.now() + ms).toTimeString().slice(0, 5));
-    schedule();
-    const id = setInterval(() => {
-      speakRef.current();
-      schedule();
-    }, ms);
-    return () => {
-      clearInterval(id);
-      setNextAt(null);
-    };
-  }, [autoEvery, done]);
+  // Repeating reminders: the setting is shared, the floating space cat runs the timer.
+  const autoEvery = useSyncExternalStore(subscribeAutoEvery, getAutoEvery, () => 0);
+  const nextAt = useSyncExternalStore(subscribeNextAt, getNextAt, () => null);
 
   return (
     <Card title="Exercise & sleep adherence" className="flex flex-col">
@@ -122,6 +123,7 @@ export function ExerciseSleep() {
           <select
             value={autoEvery}
             onChange={(e) => setAutoEvery(Number(e.target.value))}
+            aria-label="Automatic voice reminder interval"
             className="rounded-md border border-mc-line-strong bg-mc-inset px-2 py-1.5 font-mono text-xs text-foreground"
           >
             <option value={0}>Off</option>
@@ -131,6 +133,7 @@ export function ExerciseSleep() {
             <option value={60}>Every hour</option>
           </select>
         </label>
+        {autoEvery > 0 && <span className="font-mono text-[11px] text-mc-link">🐱 space cat on duty</span>}
         {nextAt && <span className="font-mono text-[11px] text-mc-label">next {nextAt}</span>}
         {autoEvery > 0 && done && <span className="font-mono text-[11px] text-mc-green">exercise done, paused</span>}
       </div>
