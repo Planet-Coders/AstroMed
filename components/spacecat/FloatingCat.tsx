@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { useHealthMissions } from "@/lib/missions";
 import { EMPTY_CAT, growthStage, isHungry, loadCat, subscribeCat, type CatState } from "@/lib/spaceCat";
 import {
   getAutoEvery,
@@ -8,6 +9,9 @@ import {
   setNextAt,
   subscribeAutoEvery,
   subscribeCatSay,
+  isSoundBlocked,
+  subscribeSoundBlocked,
+  unlockAndSpeak,
 } from "@/lib/voiceReminder";
 import { useReminderText } from "../ExerciseSleep";
 import { useCopilot } from "../CopilotProvider";
@@ -21,11 +25,19 @@ import { useCatVoice } from "./useCatVoice";
  */
 export function FloatingCat({ userId, hidden, onOpen }: { userId: string; hidden: boolean; onOpen: () => void }) {
   const autoEvery = useSyncExternalStore(subscribeAutoEvery, getAutoEvery, () => 0);
-  const { text, exerciseDone } = useReminderText();
+  const { text: routineText } = useReminderText();
+  const { tasks } = useHealthMissions(userId);
+  // Reminders keep going after exercise is done: they also cover sleep and missions still due.
+  const due = tasks.filter((t) => t.core && !t.done && (t.id === "selfcheck" || t.id === "pvt"));
+  const duePart = due.length
+    ? ` ${due.map((t) => (t.id === "selfcheck" ? "your daily checkup" : "the PVT reaction test")).join(" and ")} ${due.length === 1 ? "is" : "are"} still due.`
+    : "";
+  const text = useCallback(() => `${routineText()}${duePart ? ` Also,${duePart}` : ""}`, [routineText, duePart]);
   const { chatOpen } = useCopilot();
   const raw = useSyncExternalStore(subscribeCat, () => JSON.stringify(loadCat(userId)), () => JSON.stringify(EMPTY_CAT));
   const cat = useMemo(() => JSON.parse(raw) as CatState, [raw]);
   const { bubble, talking, say } = useCatVoice();
+  const soundBlocked = useSyncExternalStore(subscribeSoundBlocked, isSoundBlocked, () => false);
 
   // The single reminder timer (it used to live in the Habitat card and stopped when you left it).
   const textRef = useRef(text);
@@ -33,7 +45,7 @@ export function FloatingCat({ userId, hidden, onOpen }: { userId: string; hidden
     textRef.current = text;
   }, [text]);
   useEffect(() => {
-    if (!autoEvery || exerciseDone) {
+    if (!autoEvery) {
       setNextAt(null);
       return;
     }
@@ -48,7 +60,7 @@ export function FloatingCat({ userId, hidden, onOpen }: { userId: string; hidden
       clearInterval(id);
       setNextAt(null);
     };
-  }, [autoEvery, exerciseDone]);
+  }, [autoEvery]);
 
   // "×" hides the cat until the next reminder.
   const [dismissed, setDismissed] = useState(false);
@@ -74,7 +86,7 @@ export function FloatingCat({ userId, hidden, onOpen }: { userId: string; hidden
   useEffect(() => {
     if (autoEvery > 0 && prevAuto.current === 0 && !hiddenRef.current) {
       say(`I'm on reminder duty! I'll talk to you every ${autoEvery === 60 ? "hour" : `${autoEvery} minute${autoEvery === 1 ? "" : "s"}`}.`, {
-        voice: false,
+        voice: true,
       });
     }
     prevAuto.current = autoEvery;
@@ -90,6 +102,15 @@ export function FloatingCat({ userId, hidden, onOpen }: { userId: string; hidden
           role="status"
         >
           {bubble}
+          {soundBlocked && (
+            <button
+              type="button"
+              onClick={() => bubble && unlockAndSpeak(bubble)}
+              className="mt-1.5 block rounded-full border border-mc-line-strong bg-mc-raised px-2 py-0.5 text-[11px] font-semibold hover:bg-mc-inset"
+            >
+              🔊 Tap to turn sound on
+            </button>
+          )}
         </p>
       )}
       <div className="relative shrink-0">

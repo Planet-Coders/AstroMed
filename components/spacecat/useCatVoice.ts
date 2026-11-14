@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { catSpeak } from "@/lib/voiceReminder";
+import { catSpeak, isSoundBlocked } from "@/lib/voiceReminder";
 
 /** Speech bubble + cat voice. The bubble stays a few seconds after speech ends. */
 export function useCatVoice() {
@@ -21,6 +21,8 @@ export function useCatVoice() {
       if (talkTimer.current) clearTimeout(talkTimer.current);
       setTalking(false);
       if (hideTimer.current) clearTimeout(hideTimer.current);
+      // While the browser blocks sound, keep the bubble so its "tap to turn sound on" chip stays reachable.
+      if (voice && isSoundBlocked()) return;
       hideTimer.current = setTimeout(() => setBubble(null), 4000);
     };
     talkTimer.current = setTimeout(finish, estimate);

@@ -135,7 +135,7 @@ export function ExerciseSleep() {
         </label>
         {autoEvery > 0 && <span className="font-mono text-[11px] text-mc-link">🐱 space cat on duty</span>}
         {nextAt && <span className="font-mono text-[11px] text-mc-label">next {nextAt}</span>}
-        {autoEvery > 0 && done && <span className="font-mono text-[11px] text-mc-green">exercise done, paused</span>}
+        {autoEvery > 0 && done && <span className="font-mono text-[11px] text-mc-green">exercise done</span>}
       </div>
       {lastReminder && (
         <p className="mt-3 rounded-md border border-mc-line bg-mc-inset px-3 py-2 text-xs leading-relaxed text-mc-soft">
