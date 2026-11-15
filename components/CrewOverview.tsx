@@ -36,10 +36,12 @@ export function CrewOverview({
             key={m.id}
             type="button"
             onClick={() => onSelect(m.id)}
-            className={`flex flex-col gap-1 rounded-lg border p-3 text-left transition ${
+            aria-pressed={isSelected}
+            aria-label={`Show ${m.name} (${m.callsign})`}
+            className={`flex cursor-pointer flex-col gap-1 rounded-lg border bg-mc-panel p-3 text-left shadow-[0_1px_2px_rgba(0,0,0,0.04),0_6px_18px_rgba(0,0,0,0.05)] transition hover:-translate-y-0.5 hover:shadow-[0_2px_4px_rgba(0,0,0,0.06),0_10px_24px_rgba(0,0,0,0.08)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-mc-select focus-visible:ring-offset-2 focus-visible:ring-offset-mc-bg ${
               isSelected
-                ? "border-mc-cyan bg-mc-raised shadow-xs"
-                : "border-mc-line bg-mc-surface hover:border-mc-line-strong hover:bg-mc-raised/40"
+                ? "border-mc-select ring-2 ring-mc-select"
+                : "border-mc-line hover:border-mc-line-strong"
             }`}
           >
             <div className="flex items-center justify-between">
