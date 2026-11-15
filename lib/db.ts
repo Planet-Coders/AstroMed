@@ -7,8 +7,22 @@ export interface VitalRecord {
   hrv: number;
   spo2: number;
   radiation: number;
+  /** True once Earth's server has stored the record and confirmed it. */
   synced: boolean;
   timestamp: number;
+  /** When the record was last transmitted (it stays unsynced until Earth confirms). */
+  sentAt?: number;
+  /** When Earth confirmed it was received and stored. */
+  confirmedAt?: number;
+}
+
+export type DeliveryState = "queued" | "sending" | "sent" | "confirmed";
+
+/** Queued → sent (transmitted, no reply yet) → confirmed (Earth stored it). */
+export function deliveryState(r: Pick<VitalRecord, "synced" | "sentAt">, syncing: boolean): DeliveryState {
+  if (r.synced) return "confirmed";
+  if (r.sentAt) return syncing ? "sending" : "sent";
+  return "queued";
 }
 
 /** One co-pilot message waiting to be saved on the server for mission oversight. */
@@ -68,10 +82,22 @@ export async function getUnsyncedVitals(): Promise<VitalRecord[]> {
 }
 
 export async function markSynced(ids: string[]): Promise<void> {
+  const at = Date.now();
   await db.transaction("rw", db.vitals, async () => {
     for (const id of ids) {
       const row = await db.vitals.get(id);
-      if (row) await db.vitals.put({ ...row, synced: true });
+      if (row) await db.vitals.put({ ...row, synced: true, confirmedAt: at });
+    }
+  });
+}
+
+/** Records the moment a batch was transmitted, before Earth answers. */
+export async function markSent(ids: string[]): Promise<void> {
+  const at = Date.now();
+  await db.transaction("rw", db.vitals, async () => {
+    for (const id of ids) {
+      const row = await db.vitals.get(id);
+      if (row && !row.synced) await db.vitals.put({ ...row, sentAt: at });
     }
   });
 }

@@ -1,6 +1,24 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useId, useState } from "react";
+
+type Rule = { title: string; text: string; action: string; source: string };
+
+/** The rules behind the limit markers, so the crew can check what a limit means and where it comes from. */
+const RULES: Record<string, Rule> = {
+  "FLIGHT RULE 4.0": {
+    title: "Flight rule: cabin CO₂ (ppCO₂) at or below 4.0 mmHg",
+    text: "Keep the module's carbon dioxide partial pressure at or below 4.0 mmHg. Above it, crew commonly report headache, fatigue and slower thinking.",
+    action: "Boost the air scrubber, reduce exertion in the module, and tell the flight surgeon about any headache or confusion.",
+    source: "AstroMed demo limit, modelled on NASA-STD-3001 Vol. 2 (crew health) cabin CO₂ guidance.",
+  },
+  "SHELTER 1.0": {
+    title: "Shelter rule: radiation dose rate at or above 1.0 mSv/h",
+    text: "A dose rate at or above 1.0 mSv/h points to a solar particle event. The crew moves to the shielded shelter until the rate drops.",
+    action: "Go to the storm shelter, turn on shielding, and log your personal dosimeter reading for the flight surgeon.",
+    source: "AstroMed demo threshold for solar particle events, following NASA space radiation (ALARA) guidance.",
+  },
+};
 import { Card } from "./ui/Card";
 import { useMissionTelemetry } from "@/components/MissionTelemetryProvider";
 
@@ -22,6 +40,9 @@ function LimitBar({
   barClass: string;
 }) {
   const pct = Math.min(100, (Number(value) / max) * 100);
+  const rule = RULES[limitLabel];
+  const [open, setOpen] = useState(false);
+  const ruleId = useId();
   return (
     <div className="flex flex-col gap-2">
       <div className="flex items-baseline justify-between">
@@ -41,9 +62,32 @@ function LimitBar({
       </div>
       <div className="flex justify-between font-mono text-[11px] text-mc-label">
         <span>0</span>
-        <span>{limitLabel}</span>
+        {rule ? (
+          <button
+            type="button"
+            onClick={() => setOpen((o) => !o)}
+            aria-expanded={open}
+            aria-controls={ruleId}
+            className="text-mc-link underline decoration-dotted underline-offset-2 hover:text-foreground"
+            title="Show the rule"
+          >
+            {limitLabel} ⓘ
+          </button>
+        ) : (
+          <span>{limitLabel}</span>
+        )}
         <span>{max.toFixed(1)}</span>
       </div>
+      {rule && open && (
+        <div id={ruleId} className="rounded-md border border-mc-line bg-mc-inset px-3 py-2 text-[12px] leading-relaxed text-mc-soft">
+          <p className="font-semibold text-foreground">{rule.title}</p>
+          <p className="mt-1">{rule.text}</p>
+          <p className="mt-1">
+            <span className="font-semibold">What to do:</span> {rule.action}
+          </p>
+          <p className="mt-1 font-mono text-[10px] text-mc-label">Source: {rule.source}</p>
+        </div>
+      )}
     </div>
   );
 }
