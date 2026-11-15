@@ -342,8 +342,10 @@ export type StoredCheck = {
   /** The latest actual capture for each step, independent of the merged summary's time and values. */
   recordedItems?: Partial<Record<StepId, RecordedItem>>;
   values?: Partial<SelfCheckValues> & {
-    /** Additional fluid recorded by the previous version of Daily Check. */
+    /** Fluid added to today's total by this record; `fluidMl` then holds the new total. */
     fluidAddedMl?: number | null;
+    /** Sleep added to today's total by this record (e.g. a nap); `sleepHours` holds the new total. */
+    sleepAddedHours?: number | null;
   };
 };
 
@@ -389,11 +391,26 @@ const BLANK: SelfCheckValues = {
   sleepHours: null, fasting: true, fluidMl: null, urineColor: null,
 };
 
-/** A record holding just one tab's reading, sent to Earth on its own with its own time. */
-export function singleReadingCheck(userId: string, at: number, step: StepId, values: SelfCheckValues): StoredCheck {
+/** Steps whose amounts add up through the day instead of replacing the last reading. */
+export const ADDITIVE_STEPS = { sleep: "sleepHours", hydration: "fluidMl" } as const;
+export type AdditiveStep = keyof typeof ADDITIVE_STEPS;
+
+/** Today's saved total for sleep or fluid on this device, or null when nothing is saved today. */
+export function todayTotal(check: StoredCheck | null, step: AdditiveStep): number | null {
+  if (!check || !isToday(check.at)) return null;
+  const value = check.values?.[ADDITIVE_STEPS[step]];
+  return typeof value === "number" ? value : null;
+}
+
+/**
+ * A record holding just one tab's reading, sent to Earth on its own with its own time.
+ * `added` marks a sleep or fluid amount added to today's total; `values` then holds the total.
+ */
+export function singleReadingCheck(userId: string, at: number, step: StepId, values: SelfCheckValues, added?: number): StoredCheck {
   const only: SelfCheckValues = { ...BLANK };
   for (const k of STEP_KEYS[step]) (only as Record<string, unknown>)[k] = values[k];
-  return { userId, at, items: assessAll(only), values: only, partial: true };
+  const extra = added != null && step === "sleep" ? { sleepAddedHours: added } : added != null && step === "hydration" ? { fluidAddedMl: added } : {};
+  return { userId, at, items: assessAll(only), values: { ...only, ...extra }, partial: true };
 }
 
 /**
@@ -409,6 +426,8 @@ export function mergeIntoLatest(prev: StoredCheck | null, single: StoredCheck): 
   if (!prior) return { ...single, merged: true, recordedItems };
   const values = { ...BLANK, ...(prior.values ?? {}) } as SelfCheckValues;
   for (const [k, v] of Object.entries(single.values ?? {})) {
+    // The summary keeps today's totals; the added amount belongs to the record that was sent.
+    if (k === "sleepAddedHours" || k === "fluidAddedMl") continue;
     if (v !== null && v !== undefined) (values as Record<string, unknown>)[k] = v;
   }
   const done = new Set(Object.keys(single.values ?? {}).filter((k) => (single.values as Record<string, unknown>)[k] != null));
@@ -417,8 +436,8 @@ export function mergeIntoLatest(prev: StoredCheck | null, single: StoredCheck): 
 }
 
 /** Saves one tab's reading now: sent to Earth as its own record, and today's summary updated. */
-export function saveSingleReading(userId: string, step: StepId, values: SelfCheckValues, at = Date.now()) {
-  const single = singleReadingCheck(userId, at, step, values);
+export function saveSingleReading(userId: string, step: StepId, values: SelfCheckValues, at = Date.now(), added?: number) {
+  const single = singleReadingCheck(userId, at, step, values, added);
   const merged = mergeIntoLatest(getLatestCheck(userId), single);
   try {
     const all = JSON.parse(localStorage.getItem(KEY) ?? "{}") as Record<string, StoredCheck>;

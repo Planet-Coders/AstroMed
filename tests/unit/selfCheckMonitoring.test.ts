@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { assessBp } from "@/lib/selfCheck";
 import { DEFAULT_RULES, ruleKind } from "@/lib/monitoring/catalog";
-import { awaitingReading, dailySeries, evaluateRules, planAlertChanges, type ActiveAlert } from "@/lib/monitoring/engine";
+import { awaitingReading, dailySeries, evaluateRules, planAlertChanges, resolveNote, type ActiveAlert } from "@/lib/monitoring/engine";
 import { addLoggedWater, selfCheckSamples } from "@/lib/monitoring/selfCheckSamples";
 
 const morning = Date.parse("2026-11-14T07:00:00Z");
@@ -97,5 +97,50 @@ describe("Daily Check monitoring", () => {
     const later = morning + 3 * 86_400_000;
     const active: ActiveAlert[] = [{ id: "a", ruleId: "diastolic_high", level: "RED", status: "OPEN" }];
     expect(planAlertChanges(active, evaluateRules(rules, samples, later), [], awaitingReading(rules, samples, later))).toEqual([]);
+  });
+});
+
+describe("Daily Check running totals", () => {
+  const noon = Date.parse("2026-11-14T12:00:00Z");
+
+  it("adds a later sleep entry to today's total and resolves the short-sleep alert", () => {
+    const first = { at: morning, data: { values: { sleepHours: 5 } } };
+    const nap = { at: noon, data: { values: { sleepHours: 7, sleepAddedHours: 2 } } };
+    const before = assess([first], morning);
+    expect(before).toContainEqual(expect.objectContaining({ ruleId: "self_check_sleep_low", level: "YELLOW", value: 5 }));
+    const active: ActiveAlert[] = before.map((f) => ({ id: f.ruleId, ruleId: f.ruleId, level: f.level, status: "OPEN" }));
+    const samples = selfCheckSamples([nap, first]);
+    const changes = planAlertChanges(active, evaluateRules(rules, samples, evening));
+    expect(changes).toContainEqual({ type: "resolve", alertId: "self_check_sleep_low", ruleId: "self_check_sleep_low" });
+    expect(changes.every((c) => c.type === "resolve")).toBe(true);
+    expect(resolveNote("sleep", samples)).toBe("Today's total 7.0 h · back to safe.");
+  });
+
+  it("totals on the server even when the device sent only the added amount", () => {
+    const samples = selfCheckSamples([
+      { at: morning, data: { values: { sleepHours: 4 } } },
+      { at: noon, data: { values: { sleepAddedHours: 1.5 } } },
+      { at: evening, data: { values: { sleepAddedHours: 1.5 } } },
+    ]);
+    expect(dailySeries(samples, "sleep", 1, evening)[0].value).toBe(7);
+  });
+
+  it("adds fluid to a full-check snapshot instead of replacing it", () => {
+    const samples = selfCheckSamples([
+      { at: morning, data: { values: { fluidMl: 1400 } } },
+      { at: noon, data: { values: { fluidMl: 2000, fluidAddedMl: 600 } } },
+    ]);
+    expect(dailySeries(samples, "hydration", 1, evening)[0].value).toBe(2000);
+    expect(assess([{ at: morning, data: { values: { fluidMl: 1400 } } }, { at: noon, data: { values: { fluidAddedMl: 600 } } }])
+      .some((f) => f.ruleId === "hydration_low")).toBe(false);
+  });
+
+  it("starts a new total each day and lets a plain reading replace the total", () => {
+    const samples = selfCheckSamples([
+      { at: morning - 86_400_000, data: { values: { sleepHours: 6 } } },
+      { at: morning, data: { values: { sleepAddedHours: 3 } } },
+      { at: noon, data: { values: { sleepHours: 8 } } },
+    ]);
+    expect(dailySeries(samples, "sleep", 2, evening).map((p) => p.value)).toEqual([6, 8]);
   });
 });
