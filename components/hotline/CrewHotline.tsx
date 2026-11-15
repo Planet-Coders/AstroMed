@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { Card } from "../ui/Card";
 import { useMissionMode } from "../MissionModeContext";
 import { HOTLINE_OUTBOX_CHANGED, flushOutbox, pendingHotline, queueHotline } from "@/lib/outbox";
@@ -13,6 +13,7 @@ import {
   URGENCIES,
   URGENCY_LABEL,
   countdown,
+  mergeWithPending,
   type Urgency,
 } from "@/lib/hotline/rules";
 import type { HotlineClientMessage } from "@/lib/hotline/server";
@@ -100,16 +101,18 @@ export function CrewHotline({
   }, [load]);
 
   const send = async (text: string, level: Urgency) => {
-    const ok = await queueHotline({
+    const queued = await queueHotline({
       body: text,
       urgency: level,
       vitals: attach && vitals ? stampVitals(vitals) : null,
       delaySeconds,
     });
-    if (!ok) {
+    if (!queued) {
       setNotice("Could not queue the message on this device. Check that site storage is allowed.");
       return;
     }
+    // Show it in the conversation at once; the server copy replaces it when it arrives.
+    setPending((list) => (list.some((p) => p.clientId === queued.clientId) ? list : [...list, queued]));
     setBody("");
     setNotice(
       level === "EMERGENCY"
@@ -132,8 +135,16 @@ export function CrewHotline({
     void send(text.trim(), level);
   };
 
-  const pendingIds = new Set(pending.map((p) => p.clientId));
-  const sent = messages.filter((m) => !m.clientId || !pendingIds.has(m.clientId));
+  const { sent, waiting } = mergeWithPending(messages, pending);
+
+  // Follow new messages smoothly, unless the reader has scrolled up to older ones.
+  const listRef = useRef<HTMLOListElement>(null);
+  const atBottom = useRef(true);
+  const total = sent.length + waiting.length;
+  useEffect(() => {
+    const el = listRef.current;
+    if (el && atBottom.current) el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
+  }, [total]);
 
   return (
     <div className="flex flex-col gap-5">
@@ -240,26 +251,36 @@ export function CrewHotline({
       </Card>
 
       <Card title="Conversation">
-        {!sent.length && !pending.length ? (
+        {!sent.length && !waiting.length ? (
           <p className="text-sm text-mc-muted">No messages yet. The Earth medical team answers here.</p>
         ) : (
-          <ol className="flex flex-col gap-3" aria-live="polite">
+          <ol
+            ref={listRef}
+            onScroll={(e) => {
+              const el = e.currentTarget;
+              atBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight < 48;
+            }}
+            className="flex max-h-[480px] flex-col gap-3 overflow-y-auto pr-1"
+            aria-live="polite"
+          >
             {sent.map((m) => (
               <Bubble key={m.id} m={m} now={now} />
             ))}
-            {pending.map((p) => (
-              <li key={p.clientId} className="ml-auto max-w-[85%] rounded-xl border border-dashed border-mc-line-strong bg-mc-inset px-3 py-2">
+            {waiting.map((p) => (
+              <li key={p.clientId} className="chat-in ml-auto max-w-[85%] rounded-xl border border-dashed border-mc-line-strong bg-mc-inset px-3 py-2">
                 <div className="mb-1 flex items-center gap-2">
                   <UrgencyBadge urgency={p.urgency} />
                   <span className="font-mono text-[10px] text-mc-label">{hotlineTime(p.createdAt)}</span>
                 </div>
                 <p className="whitespace-pre-wrap text-sm">{p.body}</p>
-                <p className="mt-1 font-mono text-[11px] text-mc-amber">⏳ Waiting to send · goes out with the next sync</p>
+                <p className="mt-1 font-mono text-[11px] text-mc-amber">
+                  {typeof navigator !== "undefined" && navigator.onLine ? "⏳ Sending…" : "⏳ Waiting to send · goes out with the next sync"}
+                </p>
               </li>
             ))}
           </ol>
         )}
-        {pending.length > 0 && (
+        {waiting.length > 0 && (
           <button type="button" onClick={() => void flushOutbox().then(load)} className="mt-3 text-xs font-semibold text-mc-link underline">
             Try sending now
           </button>
@@ -305,7 +326,7 @@ function Bubble({ m, now }: { m: HotlineClientMessage; now: number }) {
   const left = Date.parse(m.deliverAt) - now;
   return (
     <li
-      className={`max-w-[85%] rounded-xl border px-3 py-2 ${
+      className={`chat-in max-w-[85%] rounded-xl border px-3 py-2 ${
         mine
           ? `ml-auto ${m.urgency === "EMERGENCY" ? "border-mc-red bg-mc-red/10" : "border-mc-line-strong bg-mc-raised"}`
           : "mr-auto border-mc-cyan/50 bg-mc-inset"

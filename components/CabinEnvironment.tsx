@@ -124,7 +124,7 @@ export function CabinEnvironment() {
 
   return (
     <Card title="Cabin environment & radiation" className="flex flex-col">
-      <div className="flex flex-col gap-5">
+      <div className="grid gap-5 md:grid-cols-2">
         <LimitBar
           label="Module 3 ppCO₂"
           value={ppCO2.toFixed(1)}
@@ -143,7 +143,7 @@ export function CabinEnvironment() {
           limitLabel="SHELTER 1.0"
           barClass={radiation > 1 ? "bg-mc-red" : radiation > 0.1 ? "bg-mc-amber" : "bg-mc-green"}
         />
-        <label className="flex items-center justify-between gap-3 rounded-md border border-mc-line bg-mc-inset px-3.5 py-3 text-sm">
+        <label className="flex items-center justify-between gap-3 rounded-md border border-mc-line bg-mc-inset px-3.5 py-3 text-sm md:col-span-2">
           <span>Shielding / Air scrubber boost</span>
           <input
             type="checkbox"

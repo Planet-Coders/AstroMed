@@ -1,4 +1,5 @@
 import type { RiskLevel } from "@/lib/risk";
+import { storedPvtLevel } from "@/lib/pvt";
 import type { StoredCheck } from "@/lib/selfCheck";
 import { formatLab, pick, type CrewLabs, type LabKey, type LabResult } from "@/lib/labs";
 
@@ -36,7 +37,7 @@ export type BodyInputs = {
   exerciseMinutes: number;
   exerciseTarget: number;
   voiceStress: boolean;
-  pvt: { mean: number; lapses: number } | null;
+  pvt: { mean: number; lapses: number; median?: number; minutes?: number; level?: RiskLevel } | null;
   check: StoredCheck | null;
   missionDay: number;
   sex: "male" | "female";
@@ -91,13 +92,7 @@ export function assessBody(x: BodyInputs): RegionStatus[] {
   const notDone = "not done today";
 
   // --- Brain: mood, alertness, sleep, CO2 headaches
-  const pvtLevel: RiskLevel | null = x.pvt
-    ? x.pvt.mean > 450 || x.pvt.lapses >= 5
-      ? "RED"
-      : x.pvt.mean > 350 || x.pvt.lapses >= 2
-        ? "YELLOW"
-        : "GREEN"
-    : null;
+  const pvtLevel: RiskLevel | null = x.pvt ? storedPvtLevel(x.pvt) : null;
   const sleepLevel: RiskLevel = x.sleepHours < 5 ? "RED" : x.sleepHours < 7 ? "YELLOW" : "GREEN";
   const co2Level: RiskLevel = x.ppCO2 > 4 ? "RED" : x.ppCO2 > 3 ? "YELLOW" : "GREEN";
   const brainReadings: Reading[] = [
@@ -105,7 +100,7 @@ export function assessBody(x: BodyInputs): RegionStatus[] {
     { label: "Sleep last night", value: `${x.sleepHours.toFixed(1)} h of ${x.sleepTarget} h`, level: sleepLevel },
     {
       label: "Reaction time (PVT)",
-      value: x.pvt ? `${Math.round(x.pvt.mean)} ms · ${x.pvt.lapses} lapses` : "no test yet",
+      value: x.pvt ? `${Math.round(x.pvt.median ?? x.pvt.mean)} ms ${x.pvt.median != null ? "median" : "mean"} · ${x.pvt.lapses} lapses` : "no test yet",
       level: pvtLevel,
     },
     { label: "Voice stress", value: x.voiceStress ? "elevated" : "normal", level: x.voiceStress ? "YELLOW" : "GREEN" },

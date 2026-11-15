@@ -39,11 +39,24 @@ export function CopilotChat({
   className?: string;
 }) {
   const scrollRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
   const followTail = useRef(true);
+  const lastCount = useRef(messages.length);
   useEffect(() => {
     const scroll = scrollRef.current;
-    if (scroll && followTail.current) scroll.scrollTop = scroll.scrollHeight;
+    if (!scroll) return;
+    const added = messages.length > lastCount.current;
+    lastCount.current = messages.length;
+    // Your own new message always comes into view; replies follow only if you're at the bottom.
+    if (added && messages.at(-1)?.role === "user") followTail.current = true;
+    if (!followTail.current) return;
+    // Smooth for a new bubble, instant while a reply streams in (smooth per token would lag behind).
+    scroll.scrollTo({ top: scroll.scrollHeight, behavior: added ? "smooth" : "auto" });
   }, [messages, isSending]);
+  // Keep the composer ready for the next question once a reply finishes.
+  useEffect(() => {
+    if (!isSending && document.activeElement === document.body) inputRef.current?.focus({ preventScroll: true });
+  }, [isSending]);
 
   return (
     <div
@@ -92,7 +105,7 @@ export function CopilotChat({
             data-first-token-ms={m.timing?.firstTokenMs ?? undefined}
             data-prompt-tokens={m.timing?.promptTokens ?? undefined}
             data-completion-tokens={m.timing?.completionTokens ?? undefined}
-            className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}
+            className={`chat-in flex ${m.role === "user" ? "justify-end" : "justify-start"}`}
           >
             <div
               className={`max-w-[92%] rounded-2xl px-3 py-2 text-xs leading-relaxed ${
@@ -144,6 +157,7 @@ export function CopilotChat({
       <div className="shrink-0 border-t border-mc-line bg-mc-inset p-2">
         <div className="flex gap-2">
           <input
+            ref={inputRef}
             value={input}
             aria-label="Question for the co-pilot"
             maxLength={MAX_COPILOT_INPUT}
@@ -151,11 +165,10 @@ export function CopilotChat({
             onKeyDown={(e) => {
               if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
                 e.preventDefault();
-                onSend();
+                if (!isSending) onSend();
               }
             }}
-            placeholder={placeholder}
-            disabled={isSending}
+            placeholder={isSending ? "Co-pilot is replying… you can type your next question" : placeholder}
             className="min-w-0 flex-1 rounded-full border border-mc-line-strong bg-mc-panel px-3 py-2 text-xs text-foreground placeholder:text-mc-label focus:border-mc-cyan focus:outline-none disabled:opacity-50"
           />
           {isSending ? <button type="button" onClick={onStop}

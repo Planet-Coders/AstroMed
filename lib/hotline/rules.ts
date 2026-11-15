@@ -151,3 +151,12 @@ export function countdown(ms: number) {
   const m = Math.floor(s / 60);
   return `${m}:${String(s % 60).padStart(2, "0")}`;
 }
+
+/**
+ * Chat view merge: the server copy wins, and a locally queued message disappears as soon as the
+ * server has it (same clientId), so a sent message never shows twice or blinks out.
+ */
+export function mergeWithPending<S extends { clientId?: string | null }, P extends { clientId: string }>(server: S[], pending: P[]) {
+  const saved = new Set(server.map((m) => m.clientId).filter((id): id is string => !!id));
+  return { sent: server, waiting: pending.filter((p) => !saved.has(p.clientId)) };
+}

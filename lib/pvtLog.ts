@@ -1,4 +1,7 @@
-type PvtResult = { mean: number; lapses: number; at: number };
+import type { RiskLevel } from "@/lib/risk";
+
+/** Saved PVT result. Newer runs also store the median, test length and level from lib/pvt.ts. */
+type PvtResult = { mean: number; lapses: number; at: number; median?: number; minutes?: number; level?: RiskLevel };
 
 const resultKey = (userId: string) => `aahms_pvt_summary:${userId}`;
 

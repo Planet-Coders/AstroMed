@@ -3,11 +3,13 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Card } from "./ui/Card";
 import { useMissionTelemetry } from "@/components/MissionTelemetryProvider";
+import { PVT, scoredRt, summarizePvt } from "@/lib/pvt";
+import type { RiskLevel } from "@/lib/risk";
 import { savePvtResult } from "@/lib/pvtLog";
 
 const DURATIONS = [1, 3, 5] as const;
 const LEVEL_SECONDS = 30;
-const LAPSE_MS = 500;
+const LAPSE_MS = PVT.LAPSE_MS;
 
 /**
  * "Beacon Lock": the psychomotor vigilance test as a short arcade game. Green beacons
@@ -33,14 +35,15 @@ type Stats = {
   score: number;
   combo: number;
   bestCombo: number;
-  hits: number[]; // reaction times of successful locks (ms, slowdown-adjusted)
+  hits: number[]; // scored reaction times of successful locks (ms, pointing allowance removed, slowdown-adjusted)
+  practice: number; // warm-up targets not scored
   missed: number; // beacons that faded before being tapped
   decoyHits: number;
   decoyAvoided: number;
   strays: number; // taps on empty space
 };
 
-const EMPTY: Stats = { score: 0, combo: 0, bestCombo: 0, hits: [], missed: 0, decoyHits: 0, decoyAvoided: 0, strays: 0 };
+const EMPTY: Stats = { score: 0, combo: 0, bestCombo: 0, hits: [], practice: 0, missed: 0, decoyHits: 0, decoyAvoided: 0, strays: 0 };
 
 function levelFor(elapsedS: number) {
   return Math.floor(elapsedS / LEVEL_SECONDS) + 1;
@@ -54,16 +57,17 @@ function beaconFor(level: number, focusMode: boolean, id: number): Beacon {
     y: Math.random(),
     decoy: focusMode && Math.random() < Math.min(0.3, 0.12 + level * 0.03),
     shownAt: performance.now(),
-    life: Math.max(650, 1600 - (level - 1) * 180),
-    size: Math.max(38, 70 - (level - 1) * 6),
+    // Levels speed up a little, but never below 1 s or 52 px: the test measures alertness, not dexterity.
+    life: Math.max(1000, 1700 - (level - 1) * 140),
+    size: Math.max(52, 72 - (level - 1) * 4),
   };
 }
 
-function verdict(mean: number, lapses: number, n: number) {
+function verdict(level: RiskLevel, n: number) {
   if (n === 0) return { label: "No data", tone: "text-mc-muted", advice: "Lock at least a few beacons to get a reading." };
-  if (mean < 350 && lapses <= 2)
+  if (level === "GREEN")
     return { label: "In range", tone: "text-mc-green", advice: "Reaction times and lapses were within the demo test limits." };
-  if (mean < 450 && lapses <= 5)
+  if (level === "YELLOW")
     return {
       label: "Mild fatigue",
       tone: "text-mc-amber",
@@ -123,6 +127,10 @@ export function PVTTest({ userId }: { userId: string }) {
   const showBeacon = (b: Beacon | null) => {
     beaconRef.current = b;
     setBeacon(b);
+    // Start the clock when the beacon is on screen (after the next paint), not when it was created.
+    if (b) requestAnimationFrame(() => requestAnimationFrame(() => {
+      if (beaconRef.current?.id === b.id) b.shownAt = performance.now();
+    }));
   };
 
   const endAt = useRef(0);
@@ -178,7 +186,9 @@ export function PVTTest({ userId }: { userId: string }) {
           setStats((s) => ({ ...s, decoyAvoided: s.decoyAvoided + 1, score: s.score + 10 }));
           pop(b, "+10 restraint", "info");
         } else {
-          setStats((s) => ({ ...s, missed: s.missed + 1, combo: 0 }));
+          setStats((s) =>
+            s.practice < PVT.PRACTICE_TRIALS ? { ...s, practice: s.practice + 1, combo: 0 } : { ...s, missed: s.missed + 1, combo: 0 }
+          );
           pop(b, "MISSED", "bad");
           jolt();
           blip("bad");
@@ -226,14 +236,19 @@ export function PVTTest({ userId }: { userId: string }) {
       blip("bad");
     } else {
       const raw = performance.now() - b.shownAt;
-      const rt = pvtSlowdown ? raw * 1.35 + 80 : raw;
+      const rt = scoredRt(pvtSlowdown ? raw * 1.35 + 80 : raw);
+      const warmUp = stats.practice < PVT.PRACTICE_TRIALS;
       // Taps re-render between each other, so the rendered stats are current here.
       const combo = rt <= LAPSE_MS ? stats.combo + 1 : 0;
       const mult = Math.min(5, 1 + Math.floor(combo / 3));
       const points = Math.max(10, Math.round((1000 - Math.min(rt, 900)) / 5)) * mult;
       pop(b, `+${points}${rt < 300 ? " FAST!" : ""}${mult > 1 ? ` x${mult}` : ""}`, "good");
       blip("hit", combo);
-      setStats((s) => ({ ...s, hits: [...s.hits, rt], combo, bestCombo: Math.max(s.bestCombo, combo), score: s.score + points }));
+      setStats((s) =>
+        warmUp
+          ? { ...s, practice: s.practice + 1, combo, score: s.score + points }
+          : { ...s, hits: [...s.hits, rt], combo, bestCombo: Math.max(s.bestCombo, combo), score: s.score + points }
+      );
     }
     spawn();
   };
@@ -257,18 +272,18 @@ export function PVTTest({ userId }: { userId: string }) {
     return () => clearInterval(id);
   }, [phase, finish, blip]);
 
-  const n = stats.hits.length;
-  const mean = n ? stats.hits.reduce((a, b) => a + b, 0) / n : 0;
-  const lapses = stats.hits.filter((t) => t > LAPSE_MS).length + stats.missed;
-  const fastest = n ? Math.min(...stats.hits) : 0;
-  const targets = n + stats.missed;
-  const accuracy = targets ? Math.round((n / targets) * 100) : 0;
-  const v = verdict(mean, lapses, n);
+  const summary = summarizePvt(stats.hits, stats.missed, minutes);
+  const n = summary.responses;
+  const { lapses } = summary;
+  const fastest = n ? Math.min(...stats.hits.filter((t) => t >= PVT.FALSE_START_MS)) : 0;
+  const targets = stats.hits.length + stats.missed;
+  const accuracy = targets ? Math.round((stats.hits.length / targets) * 100) : 0;
+  const v = verdict(summary.level, n);
 
   // Save the result for the co-pilot, body map and daily missions, and track the best score.
   useEffect(() => {
     if (phase !== "done" || n === 0) return;
-    savePvtResult(userId, { mean, lapses, at: Date.now() });
+    savePvtResult(userId, { ...summary, at: Date.now() });
     try {
       if (stats.score > best) {
         localStorage.setItem(bestKey, String(stats.score));
@@ -343,7 +358,7 @@ export function PVTTest({ userId }: { userId: string }) {
 
       <div
         role="presentation"
-        onClick={() => {
+        onPointerDown={() => {
           if (phase === "running") setStats((s) => ({ ...s, strays: s.strays + 1 }));
         }}
         className={`pvt-arena relative mb-4 h-72 w-full select-none overflow-hidden rounded-lg border-2 border-mc-line-strong ${
@@ -373,9 +388,13 @@ export function PVTTest({ userId }: { userId: string }) {
             key={beacon.id}
             type="button"
             aria-label={beacon.decoy ? "Decoy, do not tap" : "Beacon"}
-            onClick={(e) => {
+            onPointerDown={(e) => {
               e.stopPropagation();
               tapBeacon(beacon);
+            }}
+            onClick={(e) => {
+              e.stopPropagation();
+              if (e.detail === 0) tapBeacon(beacon); // keyboard (Enter / Space)
             }}
             style={{
               left: `calc((100% - ${beacon.size}px) * ${beacon.x})`,
@@ -429,7 +448,7 @@ export function PVTTest({ userId }: { userId: string }) {
             </div>
             <p className="mt-1 text-xs text-mc-muted">{v.advice}</p>
             <div className="mt-3 grid grid-cols-3 gap-2 font-mono text-xs sm:grid-cols-6">
-              <Hud label="Mean RT" value={n ? `${Math.round(mean)} ms` : "—"} />
+              <Hud label="Median RT" value={n ? `${Math.round(summary.median)} ms` : "—"} />
               <Hud label="Fastest" value={n ? `${Math.round(fastest)} ms` : "—"} />
               <Hud label="Lapses" value={String(lapses)} />
               <Hud label="Accuracy" value={`${accuracy}%`} />
@@ -442,7 +461,7 @@ export function PVTTest({ userId }: { userId: string }) {
       </div>
 
       <p className="text-[11px] text-mc-label">
-        Lapse = a beacon tapped slower than {LAPSE_MS} ms or missed entirely. Results feed the co-pilot, body map and daily missions.
+        Lapse = a beacon tapped {LAPSE_MS} ms or slower (after a {PVT.POINTING_ALLOWANCE_MS} ms allowance for moving to it) or missed. The first beacon is a warm-up, taps under {PVT.FALSE_START_MS} ms count as false starts, and the verdict uses your median time. Results feed the co-pilot, body map and daily missions.
       </p>
     </Card>
   );
