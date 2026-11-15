@@ -13,6 +13,7 @@ import {
   countUnsynced,
   getUnsyncedVitals,
   markSynced,
+  markSent,
 } from "@/lib/db";
 import { flushOutbox } from "@/lib/outbox";
 
@@ -69,6 +70,7 @@ export function SyncProvider({ children }: { children: ReactNode }) {
         await refreshCount();
         return;
       }
+      await markSent(records.map((r) => r.id));
       const res = await fetch("/api/biometrics/sync", {
         method: "POST",
         headers: { "Content-Type": "application/json" },

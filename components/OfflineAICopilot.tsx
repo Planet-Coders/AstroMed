@@ -22,6 +22,7 @@ type OfflineAICopilotProps = {
     hrv: number;
     spo2: number;
     radiation: number;
+    arrhythmia?: boolean;
   };
 };
 
@@ -40,7 +41,7 @@ export function OfflineAICopilot({
   displayVitals,
 }: OfflineAICopilotProps) {
   const { voiceStress } = useMissionTelemetry();
-  const { unsyncedCount, syncNow, isSyncing, isOnline } = useSync();
+  const { unsyncedCount, syncNow, isSyncing, isOnline, lastSyncAt } = useSync();
   const {
     setSession,
     voiceTranscript,
@@ -88,7 +89,9 @@ export function OfflineAICopilot({
         <p className="mc-label">Medical assessment</p>
         <p className={`mt-1 text-2xl font-semibold ${tone.text}`}>{riskLabel(overall)}</p>
         <p className="mt-2 text-sm leading-relaxed text-mc-soft">
-          {labsDriven
+          {displayVitals?.arrhythmia
+            ? "Irregular heart rhythm on the ECG. Stop activity, record a 12-lead ECG and contact the CMO now."
+            : labsDriven
             ? "Vitals are normal, but the latest blood labs need attention. See the lab flags below."
             : risk === "GREEN"
             ? "No acute findings. Crew within their own baselines."
@@ -98,6 +101,9 @@ export function OfflineAICopilot({
         </p>
         <p className="mt-3 font-mono text-xs text-mc-label">
           Stress {stressIndex}/100 · {stressLabel}
+        </p>
+        <p className="mt-1 font-mono text-[11px] text-mc-label">
+          Based on: live vitals ({riskLabel(risk)}){patientLabs ? ` + latest blood labs (${riskLabel(labLevel)})` : ""}. The header pill shows vitals only.
         </p>
         {patientLabs && patientLabs.flagged.length > 0 && (
           <p className="mt-2 text-xs leading-relaxed text-mc-amber">
@@ -161,8 +167,17 @@ export function OfflineAICopilot({
         >
           {voice.isListening ? "Stop listening" : voice.supported ? "Voice check-in" : "Type a check-in"}
         </button>
+        {!voice.isListening && !voice.error && (
+          <p className="text-[11px] leading-relaxed text-mc-label">
+            {voice.supported
+              ? `🌐 Voice typing needs a network link: the browser sends audio to its online speech service. The AI co-pilot runs on this device and works offline, but voice does not.${isOnline ? "" : " No link right now, so type your check-in."}`
+              : "This browser has no voice typing (use Chrome or Edge on desktop). You can type your check-in instead."}
+          </p>
+        )}
         {(voice.interim || voice.error) && (
-          <p className={`text-xs ${voice.error ? "text-mc-red" : "text-mc-cyan"}`}>{voice.error ?? `…${voice.interim}`}</p>
+          <p className={`text-xs ${voice.error ? "text-mc-red" : "text-mc-cyan"}`} role={voice.error ? "alert" : undefined}>
+            {voice.error ?? `…${voice.interim}`}
+          </p>
         )}
         <p className="text-xs leading-relaxed text-mc-label">
           Last check-in: <span className="text-mc-soft">{voiceTranscript}</span>
@@ -174,6 +189,11 @@ export function OfflineAICopilot({
         <p className="text-[13px] text-mc-soft">
           <span className="font-mono text-foreground">{unsyncedCount}</span> records waiting
           <span className={isOnline ? "text-mc-label" : "text-mc-amber"}>{isOnline ? " · online" : " · no link"}</span>
+          {lastSyncAt && unsyncedCount === 0 && (
+            <span className="block font-mono text-[11px] text-mc-green">
+              ✓✓ All records confirmed by Earth · checked {lastSyncAt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+            </span>
+          )}
         </p>
         <button
           type="button"

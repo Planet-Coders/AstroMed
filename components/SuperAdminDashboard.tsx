@@ -150,7 +150,12 @@ export function SuperAdminDashboard({ user }: { user: SessionUser }) {
   const selectedHrv = liveSelected?.userId === selectedId ? liveSelected.hrv : (selectedMember?.hrv ?? selectedServer?.hrv ?? 60);
   const selectedHr = liveSelected?.userId === selectedId ? liveSelected.heartRate : (selectedMember?.heartRate ?? selectedServer?.heartRate ?? 72);
 
-  const crewRisks = members.map((m) => m.risk);
+  // The live card (e.g. an irregular rhythm on the ECG) can be worse than the last server reading.
+  const crewRisks = members.map((m) => {
+    if (liveSelected?.userId !== m.id) return m.risk;
+    const order = ["GREEN", "YELLOW", "RED"] as const;
+    return order[Math.max(order.indexOf(m.risk), order.indexOf(liveSelected.risk))];
+  });
 
   // Every visible crew member's latest reading and personal baseline, so the co-pilot can
   // answer about anyone, not just the selected card.
@@ -385,6 +390,7 @@ export function SuperAdminDashboard({ user }: { user: SessionUser }) {
                           hrv: selectedHrv,
                           spo2: selectedServer?.spo2 ?? 98,
                           radiation: selectedServer?.radiation ?? 0.075,
+                          arrhythmia: telemetry.arrhythmia,
                         }
                       : undefined
                   }

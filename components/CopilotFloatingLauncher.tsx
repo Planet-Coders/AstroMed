@@ -59,7 +59,7 @@ export function CopilotFloatingLauncher() {
       <button
         type="button"
         onClick={toggleChat}
-        className={`fixed bottom-4 right-4 sm:right-6 z-40 flex items-center gap-2 rounded-full px-4 py-3 text-sm font-medium shadow-lg shadow-[0_8px_24px_rgba(60,50,20,0.12)] transition ${
+        className={`fixed bottom-3 right-3 sm:bottom-4 sm:right-6 z-40 flex h-12 w-12 items-center justify-center gap-2 rounded-full text-sm font-medium shadow-lg sm:h-auto sm:w-auto sm:px-4 sm:py-3 shadow-[0_8px_24px_rgba(60,50,20,0.12)] transition ${
           chatOpen
             ? "border border-mc-line-strong bg-mc-panel text-foreground"
             : "border border-mc-select bg-mc-select text-mc-on-select hover:bg-mc-soft"
@@ -67,8 +67,11 @@ export function CopilotFloatingLauncher() {
         aria-expanded={chatOpen}
         aria-label={chatOpen ? "Close co-pilot chat" : "Ask co-pilot"}
       >
-        <span className="flex h-2 w-2 rounded-full bg-emerald-400" aria-hidden />
-        {chatOpen ? "Close co-pilot" : "Ask co-pilot"}
+        <span className="hidden h-2 w-2 rounded-full bg-emerald-400 sm:flex" aria-hidden />
+        <span className="text-lg leading-none sm:hidden" aria-hidden>
+          {chatOpen ? "✕" : "💬"}
+        </span>
+        <span className="hidden sm:inline">{chatOpen ? "Close co-pilot" : "Ask co-pilot"}</span>
       </button>
     </>
   );

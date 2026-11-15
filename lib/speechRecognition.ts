@@ -25,13 +25,17 @@ export function createSpeechRecognition(): SpeechRecognition | null {
 export function speechErrorMessage(error: string): string {
   switch (error) {
     case "not-allowed":
-      return "Microphone permission denied. Allow mic access for this site.";
+      return "Microphone permission denied. Allow microphone access for this site (the lock icon in the address bar), then try again.";
     case "no-speech":
       return "No speech detected. Try again and speak clearly.";
     case "audio-capture":
       return "No microphone found or capture failed.";
     case "network":
-      return "Speech recognition needs network (browser STT service).";
+      return "Couldn't reach the browser's voice service. Voice typing in Chrome and Edge sends your audio to an online speech service, even when the app and the on-device AI work. Check your connection, VPN or firewall, then press Voice check-in again, or type your check-in instead.";
+    case "service-not-allowed":
+      return "This browser has turned off its voice service. Try Chrome or Edge, or type your check-in instead.";
+    case "language-not-supported":
+      return "The voice service doesn't support this language. Type your check-in instead.";
     case "aborted":
       return "Listening stopped.";
     default:
