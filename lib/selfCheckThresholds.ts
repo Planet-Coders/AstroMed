@@ -31,3 +31,55 @@ export const READING_RANGES = {
 export function reading(value: unknown, [min, max]: readonly [number, number]): number | null {
   return typeof value === "number" && Number.isFinite(value) && value >= min && value <= max ? value : null;
 }
+
+/**
+ * Input check before any medical assessment: a reading that can't be right (e.g. 80/120, with
+ * the numbers swapped) gets a "please re-enter" message instead of a health warning.
+ */
+export function bpInputError(sys: number | null, dia: number | null): string | null {
+  if (sys == null || dia == null) return null;
+  if (sys <= dia) {
+    return `The top number (systolic) must be higher than the bottom number (diastolic). Did you swap them? For example ${Math.max(sys, dia)}/${Math.min(sys, dia)}.`;
+  }
+  if (sys - dia < 10) return "The two numbers are too close together to be a real reading. Please measure again and re-enter.";
+  return null;
+}
+
+type BpRule = { id: string; metric: string; amber: number; red: number };
+
+/**
+ * Admin check for blood pressure alert rules: thresholds must be readings a cuff can show, and
+ * the systolic (top) limits must stay above the diastolic (bottom) ones, like a real reading.
+ */
+export function bpRuleError(edited: BpRule, all: BpRule[]): string | null {
+  if (edited.metric !== "systolic" && edited.metric !== "diastolic") return null;
+  const range = edited.metric === "systolic" ? READING_RANGES.systolic : READING_RANGES.diastolic;
+  for (const v of [edited.amber, edited.red]) {
+    if (v < range[0] || v > range[1]) {
+      return `Invalid blood pressure rule: ${edited.metric} limits must be between ${range[0]} and ${range[1]} mmHg.`;
+    }
+  }
+  const rules = new Map(all.map((r) => [r.id, r]));
+  rules.set(edited.id, edited);
+  const pair = (top: string, bottom: string) => {
+    const s = rules.get(top);
+    const d = rules.get(bottom);
+    if (!s || !d) return null;
+    if (s.amber <= d.amber || s.red <= d.red) {
+      return `Invalid blood pressure rule: the systolic (top) limits must be higher than the diastolic (bottom) limits, e.g. ${Math.max(s.amber, d.amber)}/${Math.min(s.amber, d.amber)} not ${s.amber}/${d.amber}.`;
+    }
+    return null;
+  };
+  const order = (low: string, high: string, name: string) => {
+    const l = rules.get(low);
+    const h = rules.get(high);
+    if (l && h && l.amber >= h.amber) return `Invalid blood pressure rule: the low ${name} limit must be below the high ${name} limit.`;
+    return null;
+  };
+  return (
+    pair("systolic_high", "diastolic_high") ??
+    pair("systolic_low", "diastolic_low") ??
+    order("systolic_low", "systolic_high", "systolic") ??
+    order("diastolic_low", "diastolic_high", "diastolic")
+  );
+}

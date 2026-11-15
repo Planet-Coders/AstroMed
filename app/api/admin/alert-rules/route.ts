@@ -4,6 +4,7 @@ import { badRequest, requireRole } from "@/lib/authz";
 import { audit } from "@/lib/audit";
 import { loadRules } from "@/lib/monitoring/server";
 import { DEFAULT_RULES, ruleKind } from "@/lib/monitoring/catalog";
+import { bpRuleError } from "@/lib/selfCheckThresholds";
 
 export async function GET() {
   const auth = await requireRole(["SUPER_ADMIN"]);
@@ -30,6 +31,10 @@ export async function PATCH(request: Request) {
     return badRequest(rule.comparator === "above" ? "Red must be higher than amber" : "Red must be lower than amber");
   }
   if (!Number.isInteger(windowDays) || windowDays < 1 || windowDays > 30) return badRequest("Window must be 1–30 days");
+  if (rule.kind !== "missing" && rule.kind !== "trend") {
+    const bp = bpRuleError({ id: rule.id, metric: rule.metric, amber, red }, await prisma.alertRule.findMany({ select: { id: true, metric: true, amber: true, red: true } }));
+    if (bp) return badRequest(bp);
+  }
 
   const updated = await prisma.alertRule.update({
     where: { id: rule.id },

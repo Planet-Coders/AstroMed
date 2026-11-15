@@ -1,5 +1,5 @@
 import type { StoredCheck } from "../selfCheck";
-import { reading, READING_RANGES as RANGE } from "../selfCheckThresholds";
+import { bpInputError, reading, READING_RANGES as RANGE } from "../selfCheckThresholds";
 import type { MetricId } from "./catalog";
 import { dayKey } from "./days";
 import type { Sample } from "./engine";
@@ -36,8 +36,13 @@ export function selfCheckSamples(reports: Report[]): Sample[] {
     const raw = (key: keyof typeof RANGE, legacy: number | null) =>
       reading(values && key in values ? values[key] : legacy, RANGE[key]);
 
-    push("systolic", raw("systolic", bp ? Number(bp[1]) : null));
-    push("diastolic", raw("diastolic", bp ? Number(bp[2]) : null));
+    // A swapped or impossible pair (e.g. 80/120) is an input error, not a reading: never alert on it.
+    const sys = raw("systolic", bp ? Number(bp[1]) : null);
+    const dia = raw("diastolic", bp ? Number(bp[2]) : null);
+    if (!bpInputError(sys, dia)) {
+      push("systolic", sys);
+      push("diastolic", dia);
+    }
     const sugar = raw("glucose", glucose ? Number(glucose[1]) : null);
     const fasting = values?.fasting ?? Boolean(glucose?.[2]);
     if (typeof fasting === "boolean") push(fasting ? "glucose_fasting" : "glucose_after_meal", sugar);
