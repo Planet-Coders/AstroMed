@@ -199,7 +199,7 @@ npm run dev               # http://localhost:3000
 Tests:
 
 ```bash
-npm test                  # Vitest unit tests (103): alert rules, trends, validation, hotline, sync, space cat
+npm test                  # Vitest unit tests (136): alert rules, trends, validation, hotline, sync, space cat
 npm run test:e2e          # Playwright UI tests (re-seeds SIM-1; uses installed Edge, PW_CHANNEL=chromium to change)
 ```
 
