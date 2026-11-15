@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import type { HotlineClientMessage as Msg } from "@/lib/hotline/server";
 import { Card } from "../ui/Card";
 import { MAX_BODY, countdown, type Urgency } from "@/lib/hotline/rules";
 import type { HotlineClientMessage } from "@/lib/hotline/server";
@@ -53,6 +54,10 @@ export function EarthHotline() {
   const [busy, setBusy] = useState(false);
   const [now, setNow] = useState(() => Date.now());
   const lastAlert = useRef<string>("");
+  // Replies shown at once while they are being sent; removed when the server copy is loaded.
+  const [outgoing, setOutgoing] = useState<Msg[]>([]);
+  const listRef = useRef<HTMLOListElement>(null);
+  const atBottom = useRef(true);
 
   const loadInbox = useCallback(async () => {
     try {
@@ -95,6 +100,12 @@ export function EarthHotline() {
       clearInterval(id);
     };
   }, [openId, loadThread]);
+
+  const threadCount = (thread?.messages.length ?? 0) + outgoing.length;
+  useEffect(() => {
+    const el = listRef.current;
+    if (el && atBottom.current) el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
+  }, [threadCount, openId]);
 
   const post = async (payload: object) => {
     if (!openId) return;
@@ -187,13 +198,20 @@ export function EarthHotline() {
                       </button>
                     </div>
                   </div>
-                  <ol className="flex max-h-[420px] flex-col gap-2 overflow-y-auto pr-1">
-                    {thread.messages.map((m) => {
+                  <ol
+                    ref={listRef}
+                    onScroll={(e) => {
+                      const el = e.currentTarget;
+                      atBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight < 48;
+                    }}
+                    className="flex max-h-[420px] flex-col gap-2 overflow-y-auto pr-1"
+                  >
+                    {[...thread.messages, ...outgoing].map((m) => {
                       const toCrewLeft = Date.parse(m.deliverAt) - now;
                       return (
                         <li
                           key={m.id}
-                          className={`max-w-[85%] rounded-xl border px-3 py-2 ${
+                          className={`chat-in max-w-[85%] rounded-xl border px-3 py-2 ${
                             m.fromEarth
                               ? "ml-auto border-mc-cyan/50 bg-mc-inset"
                               : m.urgency === "EMERGENCY"
@@ -215,7 +233,13 @@ export function EarthHotline() {
                           {!m.fromEarth && m.vitals ? <VitalsLine vitals={m.vitals as Record<string, number>} className="mt-1 block" /> : null}
                           {m.fromEarth && (
                             <p className="mt-1 font-mono text-[11px] text-mc-muted">
-                              {toCrewLeft > 0 ? `📡 Reaches the crew in ${countdown(toCrewLeft)}` : m.readAt ? "✓✓ Read by crew" : "✓ Delivered to crew"}
+                              {m.id.startsWith("sending:")
+                                ? "⏳ Sending…"
+                                : toCrewLeft > 0
+                                  ? `📡 Reaches the crew in ${countdown(toCrewLeft)}`
+                                  : m.readAt
+                                    ? "✓✓ Read by crew"
+                                    : "✓ Delivered to crew"}
                             </p>
                           )}
                         </li>
@@ -226,8 +250,18 @@ export function EarthHotline() {
                     className="flex flex-col gap-2"
                     onSubmit={(e) => {
                       e.preventDefault();
-                      if (!reply.trim()) return;
-                      void post({ body: reply.trim() }).then(() => setReply(""));
+                      const text = reply.trim();
+                      if (!text) return;
+                      // Show the reply straight away and clear the box; the server copy replaces it.
+                      const temp: Msg = {
+                        id: `sending:${Date.now()}`, clientId: null, fromEarth: true, senderName: "You", body: text,
+                        urgency: "ROUTINE", vitals: null, createdAt: new Date().toISOString(), deliverAt: new Date().toISOString(),
+                        readAt: null, acknowledgedAt: null, resolvedAt: null, status: null,
+                      };
+                      atBottom.current = true;
+                      setOutgoing((o) => [...o, temp]);
+                      setReply("");
+                      void post({ body: text }).finally(() => setOutgoing((o) => o.filter((x) => x.id !== temp.id)));
                     }}
                   >
                     <textarea

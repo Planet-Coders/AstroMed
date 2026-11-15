@@ -52,18 +52,18 @@ export async function queueHealth(kind: OutboxHealth["kind"], key: string, data:
 export const HOTLINE_OUTBOX_CHANGED = "astromed:hotline-outbox";
 
 /** Queues a hotline message to Earth; it is sent at once when online, or on the next sync. */
-export async function queueHotline(message: Omit<OutboxHotline, "id" | "clientId" | "createdAt">) {
-  if (!reporter) return false;
+export async function queueHotline(message: Omit<OutboxHotline, "id" | "clientId" | "createdAt">): Promise<OutboxHotline | null> {
+  if (!reporter) return null;
   const clientId = crypto.randomUUID();
   const payload: OutboxHotline = { ...message, id: clientId, clientId, createdAt: Date.now() };
   try {
     await db.outbox.put({ id: `hotline:${clientId}`, userId: reporter.userId, type: "hotline", createdAt: payload.createdAt, payload });
   } catch {
-    return false;
+    return null;
   }
   window.dispatchEvent(new Event(HOTLINE_OUTBOX_CHANGED));
   void flushOutbox();
-  return true;
+  return payload;
 }
 
 /** Hotline messages still waiting in this device's queue (shown as "waiting to send"). */

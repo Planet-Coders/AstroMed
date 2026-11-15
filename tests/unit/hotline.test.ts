@@ -160,7 +160,7 @@ describe("hotline offline queue", () => {
     online = false;
     outbox.setOutboxUser({ userId: "a1", name: "Nova" });
     await outbox.queueHealth("routine", "2026-11-14", { minutes: 10 });
-    expect(await outbox.queueHotline({ body: "Need a consult", urgency: "URGENT", vitals: null, delaySeconds: 20 })).toBe(true);
+    expect(await outbox.queueHotline({ body: "Need a consult", urgency: "URGENT", vitals: null, delaySeconds: 20 })).toBeTruthy();
     await outbox.flushOutbox();
     expect(calls).toHaveLength(0);
     const waiting = await outbox.pendingHotline();
