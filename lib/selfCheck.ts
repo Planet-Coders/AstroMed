@@ -449,11 +449,12 @@ export function isToday(ts: number) {
   return new Date(ts).toDateString() === new Date().toDateString();
 }
 
-/** One line for the co-pilot prompt. */
+/** Describe the recorded values from one save for co-pilot lookup and interpretation. */
 export function describeCheck(check: StoredCheck | null): string {
   if (!check) return "Daily self-check: not done yet.";
-  const when = isToday(check.at) ? "today" : new Date(check.at).toLocaleDateString();
-  return `Daily self-check (${when}): ${check.items
-    .map((i) => `${i.label} ${i.display}${i.level === "GREEN" ? " (normal)" : i.level === "YELLOW" ? " (watch)" : " (ALERT)"}`)
-    .join(", ")}.`;
+  const when = new Date(check.at).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
+  return [
+    `${check.partial ? "Daily Check retest" : "Daily Check"} saved ${when}.`,
+    ...check.items.map((i) => `• ${i.label} ${i.display} (${i.level === "GREEN" ? "normal" : i.level === "YELLOW" ? "watch" : "alert"})`),
+  ].join("\n");
 }

@@ -5,18 +5,20 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useMemo,
   useRef,
   useState,
+  useSyncExternalStore,
   type ReactNode,
 } from "react";
 import { assessRisk, riskLabel, type RiskLevel } from "@/lib/risk";
 import { generateCopilotFallback } from "@/lib/copilotFallback";
-import { describeCheck, getLatestCheck, type StepId } from "@/lib/selfCheck";
+import { describeCopilotDailyCheck, isDailyCheckLookup, loadCopilotDailyCheck } from "@/lib/copilotDailyCheck";
 import { describeSpaceWeather, useSpaceWeather } from "@/lib/useSpaceWeather";
 import { evaRecommendation, findProtocols, protocolsForReadings } from "@/lib/copilotKnowledge";
 import { findEvidence, type EvidenceCard } from "@/lib/copilotEvidence";
 import { insightFormat, insightMessages, selectInsight, type Insight, type InsightSnapshot } from "@/lib/copilotInsight";
-import { copilotMessages, repeatsPreviousReply, retrievalQuestion, MAX_COPILOT_INPUT, type CopilotTurn } from "@/lib/copilotPrompt";
+import { completeChatParagraph, copilotMessages, repeatsPreviousReply, retrievalQuestion, MAX_COPILOT_INPUT, type CopilotTurn } from "@/lib/copilotPrompt";
 import { emergencyGuidance, medicationGuidance } from "@/lib/copilotGuidance";
 import { describePersonalBaseline, describeSubjectVitals, selectSubject, type CopilotSession, type CopilotVitals } from "@/lib/copilotSubject";
 import { osdrFallbackCitation, studyPageUrl } from "@/lib/osdr";
@@ -32,6 +34,7 @@ import type { CopilotChatMessage } from "@/components/CopilotChat";
 import {
   getEngine,
   preloadEngine,
+  stopOnDeviceAI,
   useWebLLM,
   type EngineStatus,
 } from "@/lib/webllm/engine";
@@ -57,6 +60,8 @@ type CopilotContextValue = {
   loadPercent: number | null;
   modelId: string | null;
   basicReason: string | null;
+  prefersBasic: boolean;
+  setBasicPreference: (basic: boolean) => void;
   replyMetrics: ReplyMetrics | null;
   explain: (snapshot: InsightSnapshot, signal: AbortSignal) => Promise<Insight | null>;
   retryEngine: () => void;
@@ -72,31 +77,61 @@ const GENERATION_TIMEOUT_MS = 75_000;
 const INSIGHT_TIMEOUT_MS = 12_000;
 const MAX_CACHED_INSIGHTS = 24;
 
-const DAILY_CHECK_TOPICS: { id: StepId; match: RegExp }[] = [
-  { id: "bp", match: /\b(?:blood pressure|systolic|diastolic|bp)\b/i },
-  { id: "glucose", match: /\b(?:glucose|blood sugar|fasting)\b/i },
-  { id: "temperature", match: /\b(?:temperature|fever)\b/i },
-  { id: "mood", match: /\b(?:mood|stress|anxious|anxiety)\b/i },
-  { id: "sleep", match: /\b(?:sleep|fatigue|tired|eva)\b/i },
-  { id: "hydration", match: /\b(?:hydration|dehydration|water|fluid|urine|kidney)\b/i },
-];
+function readTabSetting(key: string) {
+  try {
+    return sessionStorage.getItem(key) ?? "";
+  } catch {
+    return "";
+  }
+}
+
+function restoreChat(raw: string): CopilotChatMessage[] {
+  if (!raw) return [];
+  try {
+    const messages: CopilotChatMessage[] = JSON.parse(raw);
+    return Array.isArray(messages) ? messages.filter((message) =>
+      message && (message.role === "user" || message.role === "assistant") && typeof message.content === "string"
+    ) : [];
+  } catch {
+    return [];
+  }
+}
+
+const subscribeToTabSettings = () => () => {};
 
 export function CopilotProvider({ userId, children }: { userId: string; children: ReactNode }) {
   const [session, setSessionState] = useState<CopilotSession | null>(null);
   const [voiceTranscript, setVoiceTranscript] = useState("");
-  const [messages, setMessages] = useState<CopilotChatMessage[]>([]);
+  const chatKey = `astromed_copilot_chat:${userId}`;
+  const modeKey = `astromed_copilot_basic:${userId}`;
+  const restored = useSyncExternalStore(subscribeToTabSettings, () => readTabSetting(chatKey), () => "");
+  const savedPreference = useSyncExternalStore(subscribeToTabSettings, () => readTabSetting(modeKey) === "1", () => false);
+  const [preference, setPreference] = useState<boolean | null>(null);
+  const prefersBasic = preference ?? savedPreference;
+  const [liveMessages, setMessages] = useState<CopilotChatMessage[] | null>(null);
+  const messages = useMemo(() => liveMessages ?? restoreChat(restored), [liveMessages, restored]);
   const [input, setInput] = useState("");
   const llm = useWebLLM();
   const spaceWeather = useSpaceWeather();
   const nasaStudies = useNasaStudies();
   const telemetry = useMissionTelemetry();
-  const engineStatus = llm.status;
+  const engineStatus = prefersBasic ? "basic" : llm.status;
   const [replyMetrics, setReplyMetrics] = useState<ReplyMetrics | null>(null);
   const [isSending, setIsSending] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
-  const history = useRef<CopilotTurn | undefined>(undefined);
   const active = useRef<AbortController | null>(null);
+  const modelRequests = useRef(new AbortController());
   const insights = useRef(new Map<string, Insight>());
+
+  useEffect(() => {
+    if (liveMessages === null) return;
+    try {
+      if (liveMessages.length) sessionStorage.setItem(chatKey, JSON.stringify(liveMessages));
+      else sessionStorage.removeItem(chatKey);
+    } catch {
+      /* The current chat can continue in memory when storage is unavailable. */
+    }
+  }, [chatKey, liveMessages]);
 
   const setSession = useCallback((s: CopilotSession) => {
     setSessionState(s);
@@ -110,17 +145,22 @@ export function CopilotProvider({ userId, children }: { userId: string; children
   const risk = session?.simulatedArrhythmia ? "RED"
     : session?.displayVitals ? assessRisk(session.displayVitals) : null;
 
-  // Load the model once the console has rendered and the browser is idle, so the
-  // download and GPU init never compete with sign-in or the first dashboard fetch.
-  useEffect(() => {
-    const start = () => void preloadEngine();
-    if ("requestIdleCallback" in window) {
-      const id = requestIdleCallback(start, { timeout: 3000 });
-      return () => cancelIdleCallback(id);
+  const setBasicPreference = useCallback((basic: boolean) => {
+    if (basic) {
+      modelRequests.current.abort();
+      stopOnDeviceAI();
+    } else {
+      modelRequests.current = new AbortController();
     }
-    const id = setTimeout(start, 1500);
-    return () => clearTimeout(id);
-  }, []);
+    try {
+      if (basic) sessionStorage.setItem(modeKey, "1");
+      else sessionStorage.removeItem(modeKey);
+    } catch {
+      /* The preference still applies in this tab while the app is open. */
+    }
+    setPreference(basic);
+    if (!basic) void preloadEngine(true);
+  }, [modeKey]);
 
   const stopReply = useCallback(() => {
     active.current?.abort();
@@ -128,7 +168,6 @@ export function CopilotProvider({ userId, children }: { userId: string; children
 
   const clearChat = useCallback(() => {
     stopReply();
-    history.current = undefined;
     setMessages([]);
     setInput("");
     setReplyMetrics(null);
@@ -140,13 +179,15 @@ export function CopilotProvider({ userId, children }: { userId: string; children
 
   const explain = useCallback(async (snapshot: InsightSnapshot, signal: AbortSignal) => {
     if (signal.aborted || snapshot.userId !== userId) return null;
+    if (prefersBasic) return selectInsight(snapshot, undefined, 0);
     const key = JSON.stringify([llm.model, snapshot]);
     const cached = insights.current.get(key);
     if (cached) return { ...cached, durationMs: 0 };
 
     const start = performance.now();
     const result = await generateReply(insightMessages(snapshot), {
-      signal, timeoutMs: INSIGHT_TIMEOUT_MS, maxTokens: 96, format: insightFormat(snapshot),
+      signal: AbortSignal.any([signal, modelRequests.current.signal]),
+      timeoutMs: INSIGHT_TIMEOUT_MS, maxTokens: 96, format: insightFormat(snapshot),
     });
     if (signal.aborted) return null;
     const insight = selectInsight(snapshot, result?.text, Math.round(performance.now() - start));
@@ -158,65 +199,81 @@ export function CopilotProvider({ userId, children }: { userId: string; children
       insights.current.set(key, insight);
     }
     return insight;
-  }, [llm.model, userId]);
+  }, [llm.model, prefersBasic, userId]);
 
   const sendMessage = useCallback(async () => {
     const question = input.trim().slice(0, MAX_COPILOT_INPUT);
     if (!question || !session || active.current) return;
 
     const run = new AbortController();
+    const modelSignal = modelRequests.current.signal;
     active.current = run;
     setInput("");
     setReplyMetrics(null);
     setIsSending(true);
-    setMessages((m) => [...m, { role: "user", content: question }]);
+    setMessages([...messages, { role: "user", content: question }]);
 
-    const previous = history.current;
-    const retrieved = retrievalQuestion(question, previous);
-    const subject = selectSubject(question, session, retrieved !== question ? previous?.subject : undefined);
-    const followUp = retrieved !== question && subject?.name === previous?.subject ? previous : undefined;
-    const topic = followUp ? retrieved : question;
+    const history = messages.flatMap((message, index): CopilotTurn[] => {
+      const prompt = messages[index - 1];
+      if (message.role !== "assistant" || !message.mode || !message.topic || prompt?.role !== "user") return [];
+      return [{ question: prompt.content, reply: message.content, subject: message.subject ?? "", mode: message.mode, topic: message.topic }];
+    });
+    const previous = history.at(-1);
+    const retrieved = retrievalQuestion(question, history);
+    const subject = selectSubject(question, session, retrieved.reference?.subject || undefined);
+    const reference = subject?.name === retrieved.reference?.subject ? retrieved.reference : undefined;
+    const topic = reference ? retrieved.topic : question;
+    const recordLookup = isDailyCheckLookup(question);
     const guidance = emergencyGuidance(topic) ?? medicationGuidance(topic);
-    const canGenerate = !guidance && !!subject && !!getEngine();
+    const canGenerate = !prefersBasic && !guidance && !recordLookup && !!subject && !!getEngine();
     void queueChat({ role: "user", content: question, mode: canGenerate ? "webllm" : "basic" });
 
     let mode: CopilotTurn["mode"] = "basic";
     let sources: EvidenceCard[] = [];
     const personalContext: { label: string; value: string }[] = [];
     let reply = "";
-    let fallbackReason = canGenerate ? undefined : "The on-device model is loading or unavailable.";
+    let fallbackReason = canGenerate || engineStatus === "idle" || prefersBasic ? undefined : "The on-device model is loading or unavailable.";
     let metrics: ReplyMetrics | undefined;
     const started = performance.now();
 
     try {
+      const dailyCheck = !guidance && subject?.own
+        ? describeCopilotDailyCheck(await loadCopilotDailyCheck(session.userId, topic, run.signal), topic)
+        : undefined;
+      if (run.signal.aborted) return;
       if (guidance) {
         reply = guidance;
         mode = "guidance";
       } else if (!subject) {
         reply = "Which crew member should I use for this question? Include one name or callsign.";
         mode = "guidance";
+      } else if (recordLookup) {
+        reply = dailyCheck ?? `I don’t have a saved Daily Check available for ${subject.name}.`;
+        mode = "record";
       } else {
         const { own, member, name } = subject;
-        const local = own
+        const researchQuestion = /\b(?:study|studies|research|data set|dataset|osdr|mouse|mice|animal|cytokine|biomarker)\b/i.test(topic);
+        const recall = reference && topic === question && /\b(?:what|which)\b/i.test(question)
+          && /\b(?:say|said|show|showed|list|listed|ask|asked|tell|mentioned)\b/i.test(question)
+          && !/\b(?:why|should|explain|interpret|compare)\b/i.test(question);
+        const generalResearch = researchQuestion && own && !/\b(?:my|me|i|mine|current|latest|personal)\b/i.test(topic);
+        const useReadings = !recall && !generalResearch;
+        if (useReadings && dailyCheck) personalContext.push({ label: "Last Daily Check", value: dailyCheck });
+        const local = own && useReadings
           ? await getLatestForUser(session.userId).catch(() => undefined)
           : undefined;
         if (run.signal.aborted) return;
-        const reported = subject.vitals;
+        const reported = useReadings ? subject.vitals : undefined;
         const reportedAt = reported?.timestamp == null ? 0 : new Date(reported.timestamp).getTime();
         const vitals: CopilotVitals | null | undefined = local && (!reported || local.timestamp > reportedAt) ? local : reported;
         const reading = describeSubjectVitals(vitals);
         if (vitals) personalContext.push({ label: "Available vitals", value: reading.summary });
-        const simulatedArrhythmia = own && telemetry.simulationEnabled && telemetry.arrhythmia;
+        const simulatedArrhythmia = useReadings && own && telemetry.simulationEnabled && telemetry.arrhythmia;
         if (simulatedArrhythmia) personalContext.push({ label: "Demo ECG", value: "Irregular rhythm scenario active." });
-        const usual = describePersonalBaseline(member, vitals);
+        const usual = useReadings ? describePersonalBaseline(member, vitals) : "";
         if (usual) personalContext.push({ label: "Personal baseline", value: usual });
 
-        const check = own ? getLatestCheck(session.userId) : null;
-        const fullCheck = /\b(?:daily (?:self-)?check|last check)\b/i.test(topic);
-        const items = check?.items.filter((item) => fullCheck || DAILY_CHECK_TOPICS.some(({ id, match }) => id === item.id && match.test(topic)));
-        const dailyCheck = check && items?.length ? describeCheck({ ...check, items }) : undefined;
-        if (own) {
-          if (dailyCheck) personalContext.push({ label: "Last Daily Check", value: dailyCheck });
+        if (useReadings && own) {
           if (/\b(?:sleep|tired|fatigue|exercise|workout|eva)\b/i.test(topic)) {
             const { recordedSleepHours, recordedExerciseMinutes } = telemetry.routine;
             const routine = [
@@ -234,10 +291,10 @@ export function CopilotProvider({ userId, children }: { userId: string; children
           }
         }
         const profile = CREW_PROFILES[name];
-        if (profile && /\b(?:allerg(?:y|ies|ic)|medic|role|cmo)\b/i.test(topic)) {
+        if (useReadings && profile && /\b(?:allerg(?:y|ies|ic)|medic|role|cmo)\b/i.test(topic)) {
           personalContext.push({ label: "Demo crew profile", value: profile.role + ". Recorded allergies: " + profile.allergies + "." });
         }
-        if (/\b(?:injur|pain|burn|cut|bruise|sprain|swelling)\w*\b/i.test(topic)) {
+        if (useReadings && /\b(?:injur|pain|burn|cut|bruise|sprain|swelling)\w*\b/i.test(topic)) {
           const injuries = getInjuries(name).filter((injury) => !injury.healed).slice(0, 2);
           for (const injury of injuries) {
             const last = injury.updates.at(-1);
@@ -247,7 +304,7 @@ export function CopilotProvider({ userId, children }: { userId: string; children
             });
           }
         }
-        if (/\b(?:period|menstrual|menstruation|cycle|cramp|spotting)\b/i.test(topic)) {
+        if (useReadings && /\b(?:period|menstrual|menstruation|cycle|cramp|spotting)\b/i.test(topic)) {
           const log = getCycleLog(name);
           if (log.days.length || log.suppressed) {
             const info = summarize(log);
@@ -255,10 +312,9 @@ export function CopilotProvider({ userId, children }: { userId: string; children
           }
         }
 
-        sources = findEvidence(topic);
+        sources = recall ? [] : findEvidence(topic);
         const osdrStudies = nasaStudies.data?.studies ?? [];
-        const researchQuestion = /\b(?:study|studies|research|data set|dataset|osdr|mouse|mice|animal|cytokine|biomarker)\b/i.test(topic);
-        if (researchQuestion) {
+        if (researchQuestion && !recall) {
           const analog = osdrFallbackCitation(topic, osdrStudies);
           const id = analog?.match(/^OSD-\d+/)?.[0];
           if (analog && id) sources = [...sources.slice(0, 1), {
@@ -277,24 +333,26 @@ export function CopilotProvider({ userId, children }: { userId: string; children
             ...vitals, hrv: vitals?.hrv ?? undefined, radiation: vitals?.radiation ?? undefined,
             arrhythmia: vitals?.arrhythmia || simulatedArrhythmia,
           };
-          const protocols = findProtocols(topic, protocolsForReadings({ ...signals, ppCO2: telemetry.ppCO2 }), 2);
+          const protocols = useReadings ? findProtocols(topic, protocolsForReadings({ ...signals, ppCO2: telemetry.ppCO2 }), 2) : [];
           const context = [
             "Subject: " + name,
-            reading.risk ? "Console flag: " + riskLabel(reading.risk) : "Vitals unavailable for this subject.",
+            useReadings ? reading.risk ? "Console flag: " + riskLabel(reading.risk) : "Vitals unavailable for this subject." : "",
             ...personalContext.map(({ label, value }) => label + ": " + value),
             /\b(?:cabin|co2|headache|air quality)\b/i.test(topic) ? "Cabin CO2 " + telemetry.ppCO2.toFixed(1) + " mmHg." : "",
             /\b(?:solar|radiation|dosimeter|shelter)\b/i.test(topic) ? describeSpaceWeather(spaceWeather) : "",
             /\b(?:eva|spacewalk)\b/i.test(topic) ? evaRecommendation({ ...signals, sleepHours: own ? telemetry.routine.recordedSleepHours : undefined }) : "",
-            "Demo procedures:",
+            protocols.length ? "Demo procedures:" : "",
             ...protocols.map((p) => p.title + ": " + p.text),
           ].filter(Boolean).join("\n");
-          const result = await generateReply(copilotMessages(question, context, sources, followUp), {
-            signal: run.signal, timeoutMs: GENERATION_TIMEOUT_MS, stop: ["\n\n"],
+          const result = await generateReply(copilotMessages(question, context, sources, { history, subject: name, reference, model: llm.model }), {
+            signal: AbortSignal.any([run.signal, modelSignal]), timeoutMs: GENERATION_TIMEOUT_MS, stop: ["\n\n"],
           });
           if (run.signal.aborted) return;
-          const text = result?.text ?? "";
+          const text = completeChatParagraph(result?.text ?? "");
           const includesDose = /\d(?:[\d.,]*\d)?\s*(?:mg|mcg|µg|milligrams?|micrograms?)\b(?!\s*\/\s*d[lL])/i.test(text);
-          if (result && text && !includesDose && !repeatsPreviousReply(question, text, previous)) {
+          if (modelSignal.aborted) {
+            fallbackReason = undefined;
+          } else if (result && text && !includesDose && (reference || !repeatsPreviousReply(question, text, previous))) {
             reply = text;
             metrics = result.metrics;
             mode = "webllm";
@@ -307,25 +365,25 @@ export function CopilotProvider({ userId, children }: { userId: string; children
           }
         }
         if (!reply) {
-          reply = fallBack();
+          reply = recall ? "Earlier in this chat:\n" + reference.reply : fallBack();
           const source = sources[0];
-          if (reply === followUp?.reply && source && /\b(?:short|one sentence|brief|summari[sz]e)\b/i.test(question)) {
+          if (reply === reference?.reply && source && /\b(?:short|one sentence|brief|summari[sz]e)\b/i.test(question)) {
             reply = `${source.finding} [${source.id}]`;
           }
         }
       }
       if (run.signal.aborted) return;
-      history.current = { question, reply, mode, subject: subject?.name ?? "", topic: followUp?.topic ?? question };
       const storedMode = mode === "webllm" ? "webllm" : "basic";
       void queueChat({ role: "assistant", content: reply, mode: storedMode });
       const timing = metrics ?? { totalMs: Math.round(performance.now() - started), firstTokenMs: null, promptTokens: null, completionTokens: null };
       setReplyMetrics(timing);
       setMessages((m) => [
-        ...m,
+        ...(m ?? []),
         {
           role: "assistant", content: reply, mode,
           fallbackReason: mode === "basic" ? fallbackReason : undefined,
-          subject: guidance ? undefined : subject?.name,
+          subject: subject?.name,
+          topic: reference && topic !== question ? reference.topic : question,
           personalContext, sources: sources.map(({ id, title, url }) => ({ id, title, url })),
           timing, model: mode === "webllm" ? llm.model : null,
         },
@@ -334,7 +392,7 @@ export function CopilotProvider({ userId, children }: { userId: string; children
       console.warn("Co-pilot could not prepare the reply", err);
       if (!run.signal.aborted) {
         setMessages((m) => [
-          ...m,
+          ...(m ?? []),
           { role: "assistant", mode: "basic", content: "I couldn’t load the onboard data for this reply. Try again." },
         ]);
       }
@@ -342,7 +400,7 @@ export function CopilotProvider({ userId, children }: { userId: string; children
       active.current = null;
       setIsSending(false);
     }
-  }, [input, llm.model, nasaStudies.data, session, spaceWeather, telemetry]);
+  }, [engineStatus, input, llm.model, messages, nasaStudies.data, prefersBasic, session, spaceWeather, telemetry]);
 
   const toggleChat = useCallback(() => setChatOpen((o) => !o), []);
 
@@ -361,11 +419,13 @@ export function CopilotProvider({ userId, children }: { userId: string; children
     engineStatus,
     loadProgress: llm.text,
     loadPercent: llm.progress,
-    modelId: llm.model,
-    basicReason: llm.reason,
+    modelId: prefersBasic ? null : llm.model,
+    basicReason: prefersBasic ? null : llm.reason,
+    prefersBasic,
+    setBasicPreference,
     replyMetrics,
     explain,
-    retryEngine: () => void preloadEngine(true),
+    retryEngine: () => prefersBasic ? setBasicPreference(false) : void preloadEngine(true),
     chatOpen,
     setChatOpen,
     toggleChat,

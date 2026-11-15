@@ -49,6 +49,7 @@ export function OfflineAICopilot({
     loadPercent,
     modelId,
     basicReason,
+    prefersBasic,
     isSending,
     replyMetrics,
     retryEngine,
@@ -120,6 +121,11 @@ export function OfflineAICopilot({
           <AiBadge status={engineStatus} />
         </div>
 
+        {engineStatus === "idle" && (
+          <button type="button" onClick={retryEngine} className="self-start text-xs text-mc-link underline">
+            Start on-device AI
+          </button>
+        )}
         {engineStatus === "loading" && (
           <div>
             <div className="h-1.5 overflow-hidden rounded bg-mc-line">
@@ -137,12 +143,12 @@ export function OfflineAICopilot({
         )}
         {engineStatus === "basic" && (
           <div className="rounded-md border border-mc-amber/30 bg-mc-amber/5 p-3 text-xs leading-relaxed text-mc-soft">
-            <p className="font-semibold text-mc-amber">AI running in basic mode</p>
+            <p className="font-semibold text-mc-amber">{prefersBasic ? "Basic mode selected" : "AI running in basic mode"}</p>
             <p className="mt-1">
-              Answers come from the built-in triage rules. {basicReason}
+              Answers use built-in rules and available records. {basicReason}
             </p>
             <button type="button" onClick={retryEngine} className="mt-1.5 text-mc-link underline">
-              Try on-device AI again
+              {prefersBasic ? "Use on-device AI" : "Try on-device AI again"}
             </button>
           </div>
         )}
@@ -222,7 +228,7 @@ function AiBadge({ status }: { status: string }) {
     ready: ["Full AI", "border-[#1f5f48] text-mc-green"],
     loading: ["Loading", "border-mc-line-strong text-mc-cyan"],
     basic: ["Basic mode", "border-mc-amber/40 text-mc-amber"],
-    idle: ["Starting", "border-mc-line-strong text-mc-label"],
+    idle: ["AI off", "border-mc-line-strong text-mc-label"],
   };
   const [label, cls] = map[status] ?? map.idle;
   return <span className={`rounded border px-2 py-0.5 font-mono text-[11px] ${cls}`}>{label}</span>;

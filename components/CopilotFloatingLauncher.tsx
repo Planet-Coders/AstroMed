@@ -16,11 +16,18 @@ export function CopilotFloatingLauncher() {
     stopReply,
     isSending,
     engineStatus,
+    prefersBasic,
+    setBasicPreference,
+    retryEngine,
     loadProgress,
     session,
   } = useCopilot();
 
   if (!session) return null;
+  const canPauseModel = engineStatus === "ready" || engineStatus === "loading";
+  const modeLabel = canPauseModel ? "Use Basic mode"
+    : prefersBasic ? "Use on-device AI"
+      : engineStatus === "basic" ? "Try on-device AI again" : "Start on-device AI";
 
   return (
     <>
@@ -46,13 +53,15 @@ export function CopilotFloatingLauncher() {
               onSend={() => void sendMessage()}
               onClear={clearChat}
               onStop={stopReply}
+              modeLabel={modeLabel}
+              onSwitchMode={canPauseModel ? () => setBasicPreference(true) : retryEngine}
               isSending={isSending}
               className="h-[min(480px,70vh)]"
               placeholder={
                 engineStatus === "loading"
                   ? loadProgress
-                  : engineStatus === "basic"
-                    ? "Basic mode: ask about symptoms or emergencies…"
+                  : engineStatus !== "ready"
+                    ? "Ask the built-in rules or look up a reading…"
                     : "Ask about symptoms, vitals or emergencies…"
               }
             />

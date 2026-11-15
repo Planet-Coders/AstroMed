@@ -1,15 +1,16 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { MAX_COPILOT_INPUT } from "@/lib/copilotPrompt";
+import { MAX_COPILOT_INPUT, type CopilotTurn } from "@/lib/copilotPrompt";
 import type { ReplyMetrics } from "@/lib/webllm/reply";
 
 export type CopilotChatMessage = {
   role: "user" | "assistant";
   content: string;
-  mode?: "webllm" | "basic" | "guidance";
+  mode?: CopilotTurn["mode"];
   fallbackReason?: string;
   subject?: string;
+  topic?: string;
   personalContext?: { label: string; value: string }[];
   sources?: { id: string; title: string; url: string }[];
   timing?: ReplyMetrics;
@@ -23,6 +24,8 @@ export function CopilotChat({
   onSend,
   onClear,
   onStop,
+  modeLabel,
+  onSwitchMode,
   placeholder,
   isSending = false,
   className = "h-[min(420px,55vh)]",
@@ -33,6 +36,8 @@ export function CopilotChat({
   onSend: () => void;
   onClear: () => void;
   onStop: () => void;
+  modeLabel: string;
+  onSwitchMode: () => void;
   placeholder?: string;
   isSending?: boolean;
   className?: string;
@@ -61,15 +66,21 @@ export function CopilotChat({
     <div
       className={`flex flex-col overflow-hidden rounded-lg border border-mc-line bg-mc-panel shadow-[0_10px_28px_rgba(60,50,20,0.06)] ring-1 ring-mc-line ${className}`}
     >
-      <div className="flex shrink-0 items-start gap-2 border-b border-mc-line px-3 py-2">
-        <div className="flex-1">
+      <div className="shrink-0 space-y-1 border-b border-mc-line px-3 py-2">
+        <div className="flex flex-wrap items-center justify-between gap-2">
           <p className="text-xs font-medium text-foreground">Ask co-pilot</p>
-          <p className="text-[10px] text-mc-label">Mission oversight can see saved conversations. New chat clears this view.</p>
+          <div className="flex flex-wrap gap-1.5">
+            <button type="button" onClick={onSwitchMode}
+              className="rounded-md border border-mc-line-strong px-2.5 py-1 text-xs text-mc-link">
+              {modeLabel}
+            </button>
+            <button type="button" onClick={onClear} disabled={!messages.length && !input && !isSending}
+              className="rounded-md border border-mc-line-strong px-2.5 py-1 text-xs text-mc-link disabled:opacity-40">
+              New chat
+            </button>
+          </div>
         </div>
-        <button type="button" onClick={onClear} disabled={!messages.length && !input && !isSending}
-          className="shrink-0 rounded-md border border-mc-line-strong px-2.5 py-1 text-xs text-mc-link disabled:opacity-40">
-          New chat
-        </button>
+        <p className="text-[10px] text-mc-label">Mission oversight can see saved conversations. New chat clears this view.</p>
       </div>
 
       <div
@@ -116,7 +127,7 @@ export function CopilotChat({
               <p className="whitespace-pre-wrap break-words" data-chat-content>{m.content}</p>
               {m.mode && (
                 <p className="mt-2 text-[10px] text-mc-label">
-                  {m.mode === "webllm" ? "On-device model" : m.mode === "guidance" ? "Onboard guidance" : "Basic mode"}
+                  {m.mode === "webllm" ? "On-device model" : m.mode === "record" ? "Daily Check lookup" : m.mode === "guidance" ? "Onboard guidance" : "Basic mode"}
                   {m.subject && ` · For ${m.subject}`}
                 </p>
               )}

@@ -41,8 +41,13 @@ export function generateReply(messages: ChatCompletionMessageParam[], options: G
     // still cannot settle, so a short explanation never resets a healthy model.
     const watchdog = setTimeout(() => discardEngine(engine, "stalled"), WORKER_STALL_MS);
     try {
+      const stream = (prompt: ChatCompletionMessageParam[]) => streamReply(engine, prompt, () => {}, () => stopped, options);
       const reply = await Promise.race([
-        streamReply(engine, messages, () => {}, () => stopped, options),
+        stream(messages).catch((error) => {
+          // The model's tokenizer can exceed the estimated budget. Retry with the current data and question.
+          if (stopped || messages.length <= 2 || !/prompt tokens exceed context window size/i.test(String(error))) throw error;
+          return stream([messages[0], messages[messages.length - 1]]);
+        }),
         engineStopped(engine),
       ]);
       return stopped ? null : reply;

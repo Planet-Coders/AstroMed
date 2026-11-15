@@ -116,3 +116,18 @@ it("retires a worker that still fails to settle after an interruption", async ()
   expect((await request("after stall"))?.text).toBe("after stall");
   finishFirst();
 });
+
+it("retries a context overflow with a smaller prompt and leaves the worker available", async () => {
+  const { create, engine } = controlledEngine();
+  create.mockRejectedValueOnce(new Error("Prompt tokens exceed context window size: number of prompt tokens: 1700"));
+  const messages = [
+    { role: "system", content: "Current readings" },
+    { role: "user", content: "Old question" },
+    { role: "assistant", content: "Old answer" },
+    { role: "user", content: "Current question" },
+  ] as const;
+  expect((await generateReply([...messages], { signal: new AbortController().signal, timeoutMs: 1000 }))?.text).toBe("Current readings");
+  expect(create.mock.calls.map(([request]) => request.messages)).toEqual([messages, [messages[0], messages[3]]]);
+  expect(engine.resetChat).toHaveBeenCalledTimes(2);
+  expect(discardEngine).not.toHaveBeenCalled();
+});

@@ -4,19 +4,30 @@ The browser runs Llama 3.2 1B or the compact SmolLM2 360M model through WebLLM. 
 
 ## Model startup and recovery
 
-Loading model files and testing the GPU are separate steps. The console displays Full AI after a warm-up request succeeds. WebLLM reuses model files in the browser cache when available.
+The dashboard opens with built-in answers available. Select **Start on-device AI** to load the model. Full AI appears when WebLLM has loaded its files and initialized its worker. The first generated reply runs when you ask for it. WebLLM reuses files in the browser cache when available.
 
-Mobile browsers and devices reporting low memory start with the compact model. On desktop, **Use compact model** switches a running Llama session to the smaller model and remembers the choice in that browser. A failed GPU or worker gets one automatic restart. If the browser cannot restore the GPU in the current page, reload to use the remembered compact model. **Try on-device AI again** starts a fresh attempt from Basic mode.
+Mobile browsers and devices reporting low memory select the compact model. On desktop, **Use compact model** switches a running Llama session to the smaller model and remembers the choice in that browser. The app can restart a failed worker once. After GPU loss, it stays in Basic mode until you select **Try on-device AI again**. Restart the browser if it can no longer get a WebGPU adapter.
 
 Use HTTPS or localhost for WebGPU. To qualify one model for a particular deployment, set `NEXT_PUBLIC_WEBLLM_MODEL` before building. For example, `SmolLM2-360M-Instruct-q4f16_1-MLC` requires WebGPU with `shader-f16`. Pinning also keeps the chosen model during a restart.
+
+To serve the model from your development server, copy the official WebLLM chat config, tokenizer, tensor cache manifest, and weight shards to `public/copilot-models/<model-id>/resolve/main/`. Save the matching WebGPU library from the installed WebLLM model catalog as `public/copilot-models/<model-id>/model.wasm`. Add these settings to `.env.development.local` and restart the dev server.
+
+```dotenv
+NEXT_PUBLIC_WEBLLM_MODEL=SmolLM2-360M-Instruct-q4f16_1-MLC
+NEXT_PUBLIC_WEBLLM_ASSET_BASE=/copilot-models/
+```
 
 ## Prompt
 
 The previous prompt opened with “You are the Flight Surgeon Co-Pilot on a Mars transit spacecraft.” It told the model to answer first, use only supplied data and protocols, trust the high/low labels, check allergies before medication, and respond in two to four short sentences in the user's language. It appended a mission brief, crew and habitat readings, logs, lab summaries, selected demo protocols, and OSDR baselines. Every request also included a scripted “Is Park okay?” exchange, up to two visible transcript messages, and the new question.
 
-The current static instructions live in [copilotPrompt.ts](../lib/copilotPrompt.ts). Each request adds the selected person's available readings, a personal baseline if present, relevant routine or health logs, applicable demo procedures, and up to two NASA excerpts. Direct follow-ups can include the previous model turn. **Personal data used** shows the readings and logs supplied for that answer, and **NASA references** links to the retrieved research.
+The current static instructions live in [copilotPrompt.ts](../lib/copilotPrompt.ts). Each generated reply can use the selected person's available readings, a personal baseline, relevant routine or health logs, applicable demo procedures, and up to two NASA excerpts. **Personal data used** shows the readings and logs supplied for that answer, and **NASA references** links to the retrieved research.
 
-**New chat** clears the visible transcript and context for later turns. **Stop** interrupts an in-progress reply. Chat displays generated replies after the onboard checks have finished. Messages already queued or saved remain available to authorized mission oversight.
+Asking what the last Daily Check recorded returns the original measurements from the latest saved check or retest. AstroMed compares the signed-in user's device and synced records by capture time. The same record can be supplied to the model when the user asks for an explanation.
+
+The active transcript stays in the signed-in user's browser tab across reloads. Prompts include completed turns for the selected subject within the model's context budget. When space runs low, a referenced earlier turn, recent turns, and relevant older turns take priority. **New chat** clears the tab's transcript and context. **Stop** interrupts an in-progress reply. Messages already queued or saved remain available to authorized mission oversight.
+
+**Use Basic mode** stops the worker and switches chat and new inline explanations to built-in rules and record lookups. The setting stays active in the current tab across reloads. Select **Use on-device AI** to load the model again.
 
 ## Knowledge base
 

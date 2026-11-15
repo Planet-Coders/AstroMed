@@ -3,6 +3,7 @@ import { osdrFallbackCitation, type OsdrStudy } from "@/lib/osdr";
 import { findEvidence, type EvidenceCard } from "./copilotEvidence";
 import { emergencyGuidance, medicationGuidance } from "./copilotGuidance";
 import { findProtocols } from "./copilotKnowledge";
+import { isDailyCheckQuestion } from "./copilotDailyCheck";
 
 export type CopilotContext = {
   userName: string;
@@ -31,7 +32,7 @@ export function generateCopilotFallback(
 ): string {
   const safety = emergencyGuidance(question) ?? medicationGuidance(question);
   if (safety) return safety;
-  if (/\b(?:daily (?:self-)?check|last check)\b/i.test(question)) {
+  if (isDailyCheckQuestion(question)) {
     return ctx.dailyCheck ?? `I don’t have a Daily Check available for ${ctx.userName}.`;
   }
 
