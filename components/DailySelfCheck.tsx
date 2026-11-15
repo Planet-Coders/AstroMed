@@ -17,6 +17,7 @@ import {
   overallLevel,
   saveSingleReading,
   stepStatus,
+  todayTotal,
   type StepId,
   saveLatestCheck,
   type Mood,
@@ -90,6 +91,10 @@ export function DailySelfCheck({ userId, userName, onDone, onReviewAlerts }: {
   const [mood, setMood] = useState<Mood | null>(null);
   const [sleep, setSleep] = useState(startingSleep);
   const [fluid, setFluid] = useState("");
+  // Sleep and fluid add up through the day: "add" puts a new amount on top of today's total.
+  const [addMode, setAddMode] = useState(true);
+  const [sleepExtra, setSleepExtra] = useState("");
+  const [fluidExtra, setFluidExtra] = useState("");
   const [urine, setUrine] = useState<number | null>(null);
   const [savedCheck, setSavedCheck] = useState<StoredCheck | null>(null);
   const [savedInsight, setSavedInsight] = useState<InsightSnapshot | null>(null);
@@ -125,15 +130,25 @@ export function DailySelfCheck({ userId, userName, onDone, onReviewAlerts }: {
       /* unavailable */
     }
   }, [userId, step, raw, fasting, mood, sleep, fluid, urine, skipped]);
+  const latestSaved = getLatestCheck(userId);
+  const priorSleep = todayTotal(latestSaved, "sleep");
+  const priorFluid = todayTotal(latestSaved, "hydration");
+  const addingSleep = addMode && priorSleep != null;
+  const addingFluid = addMode && priorFluid != null;
+  const extraSleep = num(sleepExtra, RANGE.sleepHours);
+  const extraFluid = num(fluidExtra, RANGE.fluidMl);
+  /** Today's total after adding; an empty entry keeps the total, an impossible one is invalid. */
+  const plus = (prior: number, extra: number | null, typed: string, range: readonly [number, number]) =>
+    typed.trim() === "" ? prior : extra == null ? null : reading(Math.round((prior + extra) * 10) / 10, range);
   const values: SelfCheckValues = {
     systolic: num(raw.sys, RANGE.systolic),
     diastolic: num(raw.dia, RANGE.diastolic),
     glucose: num(raw.glucose, RANGE.glucose),
     temperature: num(raw.temp, RANGE.temperature),
     mood,
-    sleepHours: num(sleep, RANGE.sleepHours),
+    sleepHours: addingSleep ? plus(priorSleep, extraSleep, sleepExtra, RANGE.sleepHours) : num(sleep, RANGE.sleepHours),
     fasting,
-    fluidMl: num(fluid, RANGE.fluidMl),
+    fluidMl: addingFluid ? plus(priorFluid, extraFluid, fluidExtra, RANGE.fluidMl) : num(fluid, RANGE.fluidMl),
     urineColor: urine,
   };
   const results = step === STEPS.length ? savedCheck?.items ?? [] : assessAll(values);
@@ -312,7 +327,31 @@ export function DailySelfCheck({ userId, userName, onDone, onReviewAlerts }: {
   const info = STEPS[step];
   const result = results.find((r) => r.id === info.id);
   const level = result?.level;
-  const status = stepStatus(info.id, values, { ...raw, sleep, fluid });
+  const status = stepStatus(info.id, values, { ...raw, sleep: addingSleep ? sleepExtra : sleep, fluid: addingFluid ? fluidExtra : fluid });
+  const adding = (info.id === "sleep" && addingSleep) || (info.id === "hydration" && addingFluid);
+  const addedAmount = info.id === "sleep" ? (addingSleep && sleepExtra.trim() ? extraSleep : null) : info.id === "hydration" ? (addingFluid && fluidExtra.trim() ? extraFluid : null) : null;
+  const canAdd = info.id === "sleep" ? priorSleep != null : info.id === "hydration" ? priorFluid != null : false;
+  const addToggle = canAdd ? (
+    <div className="flex flex-wrap gap-1.5" role="radiogroup" aria-label="Add or replace today's value">
+      {[
+        { on: true, label: `Add to today's total (${info.id === "sleep" ? `${priorSleep?.toFixed(1)} h` : `${priorFluid} mL`})` },
+        { on: false, label: "Replace today's value" },
+      ].map((o) => (
+        <button
+          key={o.label}
+          type="button"
+          role="radio"
+          aria-checked={addMode === o.on}
+          onClick={() => setAddMode(o.on)}
+          className={`min-h-9 rounded-md border px-3 text-xs font-medium ${
+            addMode === o.on ? "border-mc-select bg-mc-select text-mc-on-select" : "border-mc-line-strong text-mc-muted hover:text-foreground"
+          }`}
+        >
+          {o.label}
+        </button>
+      ))}
+    </div>
+  ) : null;
   const bpError = info.id === "bp" ? bpInputError(values.systolic, values.diastolic) : null;
   const bpHalf = info.id === "bp" && !bpError && (values.systolic == null) !== (values.diastolic == null);
   const typo = status === "invalid" && !bpError && !bpHalf;
@@ -451,10 +490,21 @@ export function DailySelfCheck({ userId, userName, onDone, onReviewAlerts }: {
           )}
           {info.id === "hydration" && (
             <>
-              <label className="mc-label">
-                Fluid in the last 24 h (mL)
-                <input inputMode="numeric" value={fluid} onChange={(e) => setFluid(e.target.value)} placeholder="2400" className={`${inputCls} mt-1.5`} autoFocus />
-              </label>
+              {addToggle}
+              {addingFluid ? (
+                <label className="mc-label">
+                  Fluid since your last entry (mL)
+                  <input inputMode="numeric" value={fluidExtra} onChange={(e) => setFluidExtra(e.target.value)} placeholder="500" className={`${inputCls} mt-1.5`} autoFocus />
+                  <span className="mt-1 block normal-case tracking-normal text-mc-label">
+                    {extraFluid != null && values.fluidMl != null ? `Today's total: ${priorFluid} + ${extraFluid} = ${values.fluidMl} mL` : `Today so far: ${priorFluid} mL`}
+                  </span>
+                </label>
+              ) : (
+                <label className="mc-label">
+                  Fluid in the last 24 h (mL)
+                  <input inputMode="numeric" value={fluid} onChange={(e) => setFluid(e.target.value)} placeholder="2400" className={`${inputCls} mt-1.5`} autoFocus />
+                </label>
+              )}
               <div>
                 <p className="mc-label">Most recent urine colour</p>
                 <div className="mt-1.5 grid grid-cols-8 gap-1.5" role="radiogroup" aria-label="Urine colour">
@@ -478,11 +528,26 @@ export function DailySelfCheck({ userId, userName, onDone, onReviewAlerts }: {
             </>
           )}
           {info.id === "sleep" && (
-            <label className="mc-label">
-              Hours slept last night
-              <input inputMode="decimal" value={sleep} onChange={(e) => setSleep(e.target.value)} className={`${inputCls} mt-1.5`} autoFocus />
-              <span className="mt-1 block normal-case tracking-normal text-mc-label">Pre-filled from your sleep log.</span>
-            </label>
+            <>
+              {addToggle}
+              {addingSleep ? (
+                <label className="mc-label">
+                  Extra sleep since your last entry, e.g. a nap (h)
+                  <input inputMode="decimal" value={sleepExtra} onChange={(e) => setSleepExtra(e.target.value)} placeholder="2" className={`${inputCls} mt-1.5`} autoFocus />
+                  <span className="mt-1 block normal-case tracking-normal text-mc-label">
+                    {extraSleep != null && values.sleepHours != null
+                      ? `Today's total: ${priorSleep?.toFixed(1)} + ${extraSleep} = ${values.sleepHours.toFixed(1)} h`
+                      : `Today so far: ${priorSleep?.toFixed(1)} h`}
+                  </span>
+                </label>
+              ) : (
+                <label className="mc-label">
+                  Hours slept last night
+                  <input inputMode="decimal" value={sleep} onChange={(e) => setSleep(e.target.value)} className={`${inputCls} mt-1.5`} autoFocus />
+                  <span className="mt-1 block normal-case tracking-normal text-mc-label">Pre-filled from your sleep log.</span>
+                </label>
+              )}
+            </>
           )}
 
           <div
@@ -531,7 +596,10 @@ export function DailySelfCheck({ userId, userName, onDone, onReviewAlerts }: {
             onClick={() => {
               const previous = getLatestCheck(userId);
               const before = previous?.items.find((x) => x.id === info.id);
-              const { single } = saveSingleReading(userId, info.id, values);
+              const added = adding && addedAmount != null ? addedAmount : undefined;
+              const { single } = saveSingleReading(userId, info.id, values, Date.now(), added);
+              if (info.id === "sleep") setSleepExtra("");
+              if (info.id === "hydration") setFluidExtra("");
               const now = single.items.find((x) => x.id === info.id);
               const time = new Date(single.at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
               setSkipped((list) => list.filter((id) => id !== info.id));
@@ -539,7 +607,7 @@ export function DailySelfCheck({ userId, userName, onDone, onReviewAlerts }: {
                 step: info.id,
                 insight: dailyCheckInsight(single, previous),
                 text: now
-                  ? `✓ Saved ${info.title.toLowerCase()} ${now.display} at ${time} and queued to sync to Earth.${
+                  ? `✓ ${added != null ? `Added ${added} ${info.id === "sleep" ? "h" : "mL"}. Today's total is ${now.display}, saved` : `Saved ${info.title.toLowerCase()} ${now.display}`} at ${time} and queued to sync to Earth.${
                       before && before.level !== now.level ? ` Status ${riskLabel(before.level)} → ${riskLabel(now.level)}; My monitoring updates with this re-test.` : ""
                     }`
                   : `✓ Saved at ${time}.`,

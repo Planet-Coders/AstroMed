@@ -7,7 +7,8 @@ import { dayKey } from "./days";
  * Nothing here touches the database or the clock; `now` is always passed in.
  */
 
-export type Sample = { metric: MetricId; value: number; at: number; fromSelfCheck?: boolean };
+/** `cumulative`: a running daily total, e.g. 5 h of sleep plus a later 2 h entry. */
+export type Sample = { metric: MetricId; value: number; at: number; fromSelfCheck?: boolean; cumulative?: boolean };
 export type Rule = RuleDefault & { metric: MetricId; enabled: boolean };
 
 export type Level = "YELLOW" | "RED";
@@ -247,5 +248,6 @@ export function resolveNote(metric: MetricId | undefined, samples: Sample[]): st
       reading = `${sys}/${dia} mmHg`;
     }
   }
-  return `${latest.fromSelfCheck ? "Re-test" : "Latest reading"} ${reading} · back to safe.`;
+  const label = latest.cumulative ? "Today's total" : latest.fromSelfCheck ? "Re-test" : "Latest reading";
+  return `${label} ${reading} · back to safe.`;
 }

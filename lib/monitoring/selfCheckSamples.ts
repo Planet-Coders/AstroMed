@@ -6,13 +6,22 @@ import type { Sample } from "./engine";
 
 type Report = { at: number; data: unknown };
 
-/** Old checks stored formatted results for readings other than sleep and hydration. */
+const round1 = (v: number) => Math.round(v * 10) / 10;
+
+/**
+ * Turns stored Daily Check records into samples. Old checks stored formatted results for
+ * readings other than sleep and hydration.
+ *
+ * Sleep and fluid add up through the day: a record with `sleepAddedHours` or `fluidAddedMl`
+ * adds to that day's running total (5 h, then 2 h more = 7 h), while a plain reading sets
+ * the total. The newest total is what the "latest" rules check, so reaching the limit
+ * resolves the alert.
+ */
 export function selfCheckSamples(reports: Report[]): Sample[] {
   const samples: Sample[] = [];
-  const latestSnapshot = new Map<string, number>();
-  const addedFluids = new Map<string, Sample>();
+  const totals = { sleep: new Map<string, number>(), hydration: new Map<string, number>() };
 
-  for (const { at, data } of reports) {
+  for (const { at, data } of [...reports].sort((a, b) => a.at - b.at)) {
     const check = data as Partial<StoredCheck> | null;
     const values = check?.values && typeof check.values === "object" ? check.values : undefined;
     const items = Array.isArray(check?.items) ? check.items : [];
@@ -47,32 +56,30 @@ export function selfCheckSamples(reports: Report[]): Sample[] {
     const fasting = values?.fasting ?? Boolean(glucose?.[2]);
     if (typeof fasting === "boolean") push(fasting ? "glucose_fasting" : "glucose_after_meal", sugar);
     push("temperature", raw("temperature", temperature ? Number(temperature[1]) : null));
-    push("sleep", raw("sleepHours", sleep ? Number(sleep[1]) : null));
     const score = raw("mood", moodScore);
     const shade = raw("urineColor", urine ? Number(urine[1]) : null);
     if (Number.isInteger(score)) push("mood", score);
     if (Number.isInteger(shade)) push("urine_color", shade);
 
     const day = dayKey(at);
-    if (values && "fluidAddedMl" in values) {
-      const added = reading(values.fluidAddedMl, RANGE.fluidMl);
-      if (added == null) continue;
-      const current = addedFluids.get(day);
-      addedFluids.set(day, {
-        metric: "hydration", value: (current?.value ?? 0) + added,
-        at: Math.max(at, current?.at ?? at), fromSelfCheck: true,
-      });
-    } else {
-      const snapshot = raw("fluidMl", fluid ? Number(fluid[1]) : null);
-      if (snapshot == null) continue;
-      latestSnapshot.set(day, Math.max(at, latestSnapshot.get(day) ?? -Infinity));
-      push("hydration", snapshot);
-    }
-  }
-
-  // Keep previous Daily Check totals as history. A newer 24-hour check replaces them.
-  for (const [day, sample] of addedFluids) {
-    if ((latestSnapshot.get(day) ?? -Infinity) < sample.at) samples.push(sample);
+    const running = (metric: "sleep" | "hydration", addedKey: "sleepAddedHours" | "fluidAddedMl", key: "sleepHours" | "fluidMl", legacy: number | null) => {
+      const range = RANGE[key];
+      const dayTotals = totals[metric];
+      if (values && addedKey in values) {
+        const added = reading((values as Record<string, unknown>)[addedKey], range);
+        if (added == null) return;
+        const total = round1(Math.min(range[1], (dayTotals.get(day) ?? 0) + added));
+        dayTotals.set(day, total);
+        samples.push({ metric, value: total, at, fromSelfCheck: true, cumulative: true });
+        return;
+      }
+      const value = raw(key, legacy);
+      if (value == null) return;
+      dayTotals.set(day, value);
+      push(metric, value);
+    };
+    running("sleep", "sleepAddedHours", "sleepHours", sleep ? Number(sleep[1]) : null);
+    running("hydration", "fluidAddedMl", "fluidMl", fluid ? Number(fluid[1]) : null);
   }
   return samples;
 }
