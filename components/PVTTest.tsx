@@ -305,9 +305,27 @@ export function PVTTest({ userId }: { userId: string }) {
         <button
           type="button"
           onClick={() => setSound((s) => !s)}
-          className="rounded border border-mc-line-strong px-2 py-1 font-mono text-[11px] text-mc-label hover:text-foreground"
+          className="inline-flex items-center gap-1.5 rounded border border-mc-line-strong px-2 py-1 font-mono text-[11px] text-mc-label hover:text-foreground"
         >
-          {sound ? "🔊 sound on" : "🔇 sound off"}
+          {sound ? (
+            <>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5 text-mc-green" aria-hidden="true">
+                <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
+                <path d="M15.54 8.46a5 5 0 0 1 0 7.07" />
+                <path d="M19.07 4.93a10 10 0 0 1 0 14.14" />
+              </svg>
+              <span>sound on</span>
+            </>
+          ) : (
+            <>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5 text-mc-muted" aria-hidden="true">
+                <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
+                <line x1="23" y1="9" x2="17" y2="15" />
+                <line x1="17" y1="9" x2="23" y2="15" />
+              </svg>
+              <span>sound off</span>
+            </>
+          )}
         </button>
       }
     >
@@ -369,7 +387,18 @@ export function PVTTest({ userId }: { userId: string }) {
 
         {phase === "idle" && (
           <div className="flex h-full flex-col items-center justify-center gap-2 px-6 text-center text-sm text-mc-muted">
-            <span className="text-3xl">🛰️</span>
+            <div className="flex h-12 w-12 items-center justify-center rounded-full border border-mc-line-strong bg-mc-panel/60 text-mc-cyan shadow-sm">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6" aria-hidden="true">
+                <rect x="9" y="9" width="6" height="6" rx="1" transform="rotate(45 12 12)" fill="currentColor" fillOpacity="0.2" />
+                <path d="M4.5 4.5 9 9" />
+                <path d="M15 15l4.5 4.5" />
+                <path d="M2.5 6.5l3-3 4 4-3 3z" fill="currentColor" fillOpacity="0.1" />
+                <path d="M14.5 18.5l3-3 4 4-3 3z" fill="currentColor" fillOpacity="0.1" />
+                <path d="M4 17a4 4 0 0 0 4 4" />
+                <path d="M4 21h.01" />
+                <path d="M10 14l-2 2" />
+              </svg>
+            </div>
             <p>Lock onto each green beacon before it fades. Fast locks build a combo multiplier.</p>
             <p className="text-xs text-mc-label">Every {LEVEL_SECONDS} s the beacons get faster and smaller. Personal best: {best.toLocaleString()}</p>
           </div>

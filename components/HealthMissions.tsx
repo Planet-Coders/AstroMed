@@ -29,8 +29,11 @@ export function HealthMissions({ userId, onGo }: { userId: string; onGo: (tab: s
           <div className="flex gap-6">
             <div>
               <p className="mc-label">Streak</p>
-              <p className="font-mono text-3xl">
-                🔥 {streak}
+              <p className="flex items-center gap-1.5 font-mono text-3xl">
+                <svg viewBox="0 0 24 24" fill="currentColor" className="h-7 w-7 text-amber-500 shrink-0" aria-hidden="true">
+                  <path d="M12 2c-.5 2-2 3.5-3 5.5C8 9.5 8 11.5 9 13c.5-1 1.5-1.5 2-2 0 2 1 3.5 2.5 4.5.5-1 1-2 1-3 1.5 1.5 2.5 3.5 2.5 5.5 0 3.3-2.7 6-6 6s-6-2.7-6-6c0-4 3-7.5 4.5-9.5C8 6 9.5 4 12 2z" />
+                </svg>
+                <span>{streak}</span>
                 <span className="text-sm text-mc-label"> day{streak === 1 ? "" : "s"}</span>
               </p>
             </div>
