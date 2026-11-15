@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { testEmail } from "./testAccounts";
 
 async function openCheck(page: Page) {
   await page.getByRole("button", { name: "Daily check", exact: true }).click();
@@ -6,7 +7,7 @@ async function openCheck(page: Page) {
 }
 
 test("the low fluid intake alert accepts presets and a custom amount", async ({ page }) => {
-  const email = `check-${Date.now()}@aahms.demo`;
+  const email = testEmail("check");
   const login = await page.request.post("/api/auth/login", { data: { email, password: "local-demo" } });
   expect(login.ok()).toBeTruthy();
   const hydrated = page.waitForResponse((response) => response.url().includes("/api/dashboard"));
@@ -69,7 +70,7 @@ test("the low fluid intake alert accepts presets and a custom amount", async ({ 
 
 test("replayed and out-of-order snapshots use the latest capture time for each day", async ({ request }) => {
   const login = await request.post("/api/auth/login", {
-    data: { email: `replay-${Date.now()}@aahms.demo`, password: "local-demo" },
+    data: { email: testEmail("replay"), password: "local-demo" },
   });
   expect(login.ok()).toBeTruthy();
   const day = 86_400_000;
@@ -97,7 +98,7 @@ test("replayed and out-of-order snapshots use the latest capture time for each d
 
 test("a retried water entry does not duplicate intake or history", async ({ request }) => {
   const login = await request.post("/api/auth/login", {
-    data: { email: `water-retry-${Date.now()}@aahms.demo`, password: "local-demo" },
+    data: { email: testEmail("water-retry"), password: "local-demo" },
   });
   expect(login.ok()).toBeTruthy();
   const at = Date.now();
