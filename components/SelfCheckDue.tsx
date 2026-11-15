@@ -1,7 +1,7 @@
 "use client";
 
 import { useSyncExternalStore } from "react";
-import { getLatestCheck, isToday } from "@/lib/selfCheck";
+import { checkDoneToday, getLatestCheck } from "@/lib/selfCheck";
 
 const noopSubscribe = () => () => {};
 
@@ -12,7 +12,7 @@ export function SelfCheckDue({ userId, onStart }: { userId: string; onStart: () 
     noopSubscribe,
     () => {
       const c = getLatestCheck(userId);
-      return !!c && isToday(c.at);
+      return checkDoneToday(c);
     },
     () => true
   );

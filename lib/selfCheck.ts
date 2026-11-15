@@ -250,18 +250,8 @@ export function assessHydration(fluidMl: number | null, urineColor: number | nul
   return { level: "GREEN", advice: "In range for the values entered." };
 }
 
-/**
- * Input check before any medical assessment: a reading that can't be right (e.g. 80/120, with
- * the numbers swapped) gets a "please re-enter" message instead of a health warning.
- */
-export function bpInputError(sys: number | null, dia: number | null): string | null {
-  if (sys == null || dia == null) return null;
-  if (sys <= dia) {
-    return `The top number (systolic) must be higher than the bottom number (diastolic). Did you swap them? For example ${Math.max(sys, dia)}/${Math.min(sys, dia)}.`;
-  }
-  if (sys - dia < 10) return "The two numbers are too close together to be a real reading. Please measure again and re-enter.";
-  return null;
-}
+export { bpInputError } from "@/lib/selfCheckThresholds";
+import { bpInputError } from "@/lib/selfCheckThresholds";
 
 /** Steps a check can record; a skipped step is stored so "not measured" is explicit. */
 export type StepStatus = "ready" | "empty" | "invalid";
@@ -343,6 +333,10 @@ export type StoredCheck = {
   items: ItemResult[];
   /** Steps the crew member chose to skip (not measured), so missing data is explicit. */
   skipped?: StepId[];
+  /** Only some readings (logged from a single tab, e.g. hydration or a blood pressure re-test). */
+  partial?: boolean;
+  /** Device-side summary combining today's saves; each save was already sent on its own. */
+  merged?: boolean;
   values?: Partial<SelfCheckValues> & {
     /** Additional fluid recorded by the previous version of Daily Check. */
     fluidAddedMl?: number | null;
@@ -359,6 +353,63 @@ export function saveLatestCheck(check: StoredCheck) {
   }
   // Each check is kept on the server as its own record, so oversight sees the history.
   if (getOutboxUser()?.userId === check.userId) void queueHealth("selfCheck", String(check.at), check);
+}
+
+/** Which values each tab owns. */
+export const STEP_KEYS: Record<StepId, (keyof SelfCheckValues)[]> = {
+  bp: ["systolic", "diastolic"],
+  glucose: ["glucose", "fasting"],
+  temperature: ["temperature"],
+  mood: ["mood"],
+  sleep: ["sleepHours"],
+  hydration: ["fluidMl", "urineColor"],
+};
+
+const BLANK: SelfCheckValues = {
+  systolic: null, diastolic: null, glucose: null, temperature: null, mood: null,
+  sleepHours: null, fasting: true, fluidMl: null, urineColor: null,
+};
+
+/** A record holding just one tab's reading, sent to Earth on its own with its own time. */
+export function singleReadingCheck(userId: string, at: number, step: StepId, values: SelfCheckValues): StoredCheck {
+  const only: SelfCheckValues = { ...BLANK };
+  for (const k of STEP_KEYS[step]) (only as Record<string, unknown>)[k] = values[k];
+  return { userId, at, items: assessAll(only), values: only, partial: true };
+}
+
+/**
+ * Today's summary on this device after a single save: the newest reading replaces the older one
+ * (e.g. a high blood pressure re-tested as normal now shows normal).
+ */
+export function mergeIntoLatest(prev: StoredCheck | null, single: StoredCheck): StoredCheck {
+  if (!prev || !isToday(prev.at)) return { ...single, merged: true };
+  const values = { ...BLANK, ...(prev.values ?? {}) } as SelfCheckValues;
+  for (const [k, v] of Object.entries(single.values ?? {})) {
+    if (v !== null && v !== undefined) (values as Record<string, unknown>)[k] = v;
+  }
+  const done = new Set(Object.keys(single.values ?? {}).filter((k) => (single.values as Record<string, unknown>)[k] != null));
+  const skipped = (prev.skipped ?? []).filter((id) => !STEP_KEYS[id].some((k) => done.has(k)));
+  return { userId: prev.userId, at: single.at, items: assessAll(values), values, skipped, partial: prev.partial, merged: true };
+}
+
+/** Saves one tab's reading now: sent to Earth as its own record, and today's summary updated. */
+export function saveSingleReading(userId: string, step: StepId, values: SelfCheckValues, at = Date.now()) {
+  const single = singleReadingCheck(userId, at, step, values);
+  const merged = mergeIntoLatest(getLatestCheck(userId), single);
+  try {
+    const all = JSON.parse(localStorage.getItem(KEY) ?? "{}") as Record<string, StoredCheck>;
+    all[userId] = merged;
+    localStorage.setItem(KEY, JSON.stringify(all));
+  } catch {
+    /* storage unavailable */
+  }
+  if (getOutboxUser()?.userId === userId) void queueHealth("selfCheck", String(at), single);
+  return { single, merged };
+}
+
+/** True when today's full check is done (a single hydration log doesn't count). */
+export function checkDoneToday(c: StoredCheck | null) {
+  return !!c && isToday(c.at) && !c.partial;
 }
 
 export function getLatestCheck(userId: string): StoredCheck | null {

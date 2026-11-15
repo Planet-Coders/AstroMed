@@ -11,7 +11,9 @@ import {
   URINE_COLORS,
   assessAll,
   bpInputError,
+  getLatestCheck,
   overallLevel,
+  saveSingleReading,
   stepStatus,
   type StepId,
   saveLatestCheck,
@@ -89,6 +91,8 @@ export function DailySelfCheck({ userId, userName, onDone, onReviewAlerts }: {
   const [skipped, setSkipped] = useState<StepId[]>([]);
   const [savedAt, setSavedAt] = useState<number | null>(null);
   const [resumed, setResumed] = useState(false);
+  // Confirmation after saving a single tab (e.g. a hydration log or a blood pressure re-test).
+  const [singleSaved, setSingleSaved] = useState<{ step: StepId; text: string } | null>(null);
 
   // Resume an unfinished check (e.g. after leaving at step 2 for another page).
   useEffect(() => {
@@ -173,11 +177,26 @@ export function DailySelfCheck({ userId, userName, onDone, onReviewAlerts }: {
               Six quick measurements, about 2 minutes. Each step shows how to measure and why it matters up here.
               Results are coloured as you type: green is fine, amber means watch it, red means act now.
             </p>
+            <p className="mt-2 text-xs text-mc-label">Just want to log one thing (water, a blood pressure re-test)? Tap it below.</p>
             <div className="mt-3 flex flex-wrap gap-2">
-              {STEPS.map((s) => (
-                <span key={s.id} className="rounded-full border border-mc-line-strong px-3 py-1 text-xs text-mc-soft">
+              {STEPS.map((s, i) => (
+                <button
+                  key={s.id}
+                  type="button"
+                  onClick={() => {
+                    setRaw({ sys: "", dia: "", glucose: "", temp: "" });
+                    setFasting(true);
+                    setMood(null);
+                    setSleep(sleepHours.toFixed(1));
+                    setFluid("");
+                    setUrine(null);
+                    setSingleSaved(null);
+                    setStep(i);
+                  }}
+                  className="rounded-full border border-mc-line-strong px-3 py-1 text-xs text-mc-soft hover:border-mc-select hover:bg-mc-raised"
+                >
                   {s.title}
-                </span>
+                </button>
               ))}
             </div>
           </div>
@@ -310,9 +329,27 @@ export function DailySelfCheck({ userId, userName, onDone, onReviewAlerts }: {
     <Card
       title={`Daily self-check · step ${step + 1} of ${n}`}
       action={
-        <div className="flex gap-1" aria-hidden>
+        <div className="flex flex-wrap gap-1" role="tablist" aria-label="Daily check readings">
           {STEPS.map((s, i) => (
-            <span key={s.id} className={`h-1.5 w-8 rounded-full ${i < step ? "bg-mc-select" : i === step ? "bg-white" : "bg-mc-line"}`} />
+            <button
+              key={s.id}
+              type="button"
+              role="tab"
+              aria-selected={i === step}
+              onClick={() => {
+                setSingleSaved(null);
+                setStep(i);
+              }}
+              className={`rounded-full border px-2.5 py-1 text-[11px] font-medium transition ${
+                i === step
+                  ? "border-mc-select bg-mc-select text-mc-on-select"
+                  : skipped.includes(s.id)
+                    ? "border-dashed border-mc-line-strong text-mc-label"
+                    : "border-mc-line-strong text-mc-muted hover:text-foreground"
+              }`}
+            >
+              {s.title}
+            </button>
           ))}
         </div>
       }
@@ -464,6 +501,41 @@ export function DailySelfCheck({ userId, userName, onDone, onReviewAlerts }: {
             )}
           </div>
 
+          {(() => {
+            const prev = getLatestCheck(userId)?.items.find((x) => x.id === info.id);
+            return prev ? (
+              <p className="text-[11px] text-mc-label">
+                Last saved: <span className={`font-mono ${TONE[prev.level].text}`}>{prev.display} · {riskLabel(prev.level)}</span>
+              </p>
+            ) : null;
+          })()}
+          {singleSaved?.step === info.id && (
+            <p className="rounded-md border border-mc-green/40 bg-mc-green/10 px-3 py-2 text-xs text-mc-green" role="status">
+              {singleSaved.text}
+            </p>
+          )}
+          <button
+            type="button"
+            disabled={status !== "ready"}
+            onClick={() => {
+              const before = getLatestCheck(userId)?.items.find((x) => x.id === info.id);
+              const { single } = saveSingleReading(userId, info.id, values);
+              const now = single.items.find((x) => x.id === info.id);
+              const time = new Date(single.at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+              setSkipped((list) => list.filter((id) => id !== info.id));
+              setSingleSaved({
+                step: info.id,
+                text: now
+                  ? `✓ Saved ${info.title.toLowerCase()} ${now.display} at ${time} and queued to sync to Earth.${
+                      before && before.level !== now.level ? ` Status ${riskLabel(before.level)} → ${riskLabel(now.level)}; My monitoring updates with this re-test.` : ""
+                    }`
+                  : `✓ Saved at ${time}.`,
+              });
+            }}
+            className="min-h-10 self-start rounded-md border border-mc-line-strong px-4 text-sm font-medium text-mc-soft hover:bg-mc-raised disabled:opacity-50"
+          >
+            Save just this reading
+          </button>
           <p className="mt-auto pt-2 text-[11px] text-mc-label">
             <strong>Next</strong> saves this reading. <strong>Skip</strong> leaves it out and records it as not measured.
           </p>

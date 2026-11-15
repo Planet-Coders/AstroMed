@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useSyncExternalStore } from "react";
 import { useMissionTelemetry } from "@/components/MissionTelemetryProvider";
-import { getLatestCheck, isToday } from "@/lib/selfCheck";
+import { checkDoneToday, getLatestCheck, isToday } from "@/lib/selfCheck";
 
 /**
  * Health missions: a short list of daily health tasks, with streaks and badges to make
@@ -66,7 +66,7 @@ export function useHealthMissions(userId: string) {
       const seen = readJson<Record<string, string>>(BODYMAP_KEY, {})[userId];
       const history = readJson<History>(HISTORY_KEY, {})[userId] ?? {};
       return JSON.stringify({
-        checkToday: !!check && isToday(check.at),
+        checkToday: checkDoneToday(check),
         everChecked: !!check,
         pvtToday: !!pvt?.at && isToday(pvt.at),
         bodyMapToday: seen === dayKey(),

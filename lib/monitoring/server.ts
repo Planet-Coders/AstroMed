@@ -15,6 +15,7 @@ import {
   type Level,
   type Rule,
   type Sample,
+  resolveNote,
 } from "./engine";
 
 const DAY = 86_400_000;
@@ -150,7 +151,14 @@ async function syncAlerts(db: Prisma.TransactionClient, userId: string, rules: R
           status: "RESOLVED",
           resolvedAt: new Date(now),
           resolvedBy: "Monitoring (auto)",
-          notes: { create: { authorName: "Monitoring", authorRole: "SYSTEM", action: "auto-resolved", text: "Back within the rule's limits, or the rule was switched off." } },
+          notes: {
+            create: {
+              authorName: "Monitoring",
+              authorRole: "SYSTEM",
+              action: "auto-resolved",
+              text: resolveNote(rules.find((r) => r.id === c.ruleId && r.enabled)?.metric, samples),
+            },
+          },
         },
       });
     }
