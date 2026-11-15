@@ -71,6 +71,9 @@ model User {
   healthReports  HealthReport[]
   metricSamples  MetricSample[]
   alerts         Alert[]
+  /// Hotline thread owned by this astronaut, and hotline messages this user wrote.
+  hotlineThread  HotlineMessage[]  @relation("HotlineMember")
+  hotlineSent    HotlineMessage[]  @relation("HotlineSender")
   createdAt      DateTime          @default(now())
 
   @@index([groupId])
@@ -232,3 +235,36 @@ model AlertNote {
   @@index([alertId, createdAt])
 }
 
+enum HotlineUrgency {
+  ROUTINE
+  URGENT
+  EMERGENCY
+}
+
+/// Hotline between one astronaut and the Earth medical team (oversight / super admin).
+/// Each message honours the Earth link delay: the other side sees it from deliverAt.
+model HotlineMessage {
+  id             String         @id @default(cuid())
+  /// The astronaut whose thread this message belongs to.
+  memberId       String
+  member         User           @relation("HotlineMember", fields: [memberId], references: [id], onDelete: Cascade)
+  senderId       String
+  sender         User           @relation("HotlineSender", fields: [senderId], references: [id], onDelete: Cascade)
+  fromEarth      Boolean        @default(false)
+  body           String
+  urgency        HotlineUrgency @default(ROUTINE)
+  /// Snapshot of the astronaut's latest vitals at send time, if attached.
+  vitals         Json?
+  /// Device-generated id so a message re-sent from the offline queue is stored once.
+  clientId       String?        @unique
+  createdAt      DateTime       @default(now())
+  deliverAt      DateTime
+  readAt         DateTime?
+  acknowledgedAt DateTime?
+  acknowledgedBy String?
+  resolvedAt     DateTime?
+  resolvedBy     String?
+
+  @@index([memberId, createdAt])
+  @@index([senderId, createdAt])
+}

@@ -1,6 +1,6 @@
 "use client";
 
-import { db, type OutboxChat, type OutboxHealth, type OutboxItem } from "@/lib/db";
+import { db, type OutboxChat, type OutboxHealth, type OutboxHotline, type OutboxItem } from "@/lib/db";
 
 /**
  * Sends co-pilot messages and health logs to the server for mission oversight. Everything
@@ -49,6 +49,34 @@ export async function queueHealth(kind: OutboxHealth["kind"], key: string, data:
   void flushOutbox();
 }
 
+export const HOTLINE_OUTBOX_CHANGED = "astromed:hotline-outbox";
+
+/** Queues a hotline message to Earth; it is sent at once when online, or on the next sync. */
+export async function queueHotline(message: Omit<OutboxHotline, "id" | "clientId" | "createdAt">) {
+  if (!reporter) return false;
+  const clientId = crypto.randomUUID();
+  const payload: OutboxHotline = { ...message, id: clientId, clientId, createdAt: Date.now() };
+  try {
+    await db.outbox.put({ id: `hotline:${clientId}`, userId: reporter.userId, type: "hotline", createdAt: payload.createdAt, payload });
+  } catch {
+    return false;
+  }
+  window.dispatchEvent(new Event(HOTLINE_OUTBOX_CHANGED));
+  void flushOutbox();
+  return true;
+}
+
+/** Hotline messages still waiting in this device's queue (shown as "waiting to send"). */
+export async function pendingHotline(): Promise<OutboxHotline[]> {
+  try {
+    if (!reporter) return [];
+    const items = await db.outbox.where("userId").equals(reporter.userId).sortBy("createdAt");
+    return items.filter((i): i is Extract<OutboxItem, { type: "hotline" }> => i.type === "hotline").map((i) => i.payload);
+  } catch {
+    return [];
+  }
+}
+
 let flushing: Promise<void> | null = null;
 let flushAgain = false;
 export const HEALTH_REPORTS_SYNCED = "astromed:health-reports-synced";
@@ -88,6 +116,7 @@ async function send<T extends OutboxItem>(items: T[], url: string, field: string
     }
   });
   if (field === "reports" && saved.length) window.dispatchEvent(new Event(HEALTH_REPORTS_SYNCED));
+  if (url === "/api/hotline" && saved.length) window.dispatchEvent(new Event(HOTLINE_OUTBOX_CHANGED));
 }
 
 async function doFlush() {
@@ -97,6 +126,9 @@ async function doFlush() {
     const items = await db.outbox.where("userId").equals(reporter.userId).sortBy("createdAt");
     const chats = items.filter((i): i is Extract<OutboxItem, { type: "chat" }> => i.type === "chat");
     const health = items.filter((i): i is Extract<OutboxItem, { type: "health" }> => i.type === "health");
+    const hotline = items.filter((i): i is Extract<OutboxItem, { type: "hotline" }> => i.type === "hotline");
+    // Hotline first: an emergency should not wait behind a backlog of logs.
+    for (let i = 0; i < hotline.length; i += 20) await send(hotline.slice(i, i + 20), "/api/hotline", "messages");
     for (let i = 0; i < chats.length; i += 100) await send(chats.slice(i, i + 100), "/api/chat/messages", "messages");
     for (let i = 0; i < health.length; i += 20) await send(health.slice(i, i + 20), "/api/health/reports", "reports");
   } catch {

@@ -21,6 +21,7 @@ import {
 import { StaffHeader } from "./StaffHeader";
 import { METRIC, type MetricId } from "@/lib/monitoring/catalog";
 import { MonitoringView } from "@/components/monitoring/MonitoringView";
+import { EarthHotline } from "@/components/hotline/EarthHotline";
 
 function SyntheticBadge() {
   return (
@@ -120,6 +121,8 @@ export function OversightConsole({ user }: { user: { id: string; name: string; r
       <StaffHeader user={user} active="/oversight" subtitle="Crew oversight · flight surgeon & mission control" />
       <main className="mx-auto flex w-full max-w-[1400px] flex-col gap-5 p-4 md:p-6">
         {error && <p className="rounded-md border border-mc-red/50 bg-mc-red/10 px-4 py-2.5 text-sm text-mc-red">{error}</p>}
+
+        <EarthHotline />
 
         {groups && groups.length === 0 && (
           <Card>
