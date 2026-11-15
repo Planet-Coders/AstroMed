@@ -74,7 +74,7 @@ async function run() {
     }, { userId: user.userId });
     const page = await ctx.newPage();
     page.on("console", async (message) => {
-      if (!/WebLLM: .* failed to load|On-device co-pilot reply failed|Co-pilot could not prepare|device lost|out.of.memory|uncaptured.*webgpu|GPUDevice/i.test(message.text())) return;
+      if (!/WebLLM: .* failed to load|On-device co-pilot generation failed|Co-pilot could not prepare|device.*lost|out.of.memory|uncaptured.*webgpu|GPUDevice/i.test(message.text())) return;
       console.error(message.text().slice(0, 500));
       for (const arg of message.args().slice(1)) {
         const error = await arg.evaluate((value) => value instanceof Error ? value.message : String(value)).catch(() => "");

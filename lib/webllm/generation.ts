@@ -1,5 +1,5 @@
 import type { ChatCompletionMessageParam, ResponseFormat } from "@mlc-ai/web-llm";
-import { discardEngine, getEngine } from "./engine";
+import { discardEngine, engineStopped, getEngine, runtimeFailure } from "./engine";
 import { streamReply } from "./reply";
 
 type GenerationOptions = {
@@ -7,65 +7,61 @@ type GenerationOptions = {
   timeoutMs: number;
   maxTokens?: number;
   format?: ResponseFormat;
-  onText?: (text: string) => void;
+  stop?: string[];
 };
 
+const WORKER_STALL_MS = 75_000;
 let queue = Promise.resolve();
 
 /** Chat and explanations share the worker's mutable conversation state. */
 export function generateReply(messages: ChatCompletionMessageParam[], options: GenerationOptions) {
-  const { signal, timeoutMs, onText } = options;
+  const { signal, timeoutMs } = options;
   if (signal.aborted || !getEngine()) return Promise.resolve(null);
 
   let running: ReturnType<typeof getEngine> = null;
-  let timedOut = false;
-  let expire!: (value: null) => void;
-  let cancel!: (value: null) => void;
-  const deadline = new Promise<null>((resolve) => { expire = resolve; });
-  const cancelled = new Promise<null>((resolve) => { cancel = resolve; });
-  const timer = setTimeout(() => {
-    timedOut = true;
-    if (running) {
-      discardEngine(running, "The on-device model timed out. Retry it from the co-pilot panel.");
-    }
-    expire(null);
-  }, timeoutMs);
+  let stopped = false;
+  let finishWaiting!: (value: null) => void;
+  const waiting = new Promise<null>((resolve) => { finishWaiting = resolve; });
 
-  const abort = () => {
-    cancel(null);
+  const stopWaiting = () => {
+    if (stopped) return;
+    stopped = true;
+    finishWaiting(null);
     running?.interruptGenerate();
   };
-  signal.addEventListener("abort", abort, { once: true });
-  const stopped = () => signal.aborted || timedOut;
+  const timer = setTimeout(stopWaiting, timeoutMs);
+  signal.addEventListener("abort", stopWaiting, { once: true });
 
   const job = queue.then(async () => {
-    if (stopped()) return null;
+    if (stopped) return null;
     const engine = getEngine();
     if (!engine) return null;
     running = engine;
+    // A request expiring only ends that request. Retire the engine if its worker
+    // still cannot settle, so a short explanation never resets a healthy model.
+    const watchdog = setTimeout(() => discardEngine(engine, "stalled"), WORKER_STALL_MS);
     try {
       const reply = await Promise.race([
-        streamReply(engine, messages, (text) => {
-          if (!stopped()) onText?.(text);
-        }, stopped, options),
-        deadline,
+        streamReply(engine, messages, () => {}, () => stopped, options),
+        engineStopped(engine),
       ]);
-      return stopped() ? null : reply;
+      return stopped ? null : reply;
     } catch (error) {
-      if (!stopped()) console.warn("On-device co-pilot generation failed", error);
-      if (/device.*lost|already been disposed|model not loaded/i.test(String(error))) {
-        discardEngine(engine, "WebGPU stopped during inference. Basic mode is available.");
-      }
+      const failure = runtimeFailure(error);
+      if (failure) discardEngine(engine, failure);
+      else if (!stopped) console.warn("On-device co-pilot generation failed", error);
       return null;
+    } finally {
+      clearTimeout(watchdog);
     }
   }).finally(() => {
     running = null;
     clearTimeout(timer);
-    signal.removeEventListener("abort", abort);
+    signal.removeEventListener("abort", stopWaiting);
   });
 
   // The UI can stop waiting immediately. Release the worker only once the stream
-  // settles or the deadline discards the worker, even after an interruption.
+  // settles or the worker is retired, even after an interruption.
   queue = job.then(() => undefined, () => undefined);
-  return Promise.race([job, cancelled, deadline]);
+  return Promise.race([job, waiting]);
 }

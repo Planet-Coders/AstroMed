@@ -1,6 +1,14 @@
 # Onboard co-pilot
 
-The browser runs Llama 3.2 1B through WebLLM. The app can try a smaller model if the primary model cannot load. Basic mode uses local rules and the same bundled research excerpts while the model loads or when WebGPU is unavailable.
+The browser runs Llama 3.2 1B or the compact SmolLM2 360M model through WebLLM. Basic mode uses local rules and bundled research excerpts while the model starts or when WebGPU is unavailable.
+
+## Model startup and recovery
+
+Loading model files and testing the GPU are separate steps. The console displays Full AI after a warm-up request succeeds. WebLLM reuses model files in the browser cache when available.
+
+Mobile browsers and devices reporting low memory start with the compact model. On desktop, **Use compact model** switches a running Llama session to the smaller model and remembers the choice in that browser. A failed GPU or worker gets one automatic restart. If the browser cannot restore the GPU in the current page, reload to use the remembered compact model. **Try on-device AI again** starts a fresh attempt from Basic mode.
+
+Use HTTPS or localhost for WebGPU. To qualify one model for a particular deployment, set `NEXT_PUBLIC_WEBLLM_MODEL` before building. For example, `SmolLM2-360M-Instruct-q4f16_1-MLC` requires WebGPU with `shader-f16`. Pinning also keeps the chosen model during a restart.
 
 ## Prompt
 
@@ -8,7 +16,7 @@ The previous prompt opened with “You are the Flight Surgeon Co-Pilot on a Mars
 
 The current static instructions live in [copilotPrompt.ts](../lib/copilotPrompt.ts). Each request adds the selected person's available readings, a personal baseline if present, relevant routine or health logs, applicable demo procedures, and up to two NASA excerpts. Direct follow-ups can include the previous model turn. **Personal data used** shows the readings and logs supplied for that answer, and **NASA references** links to the retrieved research.
 
-**New chat** clears the visible transcript and context for later turns. **Stop** interrupts an in-progress reply. Messages already queued or saved remain available to authorized mission oversight.
+**New chat** clears the visible transcript and context for later turns. **Stop** interrupts an in-progress reply. Chat displays generated replies after the onboard checks have finished. Messages already queued or saved remain available to authorized mission oversight.
 
 ## Knowledge base
 
@@ -28,7 +36,7 @@ NASA research provides background. Demo procedures, current crew readings, cohor
 
 **Daily Check** offers an explanation after a full save or a single retest. **My Monitoring** offers one on each active alert. The saved result, trigger, and alert controls appear immediately. The model selects a finding, a follow-up, and an optional comparison and NASA reference from the supplied record. The app displays the original values and approved text.
 
-Explanations share the chat's worker. A request can take up to 12 seconds including queue time, with Basic guidance available if the model is busy, unavailable, or returns an invalid selection. Model explanations are reused for the same record within the signed-in session. The explanation element includes `data-insight-mode` and `data-insight-duration-ms` for browser testing.
+Explanations share the chat's worker. A request can take up to 12 seconds including queue time, with Basic guidance available if the model is busy, unavailable, or returns an invalid selection. A late explanation cancels its own request and leaves chat's model available. A stalled worker is recovered independently. Model explanations are reused for the same record within the signed-in session. The explanation element includes `data-insight-mode` and `data-insight-duration-ms` for browser testing.
 
 Routine and cognitive-test logs on shared devices are stored by crew member. Older device-only rows without an owner stay in their original storage. The demo routine remains visible as an example until the crew member records entries.
 

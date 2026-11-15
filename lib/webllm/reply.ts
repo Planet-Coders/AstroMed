@@ -15,7 +15,7 @@ export async function streamReply(
   messages: ChatCompletionMessageParam[],
   onText: (text: string) => void,
   isCancelled = () => false,
-  options: { maxTokens?: number; format?: ResponseFormat } = {},
+  options: { maxTokens?: number; format?: ResponseFormat; stop?: string[] } = {},
 ) {
   const start = performance.now();
   await engine.resetChat();
@@ -25,6 +25,7 @@ export async function streamReply(
     temperature: 0.2,
     max_tokens: options.maxTokens ?? 144,
     response_format: options.format,
+    stop: options.stop,
     stream: true,
     stream_options: { include_usage: true },
   });
@@ -32,8 +33,11 @@ export async function streamReply(
   let firstTokenMs: number | null = null;
   let promptTokens: number | null = null;
   let completionTokens: number | null = null;
+  let finishReason: string | null = null;
   for await (const chunk of stream) {
-    const delta = chunk.choices[0]?.delta?.content;
+    const choice = chunk.choices[0];
+    const delta = choice?.delta?.content;
+    if (choice?.finish_reason) finishReason = choice.finish_reason;
     if (delta) {
       firstTokenMs ??= Math.round(performance.now() - start);
       text += delta;
@@ -45,7 +49,8 @@ export async function streamReply(
     }
   }
   return {
-    text: text.trim().replace(/^"([\s\S]*)"$/, "$1").replace(/\*\*/g, ""),
+    text: finishReason && finishReason !== "stop" ? "" : text.trim().replace(/^"([\s\S]*)"$/, "$1").replace(/\*\*/g, ""),
+    finishReason,
     metrics: { totalMs: Math.round(performance.now() - start), firstTokenMs, promptTokens, completionTokens } satisfies ReplyMetrics,
   };
 }

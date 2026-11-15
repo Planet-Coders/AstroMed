@@ -56,6 +56,15 @@ describe("co-pilot conversation", () => {
       .rejects.toThrow("Reply cancelled");
     expect(create).not.toHaveBeenCalled();
   });
+
+  it("discards text when the model runs out of tokens before completing its reply", async () => {
+    const create = vi.fn(async () => (async function* () {
+      yield { choices: [{ delta: { content: "An unfinished answer" }, finish_reason: "length" }] };
+    })());
+    const engine = { resetChat: vi.fn(async () => {}), chat: { completions: { create } } } as unknown as ReplyEngine;
+    const result = await streamReply(engine, copilotMessages("Sleep?", "Subject: Cho", []), () => {});
+    expect(result).toMatchObject({ text: "", finishReason: "length" });
+  });
 });
 
 describe("co-pilot grounding", () => {

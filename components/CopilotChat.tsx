@@ -7,9 +7,8 @@ import type { ReplyMetrics } from "@/lib/webllm/reply";
 export type CopilotChatMessage = {
   role: "user" | "assistant";
   content: string;
-  /** True while tokens are still arriving from the model. */
-  streaming?: boolean;
   mode?: "webllm" | "basic" | "guidance";
+  fallbackReason?: string;
   subject?: string;
   personalContext?: { label: string; value: string }[];
   sources?: { id: string; title: string; url: string }[];
@@ -50,7 +49,7 @@ export function CopilotChat({
     // Your own new message always comes into view; replies follow only if you're at the bottom.
     if (added && messages.at(-1)?.role === "user") followTail.current = true;
     if (!followTail.current) return;
-    // Smooth for a new bubble, instant while a reply streams in (smooth per token would lag behind).
+    // Smooth for newly added bubbles. Keep the thinking indicator in view.
     scroll.scrollTo({ top: scroll.scrollHeight, behavior: added ? "smooth" : "auto" });
   }, [messages, isSending]);
   // Keep the composer ready for the next question once a reply finishes.
@@ -121,6 +120,7 @@ export function CopilotChat({
                   {m.subject && ` · For ${m.subject}`}
                 </p>
               )}
+              {m.fallbackReason && <p className="mt-1 text-[10px] text-mc-label">{m.fallbackReason}</p>}
               {!!m.personalContext?.length && (
                 <details className="mt-1 text-[11px] text-mc-muted">
                   <summary className="cursor-pointer text-mc-link">Personal data used</summary>
@@ -145,9 +145,9 @@ export function CopilotChat({
             </div>
           </div>
         ))}
-        {isSending && !messages[messages.length - 1]?.streaming && (
+        {isSending && (
           <div className="flex justify-start">
-            <div className="rounded-2xl rounded-bl-md border border-mc-line bg-mc-raised px-3 py-2 text-xs text-mc-muted">
+            <div role="status" className="rounded-2xl rounded-bl-md border border-mc-line bg-mc-raised px-3 py-2 text-xs text-mc-muted">
               Thinking…
             </div>
           </div>
