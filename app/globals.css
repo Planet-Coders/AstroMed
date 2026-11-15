@@ -231,6 +231,10 @@ body {
   background: radial-gradient(ellipse at 30% 20%, #fbf6e4 0%, #f3ead0 55%, #e7e2d6 100%);
 }
 
+html[data-theme="dark"] .pvt-arena {
+  background: radial-gradient(ellipse at 30% 20%, #1a1e2a 0%, #141820 55%, #0f1218 100%);
+}
+
 .pvt-stars {
   position: absolute;
   inset: -50%;
@@ -243,6 +247,15 @@ body {
   background-size: 220px 220px;
   animation: pvt-drift 60s linear infinite;
   pointer-events: none;
+}
+
+html[data-theme="dark"] .pvt-stars {
+  background-image:
+    radial-gradient(1px 1px at 10% 20%, rgba(180, 200, 255, 0.5), transparent),
+    radial-gradient(1px 1px at 30% 70%, rgba(160, 180, 220, 0.35), transparent),
+    radial-gradient(1.5px 1.5px at 55% 35%, rgba(220, 230, 255, 0.6), transparent),
+    radial-gradient(1px 1px at 75% 80%, rgba(140, 160, 200, 0.4), transparent),
+    radial-gradient(1px 1px at 90% 15%, rgba(200, 210, 240, 0.45), transparent);
 }
 
 @keyframes pvt-drift {
