@@ -17,6 +17,21 @@ type ScenarioResult = {
 
 const results: ScenarioResult[] = [];
 
+async function retry<T>(fn: () => Promise<T>, attempts = 4, delayMs = 1500): Promise<T> {
+  let lastErr: unknown;
+  for (let i = 0; i < attempts; i++) {
+    try {
+      return await fn();
+    } catch (err) {
+      lastErr = err;
+      if (i < attempts - 1) {
+        await new Promise((r) => setTimeout(r, delayMs * (i + 1)));
+      }
+    }
+  }
+  throw lastErr;
+}
+
 function record(scenario: string, name: string, passed: boolean, details: string[]) {
   results.push({
     scenario,
@@ -38,28 +53,30 @@ async function run() {
   // Target: All metrics in target, telemetry on time, 0 open alerts.
   // ---------------------------------------------------------------------------------
   try {
-    const user = await prisma.user.findFirst({ where: { email: "sim-normal@aahms.demo" } });
-    if (!user) throw new Error("sim-normal@aahms.demo user not found in database.");
+    await retry(async () => {
+      const user = await prisma.user.findFirst({ where: { email: "sim-normal@aahms.demo" } });
+      if (!user) throw new Error("sim-normal@aahms.demo user not found in database.");
 
-    const mon = await monitoringFor(user.id, 14);
-    const summary = await monitoringSummary(user.id, rules);
+      const mon = await monitoringFor(user.id, 14);
+      const summary = await monitoringSummary(user.id, rules);
 
-    const openAlerts = mon.alerts.filter((a) => a.status === "OPEN");
-    const activeMissingOrLate = Object.entries(summary.missing).filter(
-      ([k, s]) => s === "missing" || s === "late"
-    );
-    const routineOk = ["activity", "hydration", "pulse", "radiation", "sleep"].every(
-      (m) => summary.missing[m as MetricId] === "ok"
-    );
-    const passed = openAlerts.length === 0 && activeMissingOrLate.length === 0 && routineOk;
+      const openAlerts = mon.alerts.filter((a) => a.status === "OPEN");
+      const activeMissingOrLate = Object.entries(summary.missing).filter(
+        ([k, s]) => s === "missing" || s === "late"
+      );
+      const routineOk = ["activity", "hydration", "pulse", "radiation", "sleep"].every(
+        (m) => summary.missing[m as MetricId] === "ok"
+      );
+      const passed = openAlerts.length === 0 && activeMissingOrLate.length === 0 && routineOk;
 
-    record("SCENARIO 1", "Sim Nominal (All Systems Healthy)", passed, [
-      `Open alerts: ${openAlerts.length} (expected 0)`,
-      `Active missing/late flags: ${activeMissingOrLate.length} (expected 0)`,
-      `Routine metrics (activity, hydration, pulse, radiation, sleep) on time: ${routineOk}`,
-      `Summary worst alert: ${summary.alerts.worst ?? "NONE"} (expected NONE)`,
-      `Monitored metrics series length: ${mon.metrics.length} metrics verified`,
-    ]);
+      record("SCENARIO 1", "Sim Nominal (All Systems Healthy)", passed, [
+        `Open alerts: ${openAlerts.length} (expected 0)`,
+        `Active missing/late flags: ${activeMissingOrLate.length} (expected 0)`,
+        `Routine metrics (activity, hydration, pulse, radiation, sleep) on time: ${routineOk}`,
+        `Summary worst alert: ${summary.alerts.worst ?? "NONE"} (expected NONE)`,
+        `Monitored metrics series length: ${mon.metrics.length} metrics verified`,
+      ]);
+    });
   } catch (err: any) {
     record("SCENARIO 1", "Sim Nominal", false, [`Error: ${err.message}`]);
   }
@@ -69,27 +86,29 @@ async function run() {
   // Target: Wearable offline 20h, no hydration 3d -> alerts pulse_missing, hydration_missing.
   // ---------------------------------------------------------------------------------
   try {
-    const user = await prisma.user.findFirst({ where: { email: "sim-missing@aahms.demo" } });
-    if (!user) throw new Error("sim-missing@aahms.demo user not found.");
+    await retry(async () => {
+      const user = await prisma.user.findFirst({ where: { email: "sim-missing@aahms.demo" } });
+      if (!user) throw new Error("sim-missing@aahms.demo user not found.");
 
-    const mon = await monitoringFor(user.id, 14);
-    const summary = await monitoringSummary(user.id, rules);
+      const mon = await monitoringFor(user.id, 14);
+      const summary = await monitoringSummary(user.id, rules);
 
-    const pulseStatus = summary.missing.pulse;
-    const hydrationStatus = summary.missing.hydration;
-    const activeRuleIds = mon.alerts.filter((a) => a.status === "OPEN").map((a) => a.ruleId);
+      const pulseStatus = summary.missing.pulse;
+      const hydrationStatus = summary.missing.hydration;
+      const activeRuleIds = mon.alerts.filter((a) => a.status === "OPEN").map((a) => a.ruleId);
 
-    const hasPulseAlert = activeRuleIds.includes("pulse_missing");
-    const hasHydrationAlert = activeRuleIds.includes("hydration_missing");
-    const passed = (pulseStatus === "missing" || pulseStatus === "late") && hasPulseAlert && hasHydrationAlert;
+      const hasPulseAlert = activeRuleIds.includes("pulse_missing");
+      const hasHydrationAlert = activeRuleIds.includes("hydration_missing");
+      const passed = (pulseStatus === "missing" || pulseStatus === "late") && hasPulseAlert && hasHydrationAlert;
 
-    record("SCENARIO 2", "Sim Dropout (Telemetry Loss & Missing Data Gaps)", passed, [
-      `Pulse status: ${pulseStatus} (expected missing/late)`,
-      `Hydration status: ${hydrationStatus} (expected missing/late)`,
-      `Active alert IDs: ${activeRuleIds.join(", ")}`,
-      `Pulse missing alert present: ${hasPulseAlert}`,
-      `Hydration missing alert present: ${hasHydrationAlert}`,
-    ]);
+      record("SCENARIO 2", "Sim Dropout (Telemetry Loss & Missing Data Gaps)", passed, [
+        `Pulse status: ${pulseStatus} (expected missing/late)`,
+        `Hydration status: ${hydrationStatus} (expected missing/late)`,
+        `Active alert IDs: ${activeRuleIds.join(", ")}`,
+        `Pulse missing alert present: ${hasPulseAlert}`,
+        `Hydration missing alert present: ${hasHydrationAlert}`,
+      ]);
+    });
   } catch (err: any) {
     record("SCENARIO 2", "Sim Dropout", false, [`Error: ${err.message}`]);
   }
@@ -99,21 +118,23 @@ async function run() {
   // Target: Sleep progressively falling to ~4.5h -> triggers sleep_low alert.
   // ---------------------------------------------------------------------------------
   try {
-    const user = await prisma.user.findFirst({ where: { email: "sim-sleep-debt@aahms.demo" } });
-    if (!user) throw new Error("sim-sleep-debt@aahms.demo user not found.");
+    await retry(async () => {
+      const user = await prisma.user.findFirst({ where: { email: "sim-sleep-debt@aahms.demo" } });
+      if (!user) throw new Error("sim-sleep-debt@aahms.demo user not found.");
 
-    const mon = await monitoringFor(user.id, 14);
-    const sleepMetric = mon.metrics.find((m) => m.id === "sleep");
-    const sleepAlert = mon.alerts.find((a) => a.ruleId === "sleep_low" && a.status === "OPEN");
+      const mon = await monitoringFor(user.id, 14);
+      const sleepMetric = mon.metrics.find((m) => m.id === "sleep");
+      const sleepAlert = mon.alerts.find((a) => a.ruleId === "sleep_low" && a.status === "OPEN");
 
-    const recentSleep = sleepMetric?.series.slice(-3).map((p) => p.value) ?? [];
-    const passed = Boolean(sleepAlert) || (sleepMetric?.trend.current ?? 10) < 6.0;
+      const recentSleep = sleepMetric?.series.slice(-3).map((p) => p.value) ?? [];
+      const passed = Boolean(sleepAlert) || (sleepMetric?.trend.current ?? 10) < 6.0;
 
-    record("SCENARIO 3", "Sim Sleep Debt (Chronic Microgravity Fatigue)", passed, [
-      `Recent sleep points: ${recentSleep.join(" h, ")} h`,
-      `14-day average: ${sleepMetric?.trend.current?.toFixed(1) ?? "N/A"} h`,
-      `sleep_low alert triggered: ${sleepAlert ? `YES (${sleepAlert.level}: ${sleepAlert.explanation})` : "NO"}`,
-    ]);
+      record("SCENARIO 3", "Sim Sleep Debt (Chronic Microgravity Fatigue)", passed, [
+        `Recent sleep points: ${recentSleep.join(" h, ")} h`,
+        `14-day average: ${sleepMetric?.trend.current?.toFixed(1) ?? "N/A"} h`,
+        `sleep_low alert triggered: ${sleepAlert ? `YES (${sleepAlert.level}: ${sleepAlert.explanation})` : "NO"}`,
+      ]);
+    });
   } catch (err: any) {
     record("SCENARIO 3", "Sim Sleep Debt", false, [`Error: ${err.message}`]);
   }
@@ -123,21 +144,23 @@ async function run() {
   // Target: Resting heart rate up ~17% over last week -> triggers pulse_trend alert.
   // ---------------------------------------------------------------------------------
   try {
-    const user = await prisma.user.findFirst({ where: { email: "sim-rising-hr@aahms.demo" } });
-    if (!user) throw new Error("sim-rising-hr@aahms.demo user not found.");
+    await retry(async () => {
+      const user = await prisma.user.findFirst({ where: { email: "sim-rising-hr@aahms.demo" } });
+      if (!user) throw new Error("sim-rising-hr@aahms.demo user not found.");
 
-    const mon = await monitoringFor(user.id, 14);
-    const pulseMetric = mon.metrics.find((m) => m.id === "pulse");
-    const trendAlert = mon.alerts.find((a) => a.ruleId === "pulse_trend" && a.status === "OPEN");
+      const mon = await monitoringFor(user.id, 14);
+      const pulseMetric = mon.metrics.find((m) => m.id === "pulse");
+      const trendAlert = mon.alerts.find((a) => a.ruleId === "pulse_trend" && a.status === "OPEN");
 
-    const pct = pulseMetric?.trend.pct ?? 0;
-    const passed = Boolean(trendAlert) || pct > 10;
+      const pct = pulseMetric?.trend.pct ?? 0;
+      const passed = Boolean(trendAlert) || pct > 10;
 
-    record("SCENARIO 4", "Sim Rising HR (Cardiovascular Stress / Deconditioning)", passed, [
-      `Pulse trend %: +${pct.toFixed(1)}% vs previous 14 days`,
-      `Trend description: ${pulseMetric ? describeTrend("pulse", pulseMetric.trend) : "N/A"}`,
-      `pulse_trend alert status: ${trendAlert ? `OPEN (${trendAlert.level})` : "NOT FIRED"}`,
-    ]);
+      record("SCENARIO 4", "Sim Rising HR (Cardiovascular Stress / Deconditioning)", passed, [
+        `Pulse trend %: +${pct.toFixed(1)}% vs previous 14 days`,
+        `Trend description: ${pulseMetric ? describeTrend("pulse", pulseMetric.trend) : "N/A"}`,
+        `pulse_trend alert status: ${trendAlert ? `OPEN (${trendAlert.level})` : "NOT FIRED"}`,
+      ]);
+    });
   } catch (err: any) {
     record("SCENARIO 4", "Sim Rising HR", false, [`Error: ${err.message}`]);
   }
@@ -147,20 +170,22 @@ async function run() {
   // Target: Fluid intake down to ~1.4 L/day for 4 days -> triggers hydration_low.
   // ---------------------------------------------------------------------------------
   try {
-    const user = await prisma.user.findFirst({ where: { email: "sim-dehydration@aahms.demo" } });
-    if (!user) throw new Error("sim-dehydration@aahms.demo user not found.");
+    await retry(async () => {
+      const user = await prisma.user.findFirst({ where: { email: "sim-dehydration@aahms.demo" } });
+      if (!user) throw new Error("sim-dehydration@aahms.demo user not found.");
 
-    const mon = await monitoringFor(user.id, 14);
-    const hydrationAlert = mon.alerts.find((a) => a.ruleId === "hydration_low" && a.status === "OPEN");
-    const hydrationMetric = mon.metrics.find((m) => m.id === "hydration");
+      const mon = await monitoringFor(user.id, 14);
+      const hydrationAlert = mon.alerts.find((a) => a.ruleId === "hydration_low" && a.status === "OPEN");
+      const hydrationMetric = mon.metrics.find((m) => m.id === "hydration");
 
-    const passed = Boolean(hydrationAlert);
+      const passed = Boolean(hydrationAlert);
 
-    record("SCENARIO 5", "Sim Dehydrated (Hypovolemia & Renal Stone Risk)", passed, [
-      `Hydration 14-day average: ${hydrationMetric?.trend.current?.toFixed(0) ?? "N/A"} mL`,
-      `hydration_low alert: ${hydrationAlert ? `OPEN (${hydrationAlert.level} - ${hydrationAlert.value} mL)` : "NOT FIRED"}`,
-      `Clinical explanation: ${hydrationAlert?.explanation ?? "N/A"}`,
-    ]);
+      record("SCENARIO 5", "Sim Dehydrated (Hypovolemia & Renal Stone Risk)", passed, [
+        `Hydration 14-day average: ${hydrationMetric?.trend.current?.toFixed(0) ?? "N/A"} mL`,
+        `hydration_low alert: ${hydrationAlert ? `OPEN (${hydrationAlert.level} - ${hydrationAlert.value} mL)` : "NOT FIRED"}`,
+        `Clinical explanation: ${hydrationAlert?.explanation ?? "N/A"}`,
+      ]);
+    });
   } catch (err: any) {
     record("SCENARIO 5", "Sim Dehydrated", false, [`Error: ${err.message}`]);
   }
@@ -170,20 +195,22 @@ async function run() {
   // Target: Solar particle radiation storm jumps to ~0.5 mSv/h -> triggers radiation_high (RED).
   // ---------------------------------------------------------------------------------
   try {
-    const user = await prisma.user.findFirst({ where: { email: "sim-spe@aahms.demo" } });
-    if (!user) throw new Error("sim-spe@aahms.demo user not found.");
+    await retry(async () => {
+      const user = await prisma.user.findFirst({ where: { email: "sim-spe@aahms.demo" } });
+      if (!user) throw new Error("sim-spe@aahms.demo user not found.");
 
-    const mon = await monitoringFor(user.id, 14);
-    const radAlert = mon.alerts.find((a) => (a.ruleId === "radiation_high" || a.metric === "radiation") && a.status === "OPEN");
-    const radMetric = mon.metrics.find((m) => m.id === "radiation");
+      const mon = await monitoringFor(user.id, 14);
+      const radAlert = mon.alerts.find((a) => (a.ruleId === "radiation_high" || a.metric === "radiation") && a.status === "OPEN");
+      const radMetric = mon.metrics.find((m) => m.id === "radiation");
 
-    const passed = Boolean(radAlert && radAlert.level === "RED");
+      const passed = Boolean(radAlert && radAlert.level === "RED");
 
-    record("SCENARIO 6", "Sim Solar Event (Solar Particle Event / Radiation Surge)", passed, [
-      `Peak radiation dose rate: ${radMetric?.trend.current?.toFixed(2) ?? "N/A"} mSv/day`,
-      `Radiation alert level: ${radAlert?.level ?? "NONE"} (expected RED)`,
-      `Explanation: ${radAlert?.explanation ?? "N/A"}`,
-    ]);
+      record("SCENARIO 6", "Sim Solar Event (Solar Particle Event / Radiation Surge)", passed, [
+        `Peak radiation dose rate: ${radMetric?.trend.current?.toFixed(2) ?? "N/A"} mSv/day`,
+        `Radiation alert level: ${radAlert?.level ?? "NONE"} (expected RED)`,
+        `Explanation: ${radAlert?.explanation ?? "N/A"}`,
+      ]);
+    });
   } catch (err: any) {
     record("SCENARIO 6", "Sim Solar Event", false, [`Error: ${err.message}`]);
   }
@@ -193,32 +220,34 @@ async function run() {
   // Target: 60-day baseline populated, all 14 bars filled (0 dashed slots), trend % active.
   // ---------------------------------------------------------------------------------
   try {
-    const vance = await prisma.user.findFirst({ where: { email: "vance@aahms.demo" } });
-    if (!vance) throw new Error("vance@aahms.demo user not found.");
+    await retry(async () => {
+      const vance = await prisma.user.findFirst({ where: { email: "vance@aahms.demo" } });
+      if (!vance) throw new Error("vance@aahms.demo user not found.");
 
-    const mon = await monitoringFor(vance.id, 14);
+      const mon = await monitoringFor(vance.id, 14);
 
-    const sleep = mon.metrics.find((m) => m.id === "sleep")!;
-    const exercise = mon.metrics.find((m) => m.id === "activity")!;
-    const hydration = mon.metrics.find((m) => m.id === "hydration")!;
-    const systolic = mon.metrics.find((m) => m.id === "systolic")!;
+      const sleep = mon.metrics.find((m) => m.id === "sleep")!;
+      const exercise = mon.metrics.find((m) => m.id === "activity")!;
+      const hydration = mon.metrics.find((m) => m.id === "hydration")!;
+      const systolic = mon.metrics.find((m) => m.id === "systolic")!;
 
-    const sleepFilled = sleep.series.filter((p) => p.value !== null).length;
-    const exerciseFilled = exercise.series.filter((p) => p.value !== null).length;
-    const hydrationFilled = hydration.series.filter((p) => p.value !== null).length;
-    const systolicFilled = systolic.series.filter((p) => p.value !== null).length;
+      const sleepFilled = sleep.series.filter((p) => p.value !== null).length;
+      const exerciseFilled = exercise.series.filter((p) => p.value !== null).length;
+      const hydrationFilled = hydration.series.filter((p) => p.value !== null).length;
+      const systolicFilled = systolic.series.filter((p) => p.value !== null).length;
 
-    const hasTrends = sleep.trend.pct !== null && exercise.trend.pct !== null;
-    const passed = sleepFilled === 14 && exerciseFilled === 14 && hydrationFilled === 14 && systolicFilled === 14 && hasTrends;
+      const hasTrends = sleep.trend.pct !== null && exercise.trend.pct !== null;
+      const passed = sleepFilled === 14 && exerciseFilled === 14 && hydrationFilled === 14 && systolicFilled === 14 && hasTrends;
 
-    record("SCENARIO 7", "Flight Crew Continuous History & Screen Time Trends (Vance)", passed, [
-      `Sleep populated days: ${sleepFilled}/14 days (0 dashed empty slots)`,
-      `Exercise populated days: ${exerciseFilled}/14 days (0 dashed empty slots)`,
-      `Hydration populated days: ${hydrationFilled}/14 days (0 dashed empty slots)`,
-      `Systolic BP populated days: ${systolicFilled}/14 days (0 dashed empty slots)`,
-      `Sleep trend: ${describeTrend("sleep", sleep.trend)}`,
-      `Exercise trend: ${describeTrend("activity", exercise.trend)}`,
-    ]);
+      record("SCENARIO 7", "Flight Crew Continuous History & Screen Time Trends (Vance)", passed, [
+        `Sleep populated days: ${sleepFilled}/14 days (0 dashed empty slots)`,
+        `Exercise populated days: ${exerciseFilled}/14 days (0 dashed empty slots)`,
+        `Hydration populated days: ${hydrationFilled}/14 days (0 dashed empty slots)`,
+        `Systolic BP populated days: ${systolicFilled}/14 days (0 dashed empty slots)`,
+        `Sleep trend: ${describeTrend("sleep", sleep.trend)}`,
+        `Exercise trend: ${describeTrend("activity", exercise.trend)}`,
+      ]);
+    });
   } catch (err: any) {
     record("SCENARIO 7", "Flight Crew Continuous History", false, [`Error: ${err.message}`]);
   }
