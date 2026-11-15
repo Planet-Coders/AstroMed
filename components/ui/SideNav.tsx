@@ -340,29 +340,14 @@ export function SideNav({
         </div>
       )}
 
-      {/* Prominent Quick Action Button (styled like Antigravity's '+ New Conversation') */}
+      {/* One emergency action: the hotline to Earth (astronauts only) */}
+      {tabs.some((t) => t.id === "hotline") && (
       <div className={`shrink-0 pt-3 pb-1 ${collapsed ? "flex justify-center px-2" : "px-3"}`}>
-        <button
-          type="button"
-          onClick={() => handleSelect("check")}
-          title="Daily Self-Check"
-          className={`flex items-center gap-2 rounded-lg border text-xs font-semibold shadow-xs transition-colors duration-150 ${
-            collapsed
-              ? "h-9 w-9 justify-center border-mc-line-strong bg-mc-panel text-foreground hover:border-mc-line-strong hover:bg-mc-raised"
-              : "h-9 w-full px-3 border-mc-line-strong bg-mc-panel text-foreground hover:bg-mc-raised"
-          } ${active === "check" ? "border-mc-select bg-mc-select text-mc-on-select" : ""}`}
-        >
-          <span className={`flex h-4 w-4 shrink-0 items-center justify-center rounded text-[11px] font-bold ${active === "check" ? "bg-black/10 text-mc-on-select" : "bg-mc-raised text-mc-link"}`}>
-            +
-          </span>
-          {!collapsed && <span className="truncate">Daily Self-Check</span>}
-        </button>
-        {tabs.some((t) => t.id === "hotline") && (
           <button
             type="button"
             onClick={() => handleSelect("hotline")}
             title="Hotline to Earth"
-            className={`mt-2 flex items-center gap-2 rounded-lg border border-mc-red bg-mc-red text-xs font-bold text-white shadow-xs transition hover:brightness-110 ${
+            className={`flex items-center gap-2 rounded-lg border border-mc-red bg-mc-red text-xs font-bold text-white shadow-xs transition hover:brightness-110 ${
               collapsed ? "h-9 w-9 justify-center" : "h-9 w-full px-3"
             }`}
           >
@@ -371,8 +356,8 @@ export function SideNav({
             </svg>
             {!collapsed && <span className="truncate">Hotline to Earth</span>}
           </button>
-        )}
       </div>
+      )}
 
       {/* Navigation Sections */}
       {renderNavList()}

@@ -109,7 +109,7 @@ export function MonitoringPanel({ data, onDays, loading }: { data: MonitoringDat
           {loading ? " · updating…" : ""}
         </p>
       </div>
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+      <div className="grid gap-4 sm:grid-cols-2 2xl:grid-cols-3">
         {METRICS.map((def) => {
           const mm = data.metrics.find((x) => x.id === def.id);
           if (!mm) return null;
@@ -118,18 +118,18 @@ export function MonitoringPanel({ data, onDays, loading }: { data: MonitoringDat
           // When a metric has a direct reading rule, colour the chart against that rule.
           const chartRules = rules.some((r) => r.kind === "latest") ? rules.filter((r) => r.kind === "latest") : rules;
           return (
-            <section key={def.id} data-metric={def.id} className="flex flex-col gap-3 rounded-lg border border-mc-line bg-mc-panel px-4 py-3.5">
+            <section key={def.id} data-metric={def.id} className="flex flex-col gap-3 rounded-lg border border-mc-line bg-mc-panel p-5">
               <header className="flex items-start justify-between gap-2">
                 <div className="min-w-0 flex-1">
-                  <h3 className="text-sm font-semibold">{def.label}</h3>
-                  <p className="mt-0.5 font-mono text-2xl font-bold tracking-tight text-foreground">
+                  <h3 className="text-sm font-semibold leading-snug">{def.label}</h3>
+                  <p className="mt-1 whitespace-nowrap text-2xl font-semibold tabular-nums tracking-tight text-foreground">
                     {latest?.value != null ? formatValue(def.id, latest.value) : "—"}
-                    {latest && (
-                      <span className="ml-2 text-[11px] font-normal text-mc-label">
-                        {latest.date === mm.series[mm.series.length - 1].date ? "today" : latest.date}
-                      </span>
-                    )}
                   </p>
+                  {latest && (
+                    <p className="text-[11px] text-mc-label">
+                      {latest.date === mm.series[mm.series.length - 1].date ? "Today" : `Last value ${latest.date}`}
+                    </p>
+                  )}
                 </div>
                 <div className="flex flex-col items-end gap-1.5">
                   <MissingBadge status={mm.missing} />

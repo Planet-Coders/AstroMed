@@ -189,6 +189,22 @@ export function SuperAdminDashboard({ user }: { user: SessionUser }) {
     { id: "spacecat", label: "Space cat" },
   ];
 
+  const descriptions: Record<string, string> = {
+    telemetry: seesCrew
+      ? "Live heart rate, SpO₂ and HRV for the crew. Pick a crew member to see their ECG and blood labs."
+      : "Your live heart rate, SpO₂ and HRV, with your latest blood labs.",
+    body: "How each spaceflight hazard affects the body. Tap a system to see readings and what to do.",
+    check: "Six quick measurements each morning. About two minutes.",
+    monitoring: "Open alerts and 7 to 30 day trends for everything you log.",
+    missions: "Daily health habits that build your streak and unlock mission patches.",
+    habitat: "Cabin air, radiation, space weather and today's exercise and sleep.",
+    pvt: "A 3-minute reaction-time test that checks alertness and fatigue.",
+    queue: "Records kept on this device until mission control confirms they arrived.",
+    hotline: "Message mission control on Earth. Replies arrive with the signal delay.",
+    spacecat: "Your cabin companion. Healthy habits keep it happy.",
+  };
+  const activeTab = tabs.find((t) => t.id === tab);
+
   // The crew shown first: the astronaut's own group, or MTV-1 for the commander.
   const homeCrew = user.role === "COMMANDER" ? "MTV-1" : user.crewId;
 
@@ -238,13 +254,19 @@ export function SuperAdminDashboard({ user }: { user: SessionUser }) {
             crewRisks={crewRisks}
             selfOnly={!seesCrew}
             mission={missionName}
-            activeTabLabel={tabs.find((t) => t.id === tab)?.label}
+            activeTabLabel={activeTab?.label}
             onOpenMobileMenu={() => setMobileMenuOpen(true)}
           />
 
-          <div className="flex-1 w-full p-4 md:p-6 lg:p-7 pb-24">
-            <div className="mx-auto grid w-full max-w-[1680px] gap-6 lg:grid-cols-[minmax(0,1fr)_340px] xl:grid-cols-[minmax(0,1fr)_370px]">
-              <main key={tab} className="flex min-w-0 flex-col gap-5 animate-tab-enter">
+          <div className="flex-1 w-full px-4 pt-6 pb-24 md:px-6 lg:px-8 lg:pt-8">
+            <div className="mx-auto mb-6 w-full max-w-[1680px]">
+              <h1 className="text-2xl font-semibold tracking-tight text-foreground md:text-[28px]">
+                {activeTab?.label ?? "Dashboard"}
+              </h1>
+              <p className="mt-1 max-w-2xl text-sm text-mc-muted">{descriptions[tab]}</p>
+            </div>
+            <div className="mx-auto grid w-full max-w-[1680px] gap-6 lg:grid-cols-[minmax(0,1fr)_320px] xl:grid-cols-[minmax(0,1fr)_350px]">
+              <main key={tab} className="flex min-w-0 flex-col gap-6 animate-tab-enter">
                 {tab === "telemetry" && <SelfCheckDue userId={user.userId} onStart={() => setTab("check")} />}
 
                 {tab === "telemetry" && (
