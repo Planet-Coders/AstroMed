@@ -34,6 +34,7 @@ flowchart LR
 - First setup of an empty database: `npx prisma migrate deploy`, then `npm run db:seed`, and optionally `npm run db:synthetic` (SYNTHETIC crew SIM-1).
 - **Cautions for the shared database:** don't run `migrate dev`, `migrate reset` or `db push`, don't reseed it, and don't run the e2e tests against it (they write test data).
 - `tsx` scripts don't read `.env` by themselves, so export the variables in your shell first.
+- **Cold starts:** an idle Neon database can take 6–9 s to wake, longer than Prisma's default 5 s connection timeout, so the first request after a quiet spell can fail (e.g. "Hotline server unavailable", or a demo sign-in that falls back to an offline identity). Add `connect_timeout=15` to `DATABASE_URL`, locally and in Vercel.
 
 ## Local development
 

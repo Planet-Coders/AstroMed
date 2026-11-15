@@ -7,19 +7,22 @@ For each feature: what it does, where the code is, and how to try it in the demo
 ### My vitals
 - **What:** live heart rate, SpO₂ and HRV tiles, a Lead II ECG, a 24 h HRV trend and the Medical assessment. An irregular rhythm always shows WARNING. When the wearable is silent, the tiles freeze on the last valid reading and show its age.
 - **Code:** `components/VitalsMonitor.tsx`, `components/EcgMonitor.tsx`, `lib/risk.ts`, `components/OfflineAICopilot.tsx`
+- **Crew overview:** the crew commander (CDR) sees their crew's cards and ground control sees every crew. Demo guest accounts (callsign GUEST, created by signing in with an unknown email) are left out.
 - **Try it:** use **Demo → Arrhythmia** for the warning and **Demo → Missing data** for the last-valid-reading view.
 
 ### Daily check
 - **What:** six readings (blood pressure, blood sugar, temperature, mood, sleep, hydration), each a clickable tab, with instant colour-coded results.
   - Next needs a valid value; Skip records the step as not measured.
   - "Save just this reading" logs one tab on its own, and re-tests update today's status and monitoring.
+  - Sleep and fluid are daily totals: once a value is saved today, choose **Add to today's total** (default) or **Replace today's value**. A live preview shows the sum, and the server keeps the running total (`sleepAddedHours` / `fluidAddedMl`), so it works across devices.
+  - Blood pressure, sugar, temperature and mood are not added up: the newest reading is a re-test.
   - Swapped blood pressure asks you to re-enter.
   - An unfinished check resumes, and the results page confirms the save.
 - **Code:** `components/DailySelfCheck.tsx`, `lib/selfCheck.ts`, `lib/selfCheckThresholds.ts`
-- **Try it:** enter 80/120 to see the input check. Then save 168/104, re-test with 118/76 and watch the status go WARNING → NOMINAL. Tap **Hydration** on the start screen to log only water.
+- **Try it:** enter 80/120 to see the input check. Then save 168/104, re-test with 118/76 and watch the status go WARNING → NOMINAL. Tap **Hydration** on the start screen to log only water. Save 5 h of **Sleep** ("Short sleep in Daily Check" opens), then add 2 h: the total is 7.0 h and the alert resolves with "Today's total 7.0 h · back to safe".
 
 ### My monitoring
-- **What:** 7/14/30-day charts with alert lines, missing-data badges, trends, and alerts with a note thread (open → acknowledged → resolved). Re-tests auto-resolve alerts with a note naming the reading.
+- **What:** 7/14/30-day charts with alert lines, missing-data badges, trends, and alerts with a note thread (open → acknowledged → resolved). Re-tests auto-resolve alerts with a note naming the reading; for sleep and fluid the note names today's total.
 - **Code:** `components/monitoring/*`, `lib/monitoring/*`, `app/api/monitoring/me`, `app/api/alerts/[id]`
 - **Try it:** after a red Daily Check reading, open **My monitoring**.
 
@@ -36,7 +39,7 @@ For each feature: what it does, where the code is, and how to try it in the demo
 
 ### Hotline to Earth
 - **What:** crew-to-Earth medical line with Routine / Urgent / Emergency levels (emergency needs a confirm step) and an optional vitals snapshot.
-  - Messages arrive after the 20 m link delay (20 s in demo), and work offline through the queue.
+  - Messages arrive after the 20 m link delay (20 s in demo), and work offline through the queue. Written offline, the notice says **Queued** (it goes out first when the link returns, then reaches Earth after the delay) and the message shows "Waiting to send".
   - Flight surgeons get a banner and chime, reply, acknowledge and resolve.
 - **Code:** `components/hotline/*`, `lib/hotline/*`, `app/api/hotline/*`, model `HotlineMessage`
 - **Try it:** send an Urgent message as an astronaut, then sign in as an oversight user and open `/oversight`.

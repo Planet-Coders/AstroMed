@@ -86,7 +86,7 @@ flowchart TB
 - Admin and oversight APIs read the role from the database on every request (`lib/authz.ts`), so a demoted or disabled account loses access at once.
 - Oversight users asking for a group or astronaut outside their assignment get **404**, so ids can't be probed.
 - Hotline: astronauts reach only their own thread; Earth staff reach only astronauts in groups they can read (`lib/hotline/rules.ts`).
-- Demo mode (`DEMO_MODE`) lets any email sign in as a guest astronaut. Super admin and oversight accounts always need their real password.
+- Demo mode (`DEMO_MODE`) lets any email sign in as a guest astronaut (callsign GUEST, crew MTV-1). Super admin and oversight accounts always need their real password. Guests see their own dashboard but never appear in anyone's crew overview (`app/api/dashboard/route.ts`).
 
 ## Data model
 
@@ -121,10 +121,12 @@ flowchart LR
   G --> H["Alerts<br/>open → acknowledged → resolved"]
   H --> I["My monitoring (crew)<br/>Oversight console (ground)"]
   G -- "re-test back in range" --> J["Auto-resolve + note<br/>'Re-test 118/76 mmHg · back to safe'"]
+  G -- "sleep / fluid total reaches the limit" --> K["Auto-resolve + note<br/>'Today's total 7.0 h · back to safe'"]
 ```
 
 - Each queued item leaves the outbox only when the server confirms it. The Queue page shows **Queued → Sent → Confirmed by Earth**.
 - Swapped blood pressure pairs never become monitoring samples (`lib/monitoring/selfCheckSamples.ts`).
+- Sleep and fluid entries can be added to today's value. The server keeps the running daily total (`sleepAddedHours` / `fluidAddedMl`), and the latest-reading rule sees that total. Other readings are re-tests: the newest one wins.
 - Rules are evaluated when monitoring is viewed, not by a background job.
 - Alert thresholds live in `lib/selfCheckThresholds.ts` and `lib/monitoring/catalog.ts`. Super admins can edit them in **Alert rules**, and blood pressure limits are validated.
 

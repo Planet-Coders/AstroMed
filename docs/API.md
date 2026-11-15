@@ -14,7 +14,7 @@ All routes live under `app/api/`. Unless marked **public**, a request needs the 
 
 | Route | Methods | Role | Purpose |
 | --- | --- | --- | --- |
-| `/api/dashboard` | GET | signed in | Vitals and crew cards the user may see (own / own crew / every crew) |
+| `/api/dashboard` | GET | signed in | Vitals and crew cards the user may see (own / own crew / every crew). Demo guest accounts (callsign GUEST) are left out of crew views |
 | `/api/biometrics/sync` | POST | signed in | Stores queued wearable vitals; returns the ids it saved |
 | `/api/health/reports` | POST | signed in | Stores self-checks, routine logs, injuries and period logs from the outbox |
 | `/api/chat/messages` | POST | signed in | Stores co-pilot questions and replies for oversight |
