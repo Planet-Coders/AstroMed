@@ -96,6 +96,9 @@ html:not([data-theme="dark"]) textarea.rounded-md { border-radius: 14px; }
 html:not([data-theme="dark"]) aside[aria-label="Workspace views"] { background: #ffffff; border-color: transparent; box-shadow: 4px 0 24px rgba(0, 0, 0, 0.04); }
 html:not([data-theme="dark"]) aside[aria-label="Workspace views"] .bg-mc-bg { background: #ffffff; }
 html:not([data-theme="dark"]) header.bg-mc-header { border-color: transparent; box-shadow: 0 6px 24px rgba(0, 0, 0, 0.04); }
+/* Light theme: one typeface. Numbers keep fixed-width digits so live values don't jitter;
+   add .keep-mono where a true monospace readout is wanted (mission clock). */
+html:not([data-theme="dark"]) .font-mono:not(.keep-mono) { font-family: var(--font-sans); font-variant-numeric: tabular-nums; letter-spacing: 0; }
 
 /* Tokens point at the variables above so a theme switch restyles every utility. */
 @theme inline {

@@ -39,7 +39,7 @@ export function OfflineAICopilot({
   simulatedArrhythmia,
 }: OfflineAICopilotProps) {
   const { voiceStress, scenario } = useMissionTelemetry();
-  const { unsyncedCount, syncNow, isSyncing, isOnline, lastSyncAt } = useSync();
+  const { isOnline } = useSync();
   const {
     setSession,
     voiceTranscript,
@@ -79,11 +79,17 @@ export function OfflineAICopilot({
   const labLevel = patientLabs?.level ?? "GREEN";
 
   return (
-    <aside aria-label="AI co-pilot" className="flex flex-col gap-4 self-start lg:sticky lg:top-6">
+    <aside aria-label="AI co-pilot" className="flex flex-col gap-4 self-start lg:sticky lg:top-20">
       {/* 1. The answer first: is the crew OK? */}
-      <section className={`rounded-lg border p-5 ${tone.bg}`}>
-        <p className="mc-label">Medical assessment</p>
-        <p className={`mt-1 text-2xl font-semibold ${tone.text}`}>{risk ? riskLabel(risk) : "No assessment"}</p>
+      <section className="rounded-lg border border-mc-line bg-mc-panel p-5">
+        <div className="flex items-center justify-between gap-2">
+          <p className="mc-label">Medical assessment</p>
+          <span className={`flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-[11px] font-semibold ${tone.bg} ${tone.text}`}>
+            <span className={`h-1.5 w-1.5 rounded-full ${risk === "RED" ? "bg-mc-red" : risk === "YELLOW" ? "bg-mc-amber" : risk === "GREEN" ? "bg-mc-green" : "bg-mc-label"}`} />
+            {patientName ?? userName}
+          </span>
+        </div>
+        <p className={`mt-2 text-2xl font-semibold tracking-tight ${tone.text}`}>{risk ? riskLabel(risk) : "No assessment"}</p>
         <p className="mt-2 text-sm leading-relaxed text-mc-soft">
           {simulatedArrhythmia || displayVitals?.arrhythmia
             ? "Irregular heart rhythm on the ECG. Stop activity, record a 12-lead ECG and contact the CMO now."
@@ -95,20 +101,31 @@ export function OfflineAICopilot({
               ? "Some readings are outside baseline. Review vitals and cabin air."
               : "A crew member needs attention now. Ask the co-pilot for steps."}
         </p>
-        {stressIndex != null && (
-          <p className="mt-3 font-mono text-xs text-mc-label">
-            Estimated stress {stressIndex}/100 · {stressLabel}
-          </p>
-        )}
-        {risk && (
-          <p className="mt-1 font-mono text-[11px] text-mc-label">
-            Based on {simulatedArrhythmia ? "the simulated ECG" : scenario.sensorDropout ? "last synced vitals (sensor offline)" : "last synced vitals"}.
-          </p>
+        {(stressIndex != null || risk) && (
+          <dl className="mt-4 grid grid-cols-2 gap-3 border-t border-mc-line pt-3 text-xs">
+            {stressIndex != null && (
+              <div>
+                <dt className="text-mc-label">Estimated stress</dt>
+                <dd className="mt-0.5 font-semibold tabular-nums text-foreground">
+                  {stressIndex}/100 <span className="font-normal text-mc-muted">· {stressLabel}</span>
+                </dd>
+              </div>
+            )}
+            {risk && (
+              <div>
+                <dt className="text-mc-label">Based on</dt>
+                <dd className="mt-0.5 text-foreground">
+                  {simulatedArrhythmia ? "Simulated ECG" : scenario.sensorDropout ? "Last sync (sensor offline)" : "Last synced vitals"}
+                </dd>
+              </div>
+            )}
+          </dl>
         )}
         {patientLabs && patientLabs.flagged.length > 0 && (
-          <p className={`mt-2 text-xs leading-relaxed ${RISK_TONE[labLevel].text}`}>
-            Demo lab flags (Inspiration4 research sample):{" "}
+          <p className={`mt-3 rounded-md px-3 py-2 text-xs leading-relaxed ${RISK_TONE[labLevel].bg} ${RISK_TONE[labLevel].text}`}>
+            <span className="font-semibold">Lab flag:</span>{" "}
             {patientLabs.flagged.map((r) => `${r.label} ${formatLab(r)} ${r.note}`).join(" · ")}
+            <span className="block text-[11px] opacity-80">Inspiration4 research sample</span>
           </p>
         )}
       </section>
@@ -116,7 +133,7 @@ export function OfflineAICopilot({
       {/* 2. The co-pilot and how it is running */}
       <section className="flex flex-col gap-3 rounded-lg border border-mc-line bg-mc-panel p-5">
         <div className="flex items-center justify-between gap-2">
-          <p className="text-sm font-semibold">Flight Surgeon Co-Pilot</p>
+          <p className="text-[15px] font-semibold">Flight Surgeon Co-Pilot</p>
           <AiBadge status={engineStatus} />
         </div>
 
@@ -136,15 +153,12 @@ export function OfflineAICopilot({
           </div>
         )}
         {engineStatus === "basic" && (
-          <div className="rounded-md border border-mc-amber/30 bg-mc-amber/5 p-3 text-xs leading-relaxed text-mc-soft">
-            <p className="font-semibold text-mc-amber">AI running in basic mode</p>
-            <p className="mt-1">
-              Answers come from the built-in triage rules. {basicReason}
-            </p>
-            <button type="button" onClick={retryEngine} className="mt-1.5 text-mc-link underline">
+          <p className="text-xs leading-relaxed text-mc-muted" title={basicReason || undefined}>
+            Answering with built-in triage rules while the on-device AI is unavailable.{" "}
+            <button type="button" onClick={retryEngine} className="font-medium text-mc-link underline underline-offset-2">
               Try on-device AI again
             </button>
-          </div>
+          </p>
         )}
         {engineStatus === "ready" && (
           <div className="text-xs text-mc-label">
@@ -179,7 +193,7 @@ export function OfflineAICopilot({
         {!voice.isListening && !voice.error && (
           <p className="text-[11px] leading-relaxed text-mc-label">
             {voice.supported
-              ? `🌐 Voice typing needs a network link: the browser sends audio to its online speech service. The AI co-pilot runs on this device and works offline, but voice does not.${isOnline ? "" : " No link right now, so type your check-in."}`
+              ? `Voice typing needs a network link; the co-pilot itself works offline.${isOnline ? "" : " No link right now, so type your check-in."}`
               : "This browser has no voice typing (use Chrome or Edge on desktop). You can type your check-in instead."}
           </p>
         )}
@@ -188,31 +202,12 @@ export function OfflineAICopilot({
             {voice.error ?? `…${voice.interim}`}
           </p>
         )}
-        <p className="text-xs leading-relaxed text-mc-label">
-          Last check-in: <span className="text-mc-soft">{voiceTranscript}</span>
-        </p>
+        <div className="border-t border-mc-line pt-3 text-xs leading-relaxed">
+          <p className="text-mc-label">Last check-in</p>
+          <p className="mt-0.5 text-mc-soft">{voiceTranscript}</p>
+        </div>
       </section>
 
-      {/* 3. Data link */}
-      <section className="flex items-center justify-between gap-3 rounded-lg border border-mc-line bg-mc-panel px-5 py-3.5">
-        <p className="text-[13px] text-mc-soft">
-          <span className="font-mono text-foreground">{unsyncedCount}</span> records waiting
-          <span className={isOnline ? "text-mc-label" : "text-mc-amber"}>{isOnline ? " · online" : " · no link"}</span>
-          {lastSyncAt && unsyncedCount === 0 && (
-            <span className="block font-mono text-[11px] text-mc-green">
-              ✓✓ All records confirmed by Earth · checked {lastSyncAt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-            </span>
-          )}
-        </p>
-        <button
-          type="button"
-          onClick={() => void syncNow()}
-          disabled={isSyncing || unsyncedCount === 0}
-          className="whitespace-nowrap rounded-md border border-mc-line-strong px-3 py-1.5 text-xs font-semibold text-mc-link disabled:opacity-40"
-        >
-          {isSyncing ? "Syncing…" : "Sync to Earth"}
-        </button>
-      </section>
     </aside>
   );
 }
@@ -225,5 +220,5 @@ function AiBadge({ status }: { status: string }) {
     idle: ["Starting", "border-mc-line-strong text-mc-label"],
   };
   const [label, cls] = map[status] ?? map.idle;
-  return <span className={`rounded border px-2 py-0.5 font-mono text-[11px] ${cls}`}>{label}</span>;
+  return <span className={`whitespace-nowrap rounded-full border px-2.5 py-0.5 text-[11px] font-medium ${cls}`}>{label}</span>;
 }
