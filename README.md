@@ -1,9 +1,6 @@
 # AstroMed · Astronaut Health Monitoring Console
 
-hii
 **Live demo:** https://astro-med-ashy.vercel.app
-
-jih
 
 A NASA Space Apps Challenge prototype: a self-assessment health console for astronauts on long missions. Our scenario is the MTV-1 Mars transit, 20 light-minutes from Earth.
 
@@ -12,6 +9,17 @@ Crew members measure their own health and see colour-coded results with plain-la
 On the ground, a **super admin** sets up mission groups and crew accounts, and **mission oversight** (flight surgeons and mission control) follows every astronaut in their assigned groups: vitals, health logs and AI co-pilot conversations.
 
 > Concept prototype for a hackathon. Not an official NASA system and not medical advice.
+
+## What's new (2026-11-15)
+
+- **Hotline to Earth:** a direct line from each astronaut to the Earth medical team, with Routine / Urgent / Emergency levels, the 20 m link delay and an offline queue. Flight surgeons answer from `/oversight`.
+- **Daily check:** every reading is a clickable tab. Save a single reading (e.g. water) or re-test one: the newest value updates your status and monitoring, and the alert log notes it ("Re-test 118/76 mmHg · back to safe").
+- **Input checks:** a swapped blood pressure (e.g. 80/120) asks you to re-enter instead of giving a medical warning. Super admins can't save impossible blood pressure alert rules, and monitoring ignores swapped readings.
+- **3D body map:** a realistic body made from the MakeHuman CC0 base mesh, matched to the account's sex, with injuries reported by tapping the 3D body. Browsers without WebGL get a list instead, and **Report injury** always works.
+- **Space cat:** a 3D astronaut cat companion you feed with mission points. It speaks your voice reminders.
+- **Clearer status:** an irregular heart rhythm is always a warning; one shared colour per status level; the header says it is based on vitals only; sync shows Queued / Sent / Confirmed by Earth; the sensor-dropout demo shows the last valid reading and its age.
+- **Look and feel:** sidebar navigation, a new light theme (white cards, sunflower-yellow accent) beside the dark theme, and a compact co-pilot button on phones.
+- **Monitoring and co-pilot:** Daily Check readings feed monitoring alerts, a hydration alert workflow, and an improved onboard co-pilot with personalised grounding.
 
 ## How it meets the challenge
 
@@ -34,7 +42,7 @@ On the ground, a **super admin** sets up mission groups and crew accounts, and *
 
 ### Daily self-check
 
-Six guided steps:
+Six guided steps, each also a **tab you can open directly**:
 
 - **Blood pressure** (mmHg)
 - **Blood sugar** (mg/dL, fasting or after a meal)
@@ -43,13 +51,21 @@ Six guided steps:
 - **Sleep** (pre-filled from the sleep log)
 - **Hydration** (fluid in the last 24 hours in mL and the most recent urine colour on an 8-shade chart)
 
-Results turn green, amber or red as they're typed, with follow-up guidance. Open **My monitoring** from flagged results to follow synced alerts. On a **Low fluid intake** alert, use **Log water** to add 250 mL, 500 mL or a custom amount after the last check. A fresh 24-hour reading replaces the prior total.
+Results turn green, amber or red as they're typed, with follow-up guidance.
+
+- **Next** needs a valid value; **Skip** leaves the step out and records it as not measured.
+- A reading that can't be right (e.g. blood pressure 80/120 with the numbers swapped) asks you to re-enter instead of giving a medical warning.
+- **Save just this reading** logs one tab on its own, with its own time (e.g. water after a drink). It doesn't count as the full daily check.
+- **Re-tests:** the newest reading replaces the older one in today's status (a high blood pressure re-tested as normal shows normal), syncs to monitoring, and clears the alert with a note naming the re-test.
+- An unfinished check resumes where you left it (kept on the device for 12 hours), and the results page confirms it was saved.
+ Open **My monitoring** from flagged results to follow synced alerts. On a **Low fluid intake** alert, use **Log water** to add 250 mL, 500 mL or a custom amount after the last check. A fresh 24-hour reading replaces the prior total.
 
 ### Body map + five hazards
 
-- An anatomical astronaut figure with a clickable status point per body system.
+- A rotatable **3D body** built from the MakeHuman base mesh (CC0), baked into `public/models/body.bin` by `scripts/bake-body-model.py`. The male or female build follows the astronaut's account.
+- A clickable status point per body system.
 - Each system shows its readings, what it does, how spaceflight affects it, and what to do now.
-- Injury and period tracking are built in.
+- Injury and period tracking are built in. **Report injury** places a marker by tapping the 3D body. Without WebGL (or if 3D can't start), you pick the body area from a list, and **Try 3D again** retries the scan.
 - The **RIDGE** strip shows a live status for each hazard. Picking one highlights the body systems it affects.
 
 ### My vitals / Crew vitals
@@ -58,6 +74,24 @@ Results turn green, amber or red as they're typed, with follow-up guidance. Open
 - Big heart rate, SpO₂ and HRV tiles.
 - A realistic Lead II ECG: PQRST beats, HRV-driven rhythm and a monitor sweep. It turns irregular in the arrhythmia scenario.
 - 24 h HRV trend, plus per-crew baselines (and a crew overview for the commander and ground control).
+- An irregular rhythm always shows **WARNING**, on the card, in the header and in the assessment. The header pill is based on vitals only; the Medical assessment says what it is based on.
+- When the wearable stops sending, the tiles freeze on the **last valid reading** with its age (e.g. "last valid reading · 2 min ago"), and the ECG shows no signal. Nothing is invented.
+
+### Hotline to Earth
+
+- A red **Hotline to Earth** button and a **Hotline** sidebar item (with an unread badge) for astronauts.
+- Quick messages (Medical emergency, Need a consult, Medication question) and **Routine / Urgent / Emergency** levels. An emergency asks for confirmation first, and the latest vitals can be attached.
+- Messages arrive after the Earth link delay (20 m 04 s; a demo switch shortens it to 20 s; instant in ground mode). The crew sees a countdown, then Delivered, Seen, Acknowledged and Resolved.
+- Written offline, a message waits in the sync queue and goes out first when the link returns.
+- **Earth side** (`/oversight`): a banner and chime for urgent messages, conversations sorted by urgency, the thread with vitals, replies (sent back with the same delay), **Acknowledge** and **Mark resolved**.
+- Astronauts only reach their own thread; oversight only reaches astronauts in groups assigned to them.
+
+### Space cat (Crew Morale)
+
+- An original 3D astronaut cat (three.js, no external models), with a flat fallback without WebGL. Tap, rub or drag it; it waves, winks, purrs and wags its tail.
+- Feed it with mission points (30 per meal). It gets hungry over time and grows through Slim, Plump and Chonky.
+- When **Voice reminder → Auto** is on, the cat floats on every page and speaks the reminders. If the browser blocks sound, it shows "Tap to turn sound on".
+- **Talk to me** records you and plays it back in a squeaky voice. Reminder speech stops while you talk.
 
 ### Health missions
 
@@ -87,15 +121,15 @@ See [the co-pilot guide](docs/COPILOT.md) for prompt instructions, NASA sources,
 
 ### Offline first
 
-- Vitals are saved to IndexedDB (Dexie) and synced to Postgres with **Sync to Earth** when the link is back.
-- Co-pilot chats, self-checks, exercise and sleep, injuries and period logs go through the same kind of IndexedDB outbox. An item leaves the queue only when the server confirms it.
+- Vitals are saved to IndexedDB (Dexie) and synced to Postgres with **Sync to Earth** when the link is back. The queue shows each record as **Queued**, **Sent** (no reply yet) or **Confirmed by Earth**.
+- Co-pilot chats, hotline messages, self-checks, exercise and sleep, injuries and period logs go through the same kind of IndexedDB outbox. An item leaves the queue only when the server confirms it.
 
 ### Mission groups and roles
 
 | Role                                             | Lands on     | Can do                                                                                                                                                                        |
 | ------------------------------------------------ | ------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Super admin**                                  | `/admin`     | Create, edit and delete mission groups; create astronaut and oversight accounts; move astronauts between groups; assign groups to oversight; read every group in `/oversight` |
-| **Oversight** (flight surgeon / mission control) | `/oversight` | Read the astronauts in their assigned groups only, including their AI conversations                                                                                           |
+| **Oversight** (flight surgeon / mission control) | `/oversight` | Read the astronauts in their assigned groups only, including their AI conversations; answer their hotline messages                                                           |
 | **Commander** (ground control)                   | Console      | Sees every crew on the console                                                                                                                                                |
 | **Astronaut, crew commander** (callsign `CDR`)   | Console      | Their own console plus every member of their own crew                                                                                                                         |
 | **Astronaut**                                    | Console      | Only their own health console and data; belongs to one mission group                                                                                                          |
@@ -131,7 +165,7 @@ Full detail, thresholds and NASA sources: **[docs/METRICS.md](docs/METRICS.md)**
 
 - **Metrics:** all Daily Check readings, exercise, pulse trend and radiation dose. Blood pressure shows both numbers, and blood sugar keeps fasting context. Each metric has a definition, expected cadence and rationale under **Why we monitor this**.
 - **Dashboard:** 7 / 14 / 30-day daily charts per metric with the amber and red lines, a **missing-data badge** per metric (On time / Late / Missing / No data yet, from the expected cadence) and a **trend summary** with % change against the previous period. Oversight sees it per astronaut (**Monitoring** tab); crew see their own under **My monitoring**.
-- **Alerts:** super admins can edit thresholds, windows and enabled status in **Alert rules**. Daily Check rules use the latest applicable value, including the latest daily fluid total. Alerts go **open → acknowledged → resolved** with a note thread. Crew can note and acknowledge their own alerts, and oversight can also resolve alerts. The app resolves an alert when a follow-up value clears its rule.
+- **Alerts:** super admins can edit thresholds, windows and enabled status in **Alert rules**. Daily Check rules use the latest applicable value, including the latest daily fluid total. Alerts go **open → acknowledged → resolved** with a note thread. Crew can note and acknowledge their own alerts, and oversight can also resolve alerts. The app resolves an alert when a follow-up value clears its rule, and the note names the reading (e.g. a Daily Check re-test). Blood pressure rules must stay realistic: the systolic limits above the diastolic ones.
 - **Synthetic crew:** `npm run db:synthetic` seeds group **SIM-1** with six SYNTHETIC astronauts (normal, missing data, sleep debt, rising heart rate, dehydration, solar particle event), 14–30 days each, seedable.
 
 ### Demo scenarios
@@ -143,7 +177,7 @@ The header's **Demo** dropdown switches between:
 - EV1 voice stress
 - ppCO₂ + PVT slowdown
 - Solar particle event
-- Missing data · sensor dropout (the wearable stops sending, and oversight sees the gap)
+- Missing data · sensor dropout (the wearable stops sending: the console shows the last valid reading with its age, and oversight sees the gap)
 
 ## Getting started
 
@@ -161,9 +195,11 @@ npm run dev               # http://localhost:3000
 Tests:
 
 ```bash
-npm test                  # Vitest unit tests: alert rules, trends, missing data on synthetic cases
+npm test                  # Vitest unit tests (103): alert rules, trends, validation, hotline, sync, space cat
 npm run test:e2e          # Playwright UI tests (re-seeds SIM-1; uses installed Edge, PW_CHANNEL=chromium to change)
 ```
+
+The e2e tests write to the database your dev server uses. Don't run them against the shared demo database. They sign up throwaway guest accounts and delete them again at the end of each run.
 
 A database that was created earlier with `db:push` has no migration history yet. Baseline it once with `npx prisma migrate resolve --applied 0_init`, then run `npx prisma migrate deploy`.
 
@@ -224,6 +260,8 @@ Never commit `.env` or the database URL: secrets live only in `.env` and in Verc
 - Renamed the app to **AstroMed** (browser title, login page, headers, logo).
 - **Crew privacy:** astronauts see only their own dashboard; the crew commander (CDR) sees their crew; ground control sees every crew. Enforced on the server.
 - Removed the **Space / Earth** buttons from the console header (the console always runs in space mode).
+- **Sidebar navigation** grouped into Clinical Telemetry, Habitat & Protocols, Operations & Sync and Crew Morale, with **My vitals** as the main screen.
+- **Light and dark themes:** a soft white-and-yellow light theme and a black-and-lime dark theme (toggle in the header).
 - Deployed to Vercel with a Neon database (see above).
 
 ## Tech stack
@@ -243,13 +281,17 @@ app/                 Next.js routes: login, crew console, /admin, /oversight, an
 components/          UI: SuperAdminDashboard (crew console), BodyMap, DailySelfCheck, HealthMissions,
                      VitalsMonitor + EcgMonitor, ExerciseSleep, PVTTest, OfflineAICopilot, …
 components/staff/    AdminConsole, OversightConsole, StaffHeader, ConfirmDialog (ground consoles)
+components/hotline/  CrewHotline, EarthHotline (crew ↔ Earth hotline)
+components/spacecat/ SpaceCatView, FloatingCat, TalkBack, cat3d/ (3D astronaut cat)
 components/monitoring/ MonitoringPanel, MetricChart, AlertsPanel, MonitoringView
 lib/                 Logic: risk rules, selfCheck, bodyMap (+ hazards), missions, routineLog,
                      injuries, periods, copilot knowledge/fallback, webllm engine, Dexie db,
                      outbox (chat + health log sync), authz (role checks), healthSummary
+lib/hotline/         hotline rules (validation, permissions, delivery) and server helpers
 lib/monitoring/      catalog (metrics, rules, NASA sources), engine (series, missing data,
                      trends, rules, alert lifecycle), synthetic generator, server helpers
-prisma/              Schema, migrations, seed data (groups MTV-1 / MTV-2, admin, oversight)
+scripts/             bake-body-model.py (3D body mesh), metrics-doc, copilot benchmark
+prisma/              Schema, migrations (incl. user sex and hotline), seed data (groups MTV-1 / MTV-2, admin, oversight)
                      and synthetic.ts (SYNTHETIC crew SIM-1)
 tests/               unit/ (Vitest) and e2e/ (Playwright)
 docs/METRICS.md      Metric definitions, thresholds and citations (generated from the catalog)
@@ -261,5 +303,5 @@ docs/METRICS.md      Metric definitions, thresholds and citations (generated fro
 - Monitoring alerts are a simulation: rules are evaluated when a crew member's monitoring is viewed, not by a background job, and nothing is paged or sent anywhere.
 - Missions and the PVT result stay in the browser. Vitals, self-checks, exercise and sleep, injuries and period logs sync to the database through the offline queue so mission oversight can read them.
 - **Privacy:** every AI co-pilot message (the astronaut's questions and the replies) is stored on the server and readable by the oversight users assigned to that astronaut's group and by the super admin. The co-pilot shows the crew a note saying so.
-- "Send to ground surgeon" confirms on screen. It isn't wired to the sync queue yet.
+- Hotline delivery is checked by polling every few seconds; nothing is paged or sent outside the app.
 - The first co-pilot load downloads about 0.7 GB of model weights once. After that they're cached in the browser.
