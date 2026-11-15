@@ -250,9 +250,46 @@ export function assessHydration(fluidMl: number | null, urineColor: number | nul
   return { level: "GREEN", advice: "In range for the values entered." };
 }
 
+/**
+ * Input check before any medical assessment: a reading that can't be right (e.g. 80/120, with
+ * the numbers swapped) gets a "please re-enter" message instead of a health warning.
+ */
+export function bpInputError(sys: number | null, dia: number | null): string | null {
+  if (sys == null || dia == null) return null;
+  if (sys <= dia) {
+    return `The top number (systolic) must be higher than the bottom number (diastolic). Did you swap them? For example ${Math.max(sys, dia)}/${Math.min(sys, dia)}.`;
+  }
+  if (sys - dia < 10) return "The two numbers are too close together to be a real reading. Please measure again and re-enter.";
+  return null;
+}
+
+/** Steps a check can record; a skipped step is stored so "not measured" is explicit. */
+export type StepStatus = "ready" | "empty" | "invalid";
+
+/** Whether Next may continue: it needs a complete, valid value. Skip is for leaving a step blank. */
+export function stepStatus(id: StepId, v: SelfCheckValues, raw: { sys: string; dia: string; glucose: string; temp: string; sleep: string; fluid: string }): StepStatus {
+  switch (id) {
+    case "bp":
+      if ((raw.sys && v.systolic == null) || (raw.dia && v.diastolic == null)) return "invalid";
+      if (v.systolic == null || v.diastolic == null) return raw.sys || raw.dia ? "invalid" : "empty";
+      return bpInputError(v.systolic, v.diastolic) ? "invalid" : "ready";
+    case "glucose":
+      return v.glucose != null ? "ready" : raw.glucose ? "invalid" : "empty";
+    case "temperature":
+      return v.temperature != null ? "ready" : raw.temp ? "invalid" : "empty";
+    case "mood":
+      return v.mood != null ? "ready" : "empty";
+    case "sleep":
+      return v.sleepHours != null ? "ready" : raw.sleep ? "invalid" : "empty";
+    case "hydration":
+      if (raw.fluid && v.fluidMl == null) return "invalid";
+      return v.fluidMl != null || v.urineColor != null ? "ready" : "empty";
+  }
+}
+
 export function assessAll(v: SelfCheckValues): ItemResult[] {
   const out: ItemResult[] = [];
-  if (v.systolic != null || v.diastolic != null) {
+  if ((v.systolic != null || v.diastolic != null) && !bpInputError(v.systolic, v.diastolic)) {
     const assessment = assessBp(v.systolic, v.diastolic);
     const complete = v.systolic != null && v.diastolic != null;
     if (complete || assessment.level !== "GREEN") {
@@ -304,6 +341,8 @@ export type StoredCheck = {
   userId: string;
   at: number;
   items: ItemResult[];
+  /** Steps the crew member chose to skip (not measured), so missing data is explicit. */
+  skipped?: StepId[];
   values?: Partial<SelfCheckValues> & {
     /** Additional fluid recorded by the previous version of Daily Check. */
     fluidAddedMl?: number | null;

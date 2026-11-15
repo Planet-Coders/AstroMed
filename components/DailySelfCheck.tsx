@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Card } from "./ui/Card";
 import { useMissionTelemetry } from "@/components/MissionTelemetryProvider";
 import { useCopilot } from "./CopilotProvider";
@@ -10,7 +10,10 @@ import {
   STEPS,
   URINE_COLORS,
   assessAll,
+  bpInputError,
   overallLevel,
+  stepStatus,
+  type StepId,
   saveLatestCheck,
   type Mood,
   type SelfCheckValues,
@@ -25,6 +28,37 @@ const TONE: Record<RiskLevel, { text: string; border: string; bg: string; dot: s
 
 const inputCls =
   "w-full rounded-md border border-mc-line-strong bg-mc-inset px-3 py-2.5 font-mono text-xl text-foreground focus:border-mc-select focus:outline-none";
+
+/** An unfinished check is kept on this device so leaving the page doesn't lose it (12 h). */
+const DRAFT_TTL = 12 * 3600_000;
+type Draft = {
+  at: number;
+  step: number;
+  raw: { sys: string; dia: string; glucose: string; temp: string };
+  fasting: boolean;
+  mood: Mood | null;
+  sleep: string;
+  fluid: string;
+  urine: number | null;
+  skipped: StepId[];
+};
+const nowMs = () => Date.now();
+const draftKey = (userId: string) => `astromed_selfcheck_draft:${userId}`;
+function loadDraft(userId: string): Draft | null {
+  try {
+    const d = JSON.parse(localStorage.getItem(draftKey(userId)) ?? "null") as Draft | null;
+    return d && Date.now() - d.at < DRAFT_TTL && d.step >= 0 ? d : null;
+  } catch {
+    return null;
+  }
+}
+function clearDraft(userId: string) {
+  try {
+    localStorage.removeItem(draftKey(userId));
+  } catch {
+    /* unavailable */
+  }
+}
 
 /** Parse a typed reading; values outside what a device can show count as typos. */
 function num(s: string, range: readonly [number, number]): number | null {
@@ -52,6 +86,37 @@ export function DailySelfCheck({ userId, userName, onDone, onReviewAlerts }: {
   const [fluid, setFluid] = useState("");
   const [urine, setUrine] = useState<number | null>(null);
   const [savedResults, setSavedResults] = useState<ReturnType<typeof assessAll>>([]);
+  const [skipped, setSkipped] = useState<StepId[]>([]);
+  const [savedAt, setSavedAt] = useState<number | null>(null);
+  const [resumed, setResumed] = useState(false);
+
+  // Resume an unfinished check (e.g. after leaving at step 2 for another page).
+  useEffect(() => {
+    const d = loadDraft(userId);
+    if (!d) return;
+    /* eslint-disable react-hooks/set-state-in-effect -- one-time restore from device storage */
+    setRaw(d.raw);
+    setFasting(d.fasting);
+    setMood(d.mood);
+    setSleep(d.sleep);
+    setFluid(d.fluid);
+    setUrine(d.urine);
+    setSkipped(d.skipped ?? []);
+    setStep(Math.min(d.step, STEPS.length - 1));
+    setResumed(true);
+    /* eslint-enable react-hooks/set-state-in-effect */
+  }, [userId]);
+
+  // Keep the draft up to date while a check is in progress.
+  useEffect(() => {
+    if (step < 0 || step >= STEPS.length) return;
+    try {
+      const d: Draft = { at: Date.now(), step, raw, fasting, mood, sleep, fluid, urine, skipped };
+      localStorage.setItem(draftKey(userId), JSON.stringify(d));
+    } catch {
+      /* unavailable */
+    }
+  }, [userId, step, raw, fasting, mood, sleep, fluid, urine, skipped]);
   const values: SelfCheckValues = {
     systolic: num(raw.sys, RANGE.systolic),
     diastolic: num(raw.dia, RANGE.diastolic),
@@ -68,7 +133,8 @@ export function DailySelfCheck({ userId, userName, onDone, onReviewAlerts }: {
   const n = STEPS.length;
 
   const finish = (skipHydration = false) => {
-    const at = Date.now();
+    const at = nowMs();
+    const skippedSteps: StepId[] = skipHydration ? [...new Set([...skipped, "hydration" as StepId])] : skipped;
     const completed = {
       ...values,
       fluidMl: skipHydration ? null : values.fluidMl,
@@ -76,8 +142,13 @@ export function DailySelfCheck({ userId, userName, onDone, onReviewAlerts }: {
     };
     const items = assessAll(completed);
     if (Object.values(completed).some((value) => typeof value === "number")) {
-      saveLatestCheck({ userId, at, items, values: completed });
+      saveLatestCheck({ userId, at, items, values: completed, skipped: skippedSteps });
+      setSavedAt(at);
+    } else {
+      setSavedAt(null);
     }
+    clearDraft(userId);
+    setSkipped(skippedSteps);
     setSavedResults(items);
     setStep(n);
   };
@@ -149,6 +220,16 @@ export function DailySelfCheck({ userId, userName, onDone, onReviewAlerts }: {
                 : "Review the flagged readings and follow the guidance below."}
           </p>
         </div>
+        {savedAt && (
+          <p className="mt-3 rounded-md border border-mc-green/40 bg-mc-green/10 px-3 py-2 text-sm text-mc-green" role="status">
+            ✓ Saved at {new Date(savedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}. Kept on this device and queued to sync to Earth.
+          </p>
+        )}
+        {skipped.length > 0 && (
+          <p className="mt-2 text-xs text-mc-label">
+            Skipped (not measured): {skipped.map((id) => STEPS.find((x) => x.id === id)?.title ?? id).join(", ")}.
+          </p>
+        )}
         <ul className="mt-4 divide-y divide-mc-line">
           {results.map((r) => (
             <li key={r.id} className="flex gap-3 py-3">
@@ -188,6 +269,8 @@ export function DailySelfCheck({ userId, userName, onDone, onReviewAlerts }: {
             type="button"
             onClick={() => {
               setStep(-1);
+              setSkipped([]);
+              setResumed(false);
               onDone?.();
             }}
             className="min-h-11 rounded-md border border-mc-line-strong px-4 text-sm text-mc-soft"
@@ -202,14 +285,18 @@ export function DailySelfCheck({ userId, userName, onDone, onReviewAlerts }: {
   const info = STEPS[step];
   const result = results.find((r) => r.id === info.id);
   const level = result?.level;
-  const typo =
-    (info.id === "bp" && ((raw.sys && values.systolic == null) || (raw.dia && values.diastolic == null))) ||
-    (info.id === "glucose" && raw.glucose && values.glucose == null) ||
-    (info.id === "temperature" && raw.temp && values.temperature == null) ||
-    (info.id === "sleep" && sleep && values.sleepHours == null) ||
-    (info.id === "hydration" && fluid && values.fluidMl == null);
+  const status = stepStatus(info.id, values, { ...raw, sleep, fluid });
+  const bpError = info.id === "bp" ? bpInputError(values.systolic, values.diastolic) : null;
+  const bpHalf = info.id === "bp" && !bpError && (values.systolic == null) !== (values.diastolic == null);
+  const typo = status === "invalid" && !bpError && !bpHalf;
+  const next = () => {
+    setSkipped((list) => list.filter((id) => id !== info.id));
+    if (step === n - 1) finish();
+    else setStep(step + 1);
+  };
 
   function skipStep() {
+    setSkipped((list) => (list.includes(info.id) ? list : [...list, info.id]));
     if (info.id === "hydration") return finish(true);
     if (info.id === "bp") setRaw({ ...raw, sys: "", dia: "" });
     if (info.id === "glucose") setRaw({ ...raw, glucose: "" });
@@ -230,6 +317,14 @@ export function DailySelfCheck({ userId, userName, onDone, onReviewAlerts }: {
         </div>
       }
     >
+      {resumed && (
+        <p className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-md border border-mc-line bg-mc-inset px-3 py-2 text-xs text-mc-soft" role="status">
+          Picked up where you left off.
+          <button type="button" onClick={() => setResumed(false)} className="text-mc-link underline">
+            OK
+          </button>
+        </p>
+      )}
       <div className="grid gap-6 md:grid-cols-2">
         {/* How and why */}
         <div>
@@ -349,7 +444,13 @@ export function DailySelfCheck({ userId, userName, onDone, onReviewAlerts }: {
             className={`min-h-24 rounded-lg border p-3 transition ${level ? `${TONE[level].border} ${TONE[level].bg}` : "border-mc-line bg-mc-inset"}`}
             aria-live="polite"
           >
-            {typo ? (
+            {bpError ? (
+              <p className="text-[13px] text-mc-amber" role="alert">
+                <strong>Invalid reading, please re-enter.</strong> {bpError}
+              </p>
+            ) : bpHalf ? (
+              <p className="text-[13px] text-mc-label">Enter both the top and bottom numbers to continue.</p>
+            ) : typo ? (
               <p className="text-[13px] text-mc-amber">That number looks off. Check the reading and re-enter it.</p>
             ) : level && result ? (
               <>
@@ -363,7 +464,10 @@ export function DailySelfCheck({ userId, userName, onDone, onReviewAlerts }: {
             )}
           </div>
 
-          <div className="mt-auto flex items-center justify-between gap-2 pt-2">
+          <p className="mt-auto pt-2 text-[11px] text-mc-label">
+            <strong>Next</strong> saves this reading. <strong>Skip</strong> leaves it out and records it as not measured.
+          </p>
+          <div className="flex items-center justify-between gap-2">
             <button type="button" onClick={() => setStep(step - 1)} className="min-h-11 rounded-md px-3 text-sm text-mc-muted hover:text-foreground">
               ← Back
             </button>
@@ -377,8 +481,9 @@ export function DailySelfCheck({ userId, userName, onDone, onReviewAlerts }: {
               </button>
               <button
                 type="button"
-                onClick={() => (step === n - 1 ? finish() : setStep(step + 1))}
-                disabled={Boolean(typo)}
+                onClick={next}
+                disabled={status !== "ready"}
+                title={status === "ready" ? undefined : "Enter a valid value, or use Skip to leave this step out"}
                 className="min-h-11 rounded-md border border-mc-select bg-mc-select px-5 text-sm font-semibold text-mc-on-select disabled:opacity-50"
               >
                 {step === n - 1 ? "See results" : "Next →"}
