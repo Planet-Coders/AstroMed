@@ -1,0 +1,40 @@
+# Onboard co-pilot
+
+The browser runs Llama 3.2 1B through WebLLM. The app can try a smaller model if the primary model cannot load. Basic mode uses local rules and the same bundled research excerpts while the model loads or when WebGPU is unavailable.
+
+## Prompt
+
+The previous prompt opened with “You are the Flight Surgeon Co-Pilot on a Mars transit spacecraft.” It told the model to answer first, use only supplied data and protocols, trust the high/low labels, check allergies before medication, and respond in two to four short sentences in the user's language. It appended a mission brief, crew and habitat readings, logs, lab summaries, selected demo protocols, and OSDR baselines. Every request also included a scripted “Is Park okay?” exchange, up to two visible transcript messages, and the new question.
+
+The current static instructions live in [copilotPrompt.ts](../lib/copilotPrompt.ts). Each request adds the selected person's available readings, a personal baseline if present, relevant routine or health logs, applicable demo procedures, and up to two NASA excerpts. Direct follow-ups can include the previous model turn. **Personal data used** shows the readings and logs supplied for that answer, and **NASA references** links to the retrieved research.
+
+**New chat** clears the visible transcript and context for later turns. **Stop** interrupts an in-progress reply. Messages already queued or saved remain available to authorized mission oversight.
+
+## Knowledge base
+
+[copilotEvidence.ts](../lib/copilotEvidence.ts) contains the offline evidence cards. Add a verified NASA source ID, link, a short finding, a limitation, and phrases that should retrieve it. Cards match English words and phrases. Only the best matches enter the prompt.
+
+- Renal stone risk and hydration. [NASA NTRS 20240012429](https://ntrs.nasa.gov/citations/20240012429)
+- Sleep, circadian disruption, and crew performance. [NASA NTRS 20160003864](https://ntrs.nasa.gov/citations/20160003864)
+- Cardiac rhythm risk in flight. [NASA NTRS 20170005625](https://ntrs.nasa.gov/citations/20170005625)
+- Muscle and aerobic deconditioning. [NASA NTRS 20220019338](https://ntrs.nasa.gov/citations/20220019338)
+- Solar particle events and radiation risk. [NASA NTRS 20160003870](https://ntrs.nasa.gov/citations/20160003870)
+- Inspiration4 metabolic and cytokine measurements. [NASA OSDR OSD-575](https://osdr.nasa.gov/bio/repo/data/studies/OSD-575)
+- Behavioral health risks in exploration missions. [NASA NTRS 20250001454](https://ntrs.nasa.gov/citations/20250001454)
+
+NASA research provides background. Demo procedures, current crew readings, cohort measurements, and animal research each have different uses. Review [copilotGuidance.ts](../lib/copilotGuidance.ts) for examples of symptom and medication questions handled by built-in guidance before the model runs.
+
+## Benchmark
+
+Start the app locally against a demo database with its seed accounts. Then run:
+
+```sh
+npm run benchmark:copilot
+node --import tsx scripts/copilot-benchmark.ts --basic
+```
+
+Set `BASE_URL` to the local app address if needed. `PW_CHANNEL` defaults to Edge. `COPILOT_TEST_EMAIL` and `COPILOT_TEST_PASSWORD` can override the seed credentials. The benchmark sends synthetic questions and uses a synthetic Daily Check. It intercepts that browser session's write requests for messages, reports, and biometrics.
+
+For local benchmarking with a slow network, `COPILOT_MODEL_ASSETS` can point to a directory of official Llama 3.2 1B q4f16 WebLLM model files. The benchmark labels this run as a local mirror because download timing differs from a cold browser load.
+
+The JSON includes readiness time, first-token and total generation times, token usage, model and reply mode, selected references, and simple rubric checks. The cases cover topic switching, a follow-up, a personalized reading, study limitations, urgent symptoms, medication, and missing data. Compare model results on the same device and browser version. This is a regression and latency benchmark. Clinical accuracy requires expert review and a larger test set.

@@ -2,12 +2,15 @@
 
 import { useSyncExternalStore } from "react";
 import type { MLCEngineInterface } from "@mlc-ai/web-llm";
+import { COPILOT_SYSTEM_PROMPT } from "@/lib/copilotPrompt";
 
 /**
  * Model weights are cached by WebLLM in the browser Cache API, so only the very first
  * visit downloads them. Override with NEXT_PUBLIC_WEBLLM_MODEL to pin one model.
  */
 const PINNED_MODEL = process.env.NEXT_PUBLIC_WEBLLM_MODEL || null;
+const LOAD_STALL_MS = 120_000;
+const CONTEXT_WINDOW = 1536;
 
 /**
  * Models to try, best first. GPUs without the `shader-f16` feature (common on older
@@ -68,6 +71,13 @@ function subscribe(listener: () => void) {
 
 export function getEngine(): MLCEngineInterface | null {
   return engine;
+}
+
+/** A timed-out worker cannot safely serve another completion. */
+export function discardEngine(stalled: MLCEngineInterface, reason: string) {
+  if (engine !== stalled) return;
+  enterBasicMode(reason);
+  loading = null;
 }
 
 /** Short model name for UI chips, e.g. "LLAMA-3.2-1B-Q4". */
@@ -132,6 +142,7 @@ async function load(): Promise<MLCEngineInterface | null> {
   const models = candidateModels(probe.adapter.features.has("shader-f16"));
   for (const [i, model] of models.entries()) {
     const fallback = i > 0;
+    let stallTimer: ReturnType<typeof setTimeout> | undefined;
     try {
       const cached = await webllm.hasModelInCache(model).catch(() => false);
       setState({
@@ -143,20 +154,43 @@ async function load(): Promise<MLCEngineInterface | null> {
         }`,
       });
 
-      worker = new Worker(new URL("./worker.ts", import.meta.url), { type: "module" });
-      const e = await webllm.CreateWebWorkerMLCEngine(worker, model, {
+      const candidate = new Worker(new URL("./worker.ts", import.meta.url), { type: "module" });
+      worker = candidate;
+      let rejectLoad: (reason: Error) => void = () => {};
+      const loadFailed = new Promise<never>((_, reject) => { rejectLoad = reject; });
+      const restartTimer = () => {
+        clearTimeout(stallTimer);
+        stallTimer = setTimeout(() => rejectLoad(new Error("Model load stopped making progress")), LOAD_STALL_MS);
+      };
+      candidate.addEventListener("error", () => rejectLoad(new Error("WebLLM worker failed to load")), { once: true });
+      restartTimer();
+      let lastProgress = -1;
+      let lastReport = "";
+      const e = await Promise.race([webllm.CreateWebWorkerMLCEngine(candidate, model, {
         initProgressCallback: (report) => {
+          if (worker !== candidate) return;
+          if (report.progress !== lastProgress || report.text !== lastReport) {
+            restartTimer();
+            lastProgress = report.progress;
+            lastReport = report.text;
+          }
           setState({ progress: report.progress, text: report.text });
         },
-      });
+      }, PINNED_MODEL ? undefined : { context_window_size: CONTEXT_WINDOW }), loadFailed]);
 
-      // Compile the decode kernels now so the crew's first real question is not the slow one.
+      // Preflight a realistic prompt so a device that cannot sustain prefill can try a smaller model.
       setState({ progress: 1, text: "Warming up GPU kernels…" });
-      await e.chat.completions.create({
-        messages: [{ role: "user", content: "ok" }],
-        max_tokens: 1,
-      });
-      await e.resetChat();
+      restartTimer();
+      await Promise.race([
+        e.chat.completions.create({
+          messages: [
+            { role: "system", content: COPILOT_SYSTEM_PROMPT + "\n\nExample preflight. No crew readings or research are available." },
+            { role: "user", content: "Say that data is unavailable." },
+          ],
+          max_tokens: 4,
+        }).then(() => e.resetChat()),
+        loadFailed,
+      ]);
 
       engine = e;
       setState({ status: "ready", text: "On-device inference active" });
@@ -165,9 +199,11 @@ async function load(): Promise<MLCEngineInterface | null> {
       console.warn(`WebLLM: ${model} failed to load`, err);
       worker?.terminate();
       worker = null;
+    } finally {
+      clearTimeout(stallTimer);
     }
   }
-  return enterBasicMode("This computer's GPU couldn't run the on-device model (not enough GPU memory or an unsupported driver).");
+  return enterBasicMode("The on-device model could not load. Check the model download connection or WebGPU support, then retry.");
 }
 
 /** Start (or join) the model load. Safe to call from any page, any number of times. */

@@ -51,7 +51,7 @@ export function OfflineAICopilot({
     modelCached,
     modelId,
     basicReason,
-    inferMs,
+    replyMetrics,
     retryEngine,
     risk,
     setChatOpen,
@@ -61,12 +61,12 @@ export function OfflineAICopilot({
     setSession({ userId, userName, patientName, crew, displayVitals });
   }, [userId, userName, patientName, crew, displayVitals, setSession]);
 
-  // Real blood labs (NASA OSDR) for the crew member on screen.
+  // The console pairs crew profiles with de-identified Inspiration4 samples for the demo.
   const patientLabs = labsFor(patientCallsign ?? crew?.find((c) => c.name === (patientName ?? userName))?.callsign);
-  const stressFromHrv = displayVitals?.hrv ?? 62;
-  let stressIndex = Math.max(0, Math.min(100, Math.round(100 - stressFromHrv)));
-  if (voiceStress) stressIndex = Math.min(100, stressIndex + 25);
-  const stressLabel = stressIndex < 40 ? "low" : stressIndex < 70 ? "moderate" : "elevated";
+  const stressIndex = displayVitals
+    ? Math.max(0, Math.min(100, Math.round(100 - displayVitals.hrv + (voiceStress ? 25 : 0))))
+    : null;
+  const stressLabel = stressIndex == null ? "" : stressIndex < 40 ? "low" : stressIndex < 70 ? "moderate" : "elevated";
 
   const applyVoiceTranscript = useCallback(
     (text: string) => {
@@ -75,39 +75,34 @@ export function OfflineAICopilot({
     [userName, setVoiceTranscript]
   );
   const voice = useVoiceCheckIn(applyVoiceTranscript);
-  // Vitals and blood labs together: the assessment shows whichever is worse.
-  const labLevel = patientLabs?.level ?? "GREEN";
-  const order = ["GREEN", "YELLOW", "RED"] as const;
-  const overall = order[Math.max(order.indexOf(risk), order.indexOf(labLevel))];
-  const labsDriven = overall !== risk;
-  const tone = RISK_TONE[overall];
+  const tone = risk ? RISK_TONE[risk] : { text: "text-mc-muted", bg: "bg-mc-panel border-mc-line" };
 
   return (
     <aside aria-label="AI co-pilot" className="flex flex-col gap-4 self-start lg:sticky lg:top-6">
       {/* 1. The answer first: is the crew OK? */}
       <section className={`rounded-lg border p-5 ${tone.bg}`}>
         <p className="mc-label">Medical assessment</p>
-        <p className={`mt-1 text-2xl font-semibold ${tone.text}`}>{riskLabel(overall)}</p>
+        <p className={`mt-1 text-2xl font-semibold ${tone.text}`}>{risk ? riskLabel(risk) : "No assessment"}</p>
         <p className="mt-2 text-sm leading-relaxed text-mc-soft">
           {displayVitals?.arrhythmia
             ? "Irregular heart rhythm on the ECG. Stop activity, record a 12-lead ECG and contact the CMO now."
-            : labsDriven
-            ? "Vitals are normal, but the latest blood labs need attention. See the lab flags below."
+            : risk == null
+            ? "No current vitals available for this crew member."
             : risk === "GREEN"
-            ? "No acute findings. Crew within their own baselines."
+            ? "Available vitals are within the console’s demo limits."
             : risk === "YELLOW"
               ? "Some readings are outside baseline. Review vitals and cabin air."
               : "A crew member needs attention now. Ask the co-pilot for steps."}
         </p>
-        <p className="mt-3 font-mono text-xs text-mc-label">
-          Stress {stressIndex}/100 · {stressLabel}
-        </p>
-        <p className="mt-1 font-mono text-[11px] text-mc-label">
-          Based on: live vitals ({riskLabel(risk)}){patientLabs ? ` + latest blood labs (${riskLabel(labLevel)})` : ""}. The header pill shows vitals only.
-        </p>
+        {stressIndex != null && (
+          <p className="mt-3 font-mono text-xs text-mc-label">
+            Estimated stress {stressIndex}/100 · {stressLabel}
+          </p>
+        )}
+        {risk && <p className="mt-1 font-mono text-[11px] text-mc-label">Based on displayed vitals.</p>}
         {patientLabs && patientLabs.flagged.length > 0 && (
           <p className="mt-2 text-xs leading-relaxed text-mc-amber">
-            Lab flags ({patientName ?? userName}):{" "}
+            Demo lab flags (Inspiration4 research sample):{" "}
             {patientLabs.flagged.map((r) => `${r.label} ${formatLab(r)} ${r.note}`).join(" · ")}
           </p>
         )}
@@ -147,7 +142,8 @@ export function OfflineAICopilot({
         )}
         {engineStatus === "ready" && (
           <p className="text-xs text-mc-label">
-            {modelLabel(modelId)} on this device{inferMs != null && ` · last answer ${inferMs} ms`}
+            {modelLabel(modelId)} on this device
+            {replyMetrics?.firstTokenMs != null && ` · first token ${replyMetrics.firstTokenMs} ms · reply ${replyMetrics.totalMs} ms`}
           </p>
         )}
 

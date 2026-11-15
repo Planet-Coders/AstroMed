@@ -77,6 +77,8 @@ Results turn green, amber or red as they're typed, with follow-up guidance. Open
 
 ### AI co-pilot
 
+See [the co-pilot guide](docs/COPILOT.md) for prompt instructions, NASA sources, and how to run the benchmark.
+
 - Runs **Llama 3.2 1B** fully in the browser with [WebLLM](https://github.com/mlc-ai/web-llm), so answers don't depend on the link to Earth.
 - Every question and reply is saved for mission oversight (queued offline, sent when the link is back). The chat panel tells the crew so.
 - It gets the crew's vitals, baselines, protocols, medicine kit, today's self-check and habitat data.

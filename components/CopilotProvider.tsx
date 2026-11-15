@@ -5,19 +5,23 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
-import { assessRisk, describeVitals, riskLabel, type RiskLevel } from "@/lib/risk";
+import { assessRisk, riskLabel, type RiskLevel } from "@/lib/risk";
 import { generateCopilotFallback } from "@/lib/copilotFallback";
-import { describeCheck, getLatestCheck } from "@/lib/selfCheck";
+import { describeCheck, getLatestCheck, type StepId } from "@/lib/selfCheck";
 import { describeSpaceWeather, useSpaceWeather } from "@/lib/useSpaceWeather";
-import { describeLabs, labsFor } from "@/lib/labs";
 import { evaRecommendation, findProtocols, protocolsForReadings } from "@/lib/copilotKnowledge";
-import { hasBiomarkers, osdrBaselineBlock } from "@/lib/osdr";
+import { findEvidence, type EvidenceCard } from "@/lib/copilotEvidence";
+import { copilotMessages, repeatsPreviousReply, retrievalQuestion, MAX_COPILOT_INPUT, type CopilotTurn } from "@/lib/copilotPrompt";
+import { emergencyGuidance, medicationGuidance } from "@/lib/copilotGuidance";
+import { describePersonalBaseline, describeSubjectVitals, selectSubject, type CopilotSession } from "@/lib/copilotSubject";
+import { osdrFallbackCitation, studyPageUrl } from "@/lib/osdr";
 import { useNasaStudies } from "@/lib/useNasaStudies";
 import { useMissionTelemetry } from "@/components/MissionTelemetryProvider";
-import { describeProfile } from "@/lib/crewProfiles";
+import { CREW_PROFILES } from "@/lib/crewProfiles";
 import { INJURY_TYPES, getInjuries } from "@/lib/injuries";
 import { getCycleLog, summarize } from "@/lib/periods";
 import { getLatestForUser } from "@/lib/db";
@@ -26,34 +30,14 @@ import { queueChat } from "@/lib/outbox";
 import type { CopilotChatMessage } from "@/components/CopilotChat";
 import {
   getEngine,
+  discardEngine,
   preloadEngine,
   useWebLLM,
   type EngineStatus,
 } from "@/lib/webllm/engine";
+import { streamReply, type ReplyMetrics } from "@/lib/webllm/reply";
 
-/** One crew member's latest reading and personal baseline, as the co-pilot sees them. */
-export type CrewBrief = {
-  name: string;
-  callsign: string;
-  risk: RiskLevel;
-  vitals: { heartRate: number; hrv: number; spo2: number; radiation: number } | null;
-  usualHr: number | null;
-  usualHrv: number | null;
-};
-
-export type CopilotSession = {
-  userId: string;
-  userName: string;
-  patientName?: string;
-  crew?: CrewBrief[];
-  displayVitals?: {
-    heartRate: number;
-    hrv: number;
-    spo2: number;
-    radiation: number;
-    arrhythmia?: boolean;
-  };
-};
+export type { CopilotSession, CrewBrief } from "@/lib/copilotSubject";
 
 type CopilotContextValue = {
   session: CopilotSession | null;
@@ -64,6 +48,8 @@ type CopilotContextValue = {
   input: string;
   setInput: (v: string) => void;
   sendMessage: () => Promise<void>;
+  clearChat: () => void;
+  stopReply: () => void;
   isSending: boolean;
   engineStatus: EngineStatus;
   loadProgress: string;
@@ -71,22 +57,27 @@ type CopilotContextValue = {
   modelCached: boolean | null;
   modelId: string | null;
   basicReason: string | null;
-  inferMs: number | null;
+  replyMetrics: ReplyMetrics | null;
   retryEngine: () => void;
   chatOpen: boolean;
   setChatOpen: (open: boolean) => void;
   toggleChat: () => void;
-  risk: RiskLevel;
+  risk: RiskLevel | null;
 };
 
 const CopilotContext = createContext<CopilotContextValue | null>(null);
 
-const MISSION_EPOCH = Date.UTC(2026, 0, 15);
+const GENERATION_TIMEOUT_MS = 75_000;
+type ActiveReply = { cancelled: boolean; interrupt?: () => void };
 
-function missionDay() {
-  return Math.floor((Date.now() - MISSION_EPOCH) / 86_400_000) + 1;
-}
-
+const DAILY_CHECK_TOPICS: { id: StepId; match: RegExp }[] = [
+  { id: "bp", match: /\b(?:blood pressure|systolic|diastolic|bp)\b/i },
+  { id: "glucose", match: /\b(?:glucose|blood sugar|fasting)\b/i },
+  { id: "temperature", match: /\b(?:temperature|fever)\b/i },
+  { id: "mood", match: /\b(?:mood|stress|anxious|anxiety)\b/i },
+  { id: "sleep", match: /\b(?:sleep|fatigue|tired|eva)\b/i },
+  { id: "hydration", match: /\b(?:hydration|dehydration|water|fluid|urine|kidney)\b/i },
+];
 
 export function CopilotProvider({ children }: { children: ReactNode }) {
   const [session, setSessionState] = useState<CopilotSession | null>(null);
@@ -98,9 +89,11 @@ export function CopilotProvider({ children }: { children: ReactNode }) {
   const nasaStudies = useNasaStudies();
   const telemetry = useMissionTelemetry();
   const engineStatus = llm.status;
-  const [inferMs, setInferMs] = useState<number | null>(null);
+  const [replyMetrics, setReplyMetrics] = useState<ReplyMetrics | null>(null);
   const [isSending, setIsSending] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
+  const history = useRef<CopilotTurn | undefined>(undefined);
+  const active = useRef<ActiveReply | null>(null);
 
   const setSession = useCallback((s: CopilotSession) => {
     setSessionState(s);
@@ -113,7 +106,7 @@ export function CopilotProvider({ children }: { children: ReactNode }) {
 
   const risk = session?.displayVitals
     ? assessRisk(session.displayVitals)
-    : "GREEN";
+    : null;
 
   // Load the model once the console has rendered and the browser is idle, so the
   // download and GPU init never compete with sign-in or the first dashboard fetch.
@@ -127,210 +120,217 @@ export function CopilotProvider({ children }: { children: ReactNode }) {
     return () => clearTimeout(id);
   }, []);
 
-  const buildContext = useCallback(async () => {
-    const userId = session?.userId ?? "";
-    const userName = session?.userName ?? "Crew";
-    const displayVitals = session?.displayVitals;
-    // Prefer what is on screen: the local queue holds the signed-in user's own readings,
-    // which are stale or unrelated when viewing another crew member.
-    const latest = !displayVitals && userId ? await getLatestForUser(userId) : undefined;
-    const shown = displayVitals ?? latest;
-    const vitalsCtx = shown ? describeVitals(shown) : "no vitals available";
+  const stopReply = useCallback(() => {
+    if (active.current) {
+      active.current.cancelled = true;
+      active.current.interrupt?.();
+    }
+    setMessages((m) => m.filter((message) => !message.streaming));
+  }, []);
 
-    return {
-      userName,
-      vitalsSummary: vitalsCtx,
-      risk,
-      pvtSummary: getPvtSummary(),
-      webLlmReady: engineStatus === "ready",
-      osdrStudies: nasaStudies.data?.studies ?? [],
-    };
-  }, [session, risk, engineStatus, nasaStudies.data]);
+  const clearChat = useCallback(() => {
+    stopReply();
+    history.current = undefined;
+    setMessages([]);
+    setInput("");
+    setReplyMetrics(null);
+  }, [stopReply]);
+
+  useEffect(() => () => {
+    if (active.current) {
+      active.current.cancelled = true;
+      active.current.interrupt?.();
+    }
+  }, []);
 
   const sendMessage = useCallback(async () => {
-    if (!input.trim() || isSending) return;
-    const userMsg = input.trim();
+    const question = input.trim().slice(0, MAX_COPILOT_INPUT);
+    if (!question || !session || active.current) return;
+
+    const run: ActiveReply = { cancelled: false };
+    active.current = run;
     setInput("");
-    setMessages((m) => [...m, { role: "user", content: userMsg }]);
+    setReplyMetrics(null);
     setIsSending(true);
-    // Every exchange is saved for mission oversight (queued offline, sent when online).
-    // Queue the question now so it isn't lost if the tab closes while the model warms up.
-    void queueChat({ role: "user", content: userMsg, mode: engineStatus === "basic" ? "basic" : "webllm" });
+    setMessages((m) => [...m, { role: "user", content: question }]);
+
+    const previous = history.current;
+    const retrieved = retrievalQuestion(question, previous);
+    const subject = selectSubject(question, session, retrieved !== question ? previous?.subject : undefined);
+    const followUp = retrieved !== question && subject?.name === previous?.subject ? previous : undefined;
+    const topic = followUp ? retrieved : question;
+    const guidance = emergencyGuidance(topic) ?? medicationGuidance(topic);
+    const engine = guidance || !subject ? null : getEngine();
+    void queueChat({ role: "user", content: question, mode: engine ? "webllm" : "basic" });
+
+    let mode: CopilotTurn["mode"] = "basic";
+    let sources: EvidenceCard[] = [];
+    const personalContext: { label: string; value: string }[] = [];
+    let reply = "";
+    let metrics: ReplyMetrics | undefined;
+    const started = performance.now();
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const showPartial = (content: string) => {
+      if (run.cancelled) return;
+      setMessages((m) => [
+        ...m.filter((message) => !message.streaming),
+        { role: "assistant", content, streaming: true },
+      ]);
+    };
 
     try {
-      const ctx = await buildContext();
-      let assistantContent: string;
-      const userName = session?.userName ?? "Crew";
-
-      // While the model is still warming up, wait for it rather than replying with a canned
-      // rule-based answer that ignores the question.
-      if (engineStatus === "loading" || engineStatus === "idle") {
-        setMessages((m) => [
-          ...m,
-          { role: "assistant", content: "Warming up the on-device AI, your answer will appear here shortly…", streaming: true },
-        ]);
-        await preloadEngine();
-      }
-
-      let replyMode: "webllm" | "basic" = getEngine() ? "webllm" : "basic";
-
-      if (!getEngine()) {
-        assistantContent = generateCopilotFallback(userMsg, ctx);
+      if (guidance) {
+        reply = guidance;
+        mode = "guidance";
+      } else if (!subject) {
+        reply = "Which crew member should I use for this question? Include one name or callsign.";
+        mode = "guidance";
       } else {
-        // A 1B model follows short, explicit rules and labelled data far better than one
-        // dense sentence, and it invents facts unless told to stick to the data given.
-        // Send detail only about the people the question is about: the whole crew's data,
-        // profiles and protocols made prefill take minutes on a laptop GPU and confused
-        // the model about who was who.
-        const patient = session?.patientName ?? userName;
-        const crew = session?.crew ?? [];
-        const q = userMsg.toLowerCase();
-        const named = crew.filter((m) => q.includes(m.name.toLowerCase()));
-        const focus = named.length ? named : crew.filter((m) => m.name === patient);
-        const flagged = crew.filter((m) => m.risk !== "GREEN").sort((a, b) => (a.risk === "RED" ? -1 : b.risk === "RED" ? 1 : 0));
-        const detailed = [...focus, ...flagged.filter((m) => !focus.includes(m))].slice(0, 3);
-        const others = crew.filter((m) => !detailed.includes(m));
+        const { own, member, name } = subject;
+        const local = !subject.vitals && own
+          ? await getLatestForUser(session.userId).catch(() => undefined)
+          : undefined;
+        if (run.cancelled) return;
+        const vitals = subject.vitals ?? local;
+        const reading = describeSubjectVitals(vitals);
+        if (vitals) personalContext.push({ label: "Available vitals", value: reading.summary });
+        const usual = describePersonalBaseline(member, vitals);
+        if (usual) personalContext.push({ label: "Personal baseline", value: usual });
 
-        const vitalsOf = (m: CrewBrief) =>
-          m.name === patient && session?.displayVitals ? session.displayVitals : m.vitals;
-        const memberLine = (m: CrewBrief) => {
-          const v = vitalsOf(m);
-          if (!v) return `${m.name} (${m.callsign}): no readings yet.`;
-          const usual = m.usualHr != null ? `; usual HR ${m.usualHr}, usual HRV ${m.usualHrv}` : "";
-          const eva = evaRecommendation({ ...v, sleepHours: telemetry.sleepHours, arrhythmia: m.name === patient && telemetry.arrhythmia });
-          return `${m.name} (${m.callsign}): ${describeVitals(v)}${usual}. Status ${riskLabel(m.risk)}. EVA: ${eva}.`;
-        };
-
-        const focusVitals = focus[0] ? vitalsOf(focus[0]) : undefined;
-        // Open injuries reported on the body map, for the people the question is about.
-        const injuryLines = focus.slice(0, 2).flatMap((m) =>
-          getInjuries(m.name)
-            .filter((i) => !i.healed)
-            .map((i) => {
-              const last = i.updates[i.updates.length - 1];
-              return `${m.name} injury: ${INJURY_TYPES[i.type].label.toLowerCase()} on ${i.area.toLowerCase()}, pain ${last?.pain ?? "?"}/10${last?.note ? ` (${last.note})` : ""}.`;
-            })
-        );
-        // Logged period days (female figure only logs these), so period questions get real context.
-        const cycleLines = focus.slice(0, 2).flatMap((m) => {
-          const log = getCycleLog(m.name);
-          if (!log.days.length && !log.suppressed) return [];
-          const c = summarize(log);
-          const last = [...log.days].sort((x, y) => y.date.localeCompare(x.date))[0];
-          return [
-            `${m.name} cycle: ${log.suppressed ? "on hormone suppression" : "not suppressed"}${c.cycleDay ? `, cycle day ${c.cycleDay}` : ""}${
-              last ? `, last logged ${last.date}: ${last.flow} flow, pain ${last.pain}/10${last.symptoms.length ? `, ${last.symptoms.join(", ").toLowerCase()}` : ""}` : ""
-            }${c.alerts.length ? `. Alerts: ${c.alerts.map((x) => x.text.split(".")[0]).join("; ")}` : ""}.`,
-          ];
-        });
-        const injuryCards = focus
-          .slice(0, 1)
-          .flatMap((m) => getInjuries(m.name).filter((i) => !i.healed).map((i) => `injury-${i.type}`));
-        const protocols = findProtocols(
-          userMsg,
-          [...injuryCards, ...protocolsForReadings({ ...focusVitals, ppCO2: telemetry.ppCO2, arrhythmia: telemetry.arrhythmia })],
-          2
-        );
-        const habitatFlags = [
-          telemetry.ppCO2 > 4 ? `cabin CO2 HIGH (${telemetry.ppCO2.toFixed(1)} mmHg)` : "",
-          telemetry.radiation >= 0.1 ? `cabin radiation HIGH (${telemetry.radiation.toFixed(3)} mSv/h)` : "",
-          telemetry.voiceStress ? "voice stress detected" : "",
-          telemetry.arrhythmia ? `${patient}'s ECG shows an irregular rhythm` : "",
-        ].filter(Boolean);
-
-        const system = [
-          "You are the Flight Surgeon Co-Pilot on a Mars transit spacecraft.",
-          "Rules: answer the question first. Use only the data and protocols below; never invent diagnoses or numbers. Values are already marked (normal)/(HIGH)/(LOW); trust the marks. Check allergies before any medicine. Reply in 2-4 short plain sentences, in the user's language.",
-          `Mission day ${missionDay()}; Earth is 20 min away one way. CMO: Silva. CDR: Vance.`,
-          flagged.length
-            ? `Needs attention, worst first: ${flagged.map((m) => `${m.name} (${riskLabel(m.risk)})`).join(", ")}.`
-            : "Needs attention: nobody.",
-          "CREW:",
-          ...detailed.map(memberLine),
-          others.length ? `All others NOMINAL: ${others.map((m) => m.name).join(", ")}.` : "",
-          ...focus.slice(0, 2).map((m) => describeProfile(m.name)).filter((p): p is string => p !== null),
-          ...injuryLines,
-          ...cycleLines,
-          habitatFlags.length ? `Habitat: ${habitatFlags.join("; ")}.` : "Habitat: cabin air and radiation normal.",
-          `Sleep last night ${telemetry.sleepHours.toFixed(1)} h (target ${telemetry.sleepTarget}). Exercise today ${telemetry.exerciseMinutes}/${telemetry.exerciseTarget} min. ${ctx.pvtSummary}.`,
-          describeCheck(getLatestCheck(session?.userId ?? "")),
-          describeSpaceWeather(spaceWeather),
-          ...detailed.slice(0, 2).map((m) => describeLabs(m.name, labsFor(m.callsign))),
-          "PROTOCOLS:",
-          ...protocols.map((p) => `${p.title}: ${p.text}`),
-          hasBiomarkers(nasaStudies.data?.studies ?? []) ? osdrBaselineBlock(nasaStudies.data?.studies ?? []) : "",
-        ]
-          .filter(Boolean)
-          .join("\n");
-
-        const t0 = performance.now();
-        // Stream tokens into the chat so the crew sees the answer forming instead of
-        // waiting for the whole reply (decode can be a few tokens/s on laptop GPUs).
-        const showPartial = (content: string) =>
-          setMessages((m) => {
-            const last = m[m.length - 1];
-            return last?.role === "assistant" && last.streaming
-              ? [...m.slice(0, -1), { role: "assistant", content, streaming: true }]
-              : [...m, { role: "assistant", content, streaming: true }];
-          });
-        try {
-          const stream = await getEngine()!.chat.completions.create({
-            messages: [
-              { role: "system", content: system },
-              // One worked example shows the 1B model the expected length and grounding.
-              { role: "user", content: "Is Park okay?" },
-              {
-                role: "assistant",
-                content:
-                  "Yes. Park's heart rate, SpO2 and HRV are all normal and the status is NOMINAL. No action needed; keep routine monitoring.",
-              },
-              // Recent turns only: canned basic-mode replies and long history drown out the new question.
-              ...messages
-                .filter((msg) => !msg.content.startsWith("[Basic mode"))
-                .slice(-2)
-                .map((msg) => ({ role: msg.role, content: msg.content })),
-              { role: "user", content: userMsg },
-            ],
-            temperature: 0.2,
-            max_tokens: 320,
-            stream: true,
-          });
-          let text = "";
-          for await (const chunk of stream) {
-            text += chunk.choices[0]?.delta?.content ?? "";
-            if (text) showPartial(text);
+        const check = own ? getLatestCheck(session.userId) : null;
+        const fullCheck = /\b(?:daily (?:self-)?check|last check)\b/i.test(topic);
+        const items = check?.items.filter((item) => fullCheck || DAILY_CHECK_TOPICS.some(({ id, match }) => id === item.id && match.test(topic)));
+        const dailyCheck = check && items?.length ? describeCheck({ ...check, items }) : undefined;
+        if (own) {
+          if (dailyCheck) personalContext.push({ label: "Last Daily Check", value: dailyCheck });
+          if (/\b(?:sleep|tired|fatigue|exercise|workout|eva)\b/i.test(topic)) {
+            personalContext.push({
+              label: "Routine log",
+              value: "Sleep " + telemetry.sleepHours.toFixed(1) + " h. Exercise " + telemetry.exerciseMinutes + "/" + telemetry.exerciseTarget + " min.",
+            });
           }
-          setInferMs(Math.round(performance.now() - t0));
-          // Small models sometimes wrap the whole reply in quotes or add markdown bold,
-          // which the chat shows as raw characters.
-          const cleaned = text.trim().replace(/^"([\s\S]*)"$/, "$1").replace(/\*\*/g, "");
-          assistantContent = cleaned || generateCopilotFallback(userMsg, ctx);
-          if (!cleaned) replyMode = "basic";
-        } catch {
-          assistantContent = generateCopilotFallback(userMsg, ctx);
-          replyMode = "basic";
+          if (/\b(?:pvt|vigilance|reaction time)\b/i.test(topic)) {
+            personalContext.push({ label: "Cognitive test", value: getPvtSummary() });
+          }
+        }
+        const profile = CREW_PROFILES[name];
+        if (profile && /\b(?:allerg(?:y|ies|ic)|medic|role|cmo)\b/i.test(topic)) {
+          personalContext.push({ label: "Demo crew profile", value: profile.role + ". Recorded allergies: " + profile.allergies + "." });
+        }
+        if (/\b(?:injur|pain|burn|cut|bruise|sprain|swelling)\w*\b/i.test(topic)) {
+          const injuries = getInjuries(name).filter((injury) => !injury.healed).slice(0, 2);
+          for (const injury of injuries) {
+            const last = injury.updates.at(-1);
+            personalContext.push({
+              label: "Injury log",
+              value: INJURY_TYPES[injury.type].label + " on " + injury.area + ", recorded pain " + (last?.pain ?? "?") + "/10.",
+            });
+          }
+        }
+        if (/\b(?:period|menstrual|menstruation|cycle|cramp|spotting)\b/i.test(topic)) {
+          const log = getCycleLog(name);
+          if (log.days.length || log.suppressed) {
+            const info = summarize(log);
+            personalContext.push({ label: "Cycle log", value: info.cycleDay ? "Cycle day " + info.cycleDay : "A cycle log is available." });
+          }
+        }
+
+        sources = findEvidence(topic);
+        const osdrStudies = nasaStudies.data?.studies ?? [];
+        const researchQuestion = /\b(?:study|studies|research|data set|dataset|osdr|mouse|mice|animal|cytokine|biomarker)\b/i.test(topic);
+        if (researchQuestion) {
+          const analog = osdrFallbackCitation(topic, osdrStudies);
+          const id = analog?.match(/^OSD-\d+/)?.[0];
+          if (analog && id) sources = [...sources.slice(0, 1), {
+            id, title: "NASA OSDR research analog", url: studyPageUrl(id), keywords: [],
+            finding: analog, limit: "Use as research context only.",
+          }];
+        }
+        const fallBack = () => generateCopilotFallback(topic, {
+          userName: name, vitalsSummary: [reading.summary, usual].filter(Boolean).join(". "), risk: reading.risk,
+          dailyCheck,
+          osdrStudies: researchQuestion ? osdrStudies : [],
+        }, sources);
+
+        if (engine) {
+          const arrhythmia = subject.vitals?.arrhythmia ?? (own && telemetry.arrhythmia);
+          const protocols = findProtocols(topic, protocolsForReadings({
+            ...vitals, ppCO2: telemetry.ppCO2, arrhythmia,
+          }), 2);
+          const context = [
+            "Subject: " + name,
+            reading.risk ? "Console flag: " + riskLabel(reading.risk) : "Vitals unavailable for this subject.",
+            ...personalContext.map(({ label, value }) => label + ": " + value),
+            /\b(?:cabin|co2|headache|air quality)\b/i.test(topic) ? "Cabin CO2 " + telemetry.ppCO2.toFixed(1) + " mmHg." : "",
+            /\b(?:solar|radiation|dosimeter|shelter)\b/i.test(topic) ? describeSpaceWeather(spaceWeather) : "",
+            /\b(?:eva|spacewalk)\b/i.test(topic) ? evaRecommendation({ ...vitals, sleepHours: own ? telemetry.sleepHours : undefined, arrhythmia }) : "",
+            "Demo procedures:",
+            ...protocols.map((p) => p.title + ": " + p.text),
+          ].filter(Boolean).join("\n");
+          run.interrupt = () => engine.interruptGenerate();
+          try {
+            const result = await Promise.race([
+              streamReply(engine, copilotMessages(question, context, sources, followUp), showPartial, () => run.cancelled),
+              new Promise<never>((_, reject) => {
+                timer = setTimeout(() => {
+                  discardEngine(engine, "The on-device model timed out. You can retry it from the co-pilot panel.");
+                  reject(new Error("Generation timed out"));
+                }, GENERATION_TIMEOUT_MS);
+              }),
+            ]);
+            if (run.cancelled) return;
+            const includesDose = /\d(?:[\d.,]*\d)?\s*(?:mg|mcg|µg|milligrams?|micrograms?)\b(?!\s*\/\s*d[lL])/i.test(result.text);
+            if (result.text && !includesDose && !repeatsPreviousReply(question, result.text, previous)) {
+              reply = result.text;
+              metrics = result.metrics;
+              mode = "webllm";
+            }
+          } catch (err) {
+            if (!run.cancelled) {
+              console.warn("On-device co-pilot reply failed", err);
+              if (/device.*lost|already been disposed|model not loaded/i.test(String(err))) {
+                discardEngine(engine, "WebGPU stopped during inference. Basic mode is available. Retry to reload the on-device model.");
+              }
+            }
+          }
+        }
+        if (!reply) {
+          reply = fallBack();
+          const source = sources[0];
+          if (reply === followUp?.reply && source && /\b(?:short|one sentence|brief|summari[sz]e)\b/i.test(question)) {
+            reply = `${source.finding} [${source.id}]`;
+          }
         }
       }
-      void queueChat({ role: "assistant", content: assistantContent, mode: replyMode });
-
+      if (run.cancelled) return;
+      history.current = { question, reply, mode, subject: subject?.name ?? "", topic: followUp?.topic ?? question };
+      const storedMode = mode === "webllm" ? "webllm" : "basic";
+      void queueChat({ role: "assistant", content: reply, mode: storedMode });
+      const timing = metrics ?? { totalMs: Math.round(performance.now() - started), firstTokenMs: null, promptTokens: null, completionTokens: null };
+      setReplyMetrics(timing);
       setMessages((m) => [
-        ...m.filter((msg) => !msg.streaming),
-        { role: "assistant", content: assistantContent },
+        ...m.filter((message) => !message.streaming),
+        {
+          role: "assistant", content: reply, mode,
+          subject: guidance ? undefined : subject?.name,
+          personalContext, sources: sources.map(({ id, title, url }) => ({ id, title, url })),
+          timing, model: mode === "webllm" ? llm.model : null,
+        },
       ]);
+    } catch (err) {
+      console.warn("Co-pilot could not prepare the reply", err);
+      if (!run.cancelled) {
+        setMessages((m) => [
+          ...m.filter((message) => !message.streaming),
+          { role: "assistant", mode: "basic", content: "I couldn’t load the onboard data for this reply. Try again." },
+        ]);
+      }
     } finally {
+      clearTimeout(timer);
+      active.current = null;
       setIsSending(false);
     }
-  }, [
-    input,
-    isSending,
-    buildContext,
-    spaceWeather,
-    engineStatus,
-    messages,
-    session,
-    telemetry,
-    nasaStudies.data,
-  ]);
+  }, [input, llm.model, nasaStudies.data, session, spaceWeather, telemetry]);
 
   const toggleChat = useCallback(() => setChatOpen((o) => !o), []);
 
@@ -343,6 +343,8 @@ export function CopilotProvider({ children }: { children: ReactNode }) {
     input,
     setInput,
     sendMessage,
+    clearChat,
+    stopReply,
     isSending,
     engineStatus,
     loadProgress: llm.text,
@@ -350,7 +352,7 @@ export function CopilotProvider({ children }: { children: ReactNode }) {
     modelCached: llm.cached,
     modelId: llm.model,
     basicReason: llm.reason,
-    inferMs,
+    replyMetrics,
     retryEngine: () => void preloadEngine(true),
     chatOpen,
     setChatOpen,
