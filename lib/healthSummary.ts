@@ -1,7 +1,7 @@
 import { worstRisk, type RiskLevel } from "@/lib/risk";
 import { INJURY_TYPES, injuryLevel, type Injury } from "@/lib/injuries";
 import { summarize, type CycleLog } from "@/lib/periods";
-import type { DayLog } from "@/lib/routineLog";
+import type { RoutineReport } from "@/lib/routineLog";
 import type { StoredCheck } from "@/lib/selfCheck";
 
 /**
@@ -22,7 +22,7 @@ export type Alert = { level: Exclude<RiskLevel, "GREEN">; source: string; text: 
 
 export type HealthSummary = {
   selfCheck: (StoredCheck & { level: RiskLevel }) | null;
-  routine: { date: string; sleepHours: number; exerciseMinutes: number; recordedAt: string } | null;
+  routine: { date: string; sleepHours: number | null; exerciseMinutes: number | null; recordedAt: string } | null;
   injuries: { open: Injury[]; all: Injury[]; level: RiskLevel } | null;
   periods: { log: CycleLog; summary: ReturnType<typeof summarize> } | null;
   alerts: Alert[];
@@ -40,8 +40,9 @@ function latest(reports: HealthReportRow[], kind: HealthReportRow["kind"]) {
     .sort((a, b) => time(b) - time(a))[0];
 }
 
-function sleepHoursOf(day: DayLog & { sleepHours?: number }) {
+function sleepHoursOf(day: RoutineReport) {
   if (typeof day.sleepHours === "number") return day.sleepHours;
+  if (!day.sleep) return null;
   const [bh, bm] = day.sleep.bed.split(":").map(Number);
   const [wh, wm] = day.sleep.wake.split(":").map(Number);
   let mins = wh * 60 + wm - (bh * 60 + bm);
@@ -76,11 +77,11 @@ export function summarizeHealth(reports: HealthReportRow[], vitalsRisk: RiskLeve
   const routineRow = latest(reports, "ROUTINE");
   let routine: HealthSummary["routine"] = null;
   if (routineRow) {
-    const day = routineRow.data as DayLog & { sleepHours?: number };
+    const day = routineRow.data as RoutineReport;
     const sleepHours = sleepHoursOf(day);
-    const exerciseMinutes = (day.exercise ?? []).reduce((sum, s) => sum + s.minutes, 0);
+    const exerciseMinutes = day.exercise?.reduce((sum, s) => sum + s.minutes, 0) ?? null;
     routine = { date: routineRow.key, sleepHours, exerciseMinutes, recordedAt: routineRow.recordedAt };
-    if (sleepHours < 6) {
+    if (sleepHours != null && sleepHours < 6) {
       alerts.push({ level: sleepHours < 5 ? "RED" : "YELLOW", source: "Sleep", text: `${sleepHours.toFixed(1)} h on ${routineRow.key} (target 8.5 h)` });
     }
   }

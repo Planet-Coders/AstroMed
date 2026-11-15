@@ -9,6 +9,7 @@ import { useSync } from "./SyncContext";
 import { useCopilot, type CrewBrief } from "./CopilotProvider";
 import { modelLabel } from "@/lib/webllm/engine";
 import { formatLab, labsFor } from "@/lib/labs";
+import type { CopilotVitals } from "@/lib/copilotSubject";
 
 type OfflineAICopilotProps = {
   userId: string;
@@ -18,13 +19,8 @@ type OfflineAICopilotProps = {
   /** The crew member whose vitals are on screen (may differ from the signed-in user). */
   patientName?: string;
   crew?: CrewBrief[];
-  displayVitals?: {
-    heartRate: number;
-    hrv: number;
-    spo2: number;
-    radiation: number;
-    arrhythmia?: boolean;
-  };
+  displayVitals?: CopilotVitals;
+  simulatedArrhythmia?: boolean;
 };
 
 const RISK_TONE = {
@@ -40,6 +36,7 @@ export function OfflineAICopilot({
   patientCallsign,
   crew,
   displayVitals,
+  simulatedArrhythmia,
 }: OfflineAICopilotProps) {
   const { voiceStress, scenario } = useMissionTelemetry();
   const { unsyncedCount, syncNow, isSyncing, isOnline, lastSyncAt } = useSync();
@@ -59,12 +56,12 @@ export function OfflineAICopilot({
   } = useCopilot();
 
   useEffect(() => {
-    setSession({ userId, userName, patientName, crew, displayVitals });
-  }, [userId, userName, patientName, crew, displayVitals, setSession]);
+    setSession({ userId, userName, patientName, crew, displayVitals, simulatedArrhythmia });
+  }, [userId, userName, patientName, crew, displayVitals, simulatedArrhythmia, setSession]);
 
   // The console pairs crew profiles with de-identified Inspiration4 samples for the demo.
   const patientLabs = labsFor(patientCallsign ?? crew?.find((c) => c.name === (patientName ?? userName))?.callsign);
-  const stressIndex = displayVitals
+  const stressIndex = displayVitals?.hrv != null
     ? Math.max(0, Math.min(100, Math.round(100 - displayVitals.hrv + (voiceStress ? 25 : 0))))
     : null;
   const stressLabel = stressIndex == null ? "" : stressIndex < 40 ? "low" : stressIndex < 70 ? "moderate" : "elevated";
@@ -87,10 +84,10 @@ export function OfflineAICopilot({
         <p className="mc-label">Medical assessment</p>
         <p className={`mt-1 text-2xl font-semibold ${tone.text}`}>{risk ? riskLabel(risk) : "No assessment"}</p>
         <p className="mt-2 text-sm leading-relaxed text-mc-soft">
-          {displayVitals?.arrhythmia
+          {simulatedArrhythmia || displayVitals?.arrhythmia
             ? "Irregular heart rhythm on the ECG. Stop activity, record a 12-lead ECG and contact the CMO now."
             : risk == null
-            ? "No current vitals available for this crew member."
+            ? "No synced vitals available for this crew member."
             : risk === "GREEN"
             ? "Available vitals are within the console’s demo limits."
             : risk === "YELLOW"
@@ -104,7 +101,7 @@ export function OfflineAICopilot({
         )}
         {risk && (
           <p className="mt-1 font-mono text-[11px] text-mc-label">
-            Based on {scenario.sensorDropout ? "last valid vitals (sensor offline)" : "displayed vitals"}.
+            Based on {simulatedArrhythmia ? "the simulated ECG" : scenario.sensorDropout ? "last synced vitals (sensor offline)" : "last synced vitals"}.
           </p>
         )}
         {patientLabs && patientLabs.flagged.length > 0 && (

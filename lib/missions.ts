@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useSyncExternalStore } from "react";
 import { useMissionTelemetry } from "@/components/MissionTelemetryProvider";
 import { checkDoneToday, getLatestCheck, isToday } from "@/lib/selfCheck";
+import { getPvtResult } from "@/lib/pvtLog";
 
 /**
  * Health missions: a short list of daily health tasks, with streaks and badges to make
@@ -26,7 +27,6 @@ export type Badge = { id: string; icon: string; name: string; how: string; earne
 
 const HISTORY_KEY = "aahms_missions_history";
 const BODYMAP_KEY = "aahms_bodymap_seen";
-const PVT_KEY = "aahms_pvt_summary";
 
 type History = Record<string, Record<string, TaskId[]>>; // userId -> day -> done tasks
 
@@ -62,7 +62,7 @@ export function useHealthMissions(userId: string) {
     noopSubscribe,
     () => {
       const check = getLatestCheck(userId);
-      const pvt = readJson<{ at?: number } | null>(PVT_KEY, null);
+      const pvt = getPvtResult(userId);
       const seen = readJson<Record<string, string>>(BODYMAP_KEY, {})[userId];
       const history = readJson<History>(HISTORY_KEY, {})[userId] ?? {};
       return JSON.stringify({

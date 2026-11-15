@@ -1,4 +1,4 @@
-import type { ChatCompletionMessageParam, MLCEngineInterface } from "@mlc-ai/web-llm";
+import type { ChatCompletionMessageParam, MLCEngineInterface, ResponseFormat } from "@mlc-ai/web-llm";
 
 export type ReplyMetrics = {
   totalMs: number;
@@ -15,6 +15,7 @@ export async function streamReply(
   messages: ChatCompletionMessageParam[],
   onText: (text: string) => void,
   isCancelled = () => false,
+  options: { maxTokens?: number; format?: ResponseFormat } = {},
 ) {
   const start = performance.now();
   await engine.resetChat();
@@ -22,7 +23,8 @@ export async function streamReply(
   const stream = await engine.chat.completions.create({
     messages,
     temperature: 0.2,
-    max_tokens: 144,
+    max_tokens: options.maxTokens ?? 144,
+    response_format: options.format,
     stream: true,
     stream_options: { include_usage: true },
   });
