@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { assessRisk, type RiskLevel } from "@/lib/risk";
+import { defaultSexFor } from "@/lib/crewProfiles";
 
 export async function GET() {
   const session = await getSession();
@@ -81,6 +82,7 @@ export async function GET() {
         email: string;
         callsign: string;
         crewId: string;
+        sex: "male" | "female";
       };
       latest: (typeof records)[0] | null;
       baseline: ReturnType<typeof baselines.get> | null;
@@ -107,6 +109,7 @@ export async function GET() {
         email: u.email,
         callsign: u.callsign,
         crewId: u.crewId,
+        sex: ((u as { sex?: string }).sex as "male" | "female") || defaultSexFor(u.name),
       },
       latest,
       baseline: baselines.get(u.id) ?? null,

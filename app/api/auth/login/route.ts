@@ -4,6 +4,7 @@ import { createHash } from "crypto";
 import { prisma } from "@/lib/prisma";
 import { COOKIE_NAME, createSessionToken, homeFor, type SessionUser } from "@/lib/auth";
 import { PRIVILEGED_ROLES } from "@/lib/authz";
+import { defaultSexFor } from "@/lib/crewProfiles";
 
 const DEMO_EMAIL = "john@aahms.demo";
 
@@ -31,20 +32,23 @@ async function demoSignIn(email: string, password: string): Promise<SessionUser>
     }
     if (existing?.disabled) throw new DisabledAccountError();
     const defaultGroup = existing ? null : await prisma.missionGroup.findUnique({ where: { code: "MTV-1" } });
+    const name = existing ? existing.name : nameFromEmail(email);
     const user =
       existing ??
       (await prisma.user.create({
         data: {
           email,
-          name: nameFromEmail(email),
+          name,
           password: await bcrypt.hash(password || "demo", 10),
           // Unknown emails always become astronauts; privileged roles are only created by a super admin.
           role: "ASTRONAUT",
           callsign: "GUEST",
           crewId: "MTV-1",
+          sex: defaultSexFor(name),
           groupId: defaultGroup?.id ?? null,
         },
       }));
+    const sex = ((user as { sex?: string }).sex as "male" | "female") || defaultSexFor(user.name);
     return {
       userId: user.id,
       name: user.name,
@@ -52,18 +56,21 @@ async function demoSignIn(email: string, password: string): Promise<SessionUser>
       role: user.role,
       crewId: user.crewId,
       callsign: user.callsign,
+      sex,
     };
   } catch (err) {
     if (err instanceof PrivilegedLoginError || err instanceof DisabledAccountError) throw err;
     // Database unreachable or not migrated yet: still let the demo in with a stable offline identity.
     console.warn("Demo sign-in without database:", err instanceof Error ? err.message.split("\n").pop() : err);
+    const name = nameFromEmail(email);
     return {
       userId: `demo-${createHash("sha256").update(email).digest("hex").slice(0, 16)}`,
-      name: nameFromEmail(email),
+      name,
       email,
       role: "ASTRONAUT",
       crewId: "MTV-1",
       callsign: "GUEST",
+      sex: defaultSexFor(name),
     };
   }
 }
@@ -106,6 +113,7 @@ export async function POST(request: Request) {
       role: user.role,
       crewId: user.crewId,
       callsign: user.callsign,
+      sex: ((user as { sex?: string }).sex as "male" | "female") || defaultSexFor(user.name),
     };
   }
 
@@ -113,10 +121,9 @@ export async function POST(request: Request) {
   const response = NextResponse.json({ user: sessionUser, home: homeFor(sessionUser.role) });
   response.cookies.set(COOKIE_NAME, token, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
     sameSite: "lax",
     path: "/",
-    maxAge: 60 * 60 * 24 * 7,
+    maxAge: 7 * 24 * 60 * 60,
   });
   return response;
 }

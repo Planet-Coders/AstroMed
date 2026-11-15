@@ -31,6 +31,7 @@ type SeedUser = {
   role: Role;
   callsign: string;
   crewId: string;
+  sex?: "male" | "female";
   password?: string;
   /** OVERSIGHT only: group codes this user may read. */
   oversees?: string[];
@@ -44,6 +45,7 @@ const users: SeedUser[] = [
     role: Role.SUPER_ADMIN,
     callsign: "ADMIN",
     crewId: "HQ",
+    sex: "male",
     password: ADMIN_PASSWORD,
   },
   {
@@ -52,6 +54,7 @@ const users: SeedUser[] = [
     role: Role.OVERSIGHT,
     callsign: "SURGEON",
     crewId: "HQ",
+    sex: "female",
     password: OVERSIGHT_PASSWORD,
     oversees: ["MTV-1"],
   },
@@ -61,6 +64,7 @@ const users: SeedUser[] = [
     role: Role.COMMANDER,
     callsign: "FLIGHT",
     crewId: "HQ",
+    sex: "male",
   },
   {
     name: "Vance",
@@ -68,6 +72,7 @@ const users: SeedUser[] = [
     role: Role.ASTRONAUT,
     callsign: "CDR",
     crewId: "MTV-1",
+    sex: "male",
     vitals: { heartRate: 64, hrv: 71, spo2: 98, radiation: 0.021 },
   },
   {
@@ -76,6 +81,7 @@ const users: SeedUser[] = [
     role: Role.ASTRONAUT,
     callsign: "EV1",
     crewId: "MTV-1",
+    sex: "male",
     vitals: { heartRate: 78, hrv: 62, spo2: 98, radiation: 0.021 },
   },
   {
@@ -84,6 +90,7 @@ const users: SeedUser[] = [
     role: Role.ASTRONAUT,
     callsign: "FE",
     crewId: "MTV-1",
+    sex: "female",
     vitals: { heartRate: 70, hrv: 58, spo2: 97, radiation: 0.021 },
   },
   {
@@ -92,6 +99,7 @@ const users: SeedUser[] = [
     role: Role.ASTRONAUT,
     callsign: "CMO",
     crewId: "MTV-1",
+    sex: "female",
     vitals: { heartRate: 61, hrv: 80, spo2: 99, radiation: 0.021 },
   },
   {
@@ -100,6 +108,7 @@ const users: SeedUser[] = [
     role: Role.ASTRONAUT,
     callsign: "EV2",
     crewId: "MTV-2",
+    sex: "male",
     vitals: { heartRate: 72, hrv: 55, spo2: 97, radiation: 0.019 },
   },
   {
@@ -108,6 +117,7 @@ const users: SeedUser[] = [
     role: Role.ASTRONAUT,
     callsign: "MS1",
     crewId: "MTV-2",
+    sex: "female",
     vitals: { heartRate: 68, hrv: 63, spo2: 98, radiation: 0.02 },
   },
   {
@@ -116,6 +126,7 @@ const users: SeedUser[] = [
     role: Role.ASTRONAUT,
     callsign: "MS2",
     crewId: "MTV-2",
+    sex: "male",
     vitals: { heartRate: 75, hrv: 49, spo2: 96, radiation: 0.022 },
   },
 ];
@@ -141,6 +152,7 @@ async function main() {
         role: u.role,
         callsign: u.callsign,
         crewId: u.crewId,
+        sex: u.sex ?? "male",
         groupId,
         overseenGroups,
       },
@@ -151,6 +163,7 @@ async function main() {
         role: u.role,
         callsign: u.callsign,
         crewId: u.crewId,
+        sex: u.sex ?? "male",
         groupId,
         overseenGroups: { connect: overseenGroups.set },
       },

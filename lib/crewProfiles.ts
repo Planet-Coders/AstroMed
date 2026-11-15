@@ -11,6 +11,7 @@ export type CrewProfile = {
   allergies: string;
   medications: string;
   notes: string;
+  sex: "male" | "female";
 };
 
 export const CREW_PROFILES: Record<string, CrewProfile> = {
@@ -21,6 +22,7 @@ export const CREW_PROFILES: Record<string, CrewProfile> = {
     allergies: "none known",
     medications: "none",
     notes: "Former test pilot. Makes the final call on crew medical actions on MTV-1.",
+    sex: "male",
   },
   John: {
     role: "EVA crew member 1 (EV1), MTV-1",
@@ -29,6 +31,7 @@ export const CREW_PROFILES: Record<string, CrewProfile> = {
     allergies: "penicillin (rash)",
     medications: "none",
     notes: "Lead spacewalker. History of mild space motion sickness in the first week of flight.",
+    sex: "male",
   },
   Cho: {
     role: "Flight engineer (FE), MTV-1",
@@ -37,6 +40,7 @@ export const CREW_PROFILES: Record<string, CrewProfile> = {
     allergies: "ibuprofen and other NSAIDs (wheezing)",
     medications: "none",
     notes: "Mild exercise-induced asthma as a child, no symptoms in recent years. Use acetaminophen, not ibuprofen, for pain.",
+    sex: "female",
   },
   Silva: {
     role: "Crew medical officer (CMO), MTV-1",
@@ -45,6 +49,7 @@ export const CREW_PROFILES: Record<string, CrewProfile> = {
     allergies: "none known",
     medications: "none",
     notes: "Physician and the onboard medic. Administers medications and procedures for both crews.",
+    sex: "female",
   },
   Reyes: {
     role: "EVA crew member 2 (EV2), MTV-2",
@@ -53,6 +58,7 @@ export const CREW_PROFILES: Record<string, CrewProfile> = {
     allergies: "none known",
     medications: "melatonin 3 mg at bedtime as needed",
     notes: "Universal blood donor. Occasional trouble sleeping on shifted schedules.",
+    sex: "male",
   },
   Park: {
     role: "Mission specialist 1 (MS1), MTV-2",
@@ -61,6 +67,7 @@ export const CREW_PROFILES: Record<string, CrewProfile> = {
     allergies: "shellfish",
     medications: "none",
     notes: "Youngest crew member, excellent fitness scores.",
+    sex: "female",
   },
   Okonkwo: {
     role: "Mission specialist 2 (MS2), MTV-2",
@@ -69,8 +76,17 @@ export const CREW_PROFILES: Record<string, CrewProfile> = {
     allergies: "sulfa drugs",
     medications: "none",
     notes: "Radiation physicist; runs the dosimetry and storm shelter procedures. Works long hours in the lab module, which has lighter shielding.",
+    sex: "male",
   },
 };
+
+export function defaultSexFor(name?: string): "male" | "female" {
+  if (!name) return "male";
+  const profile = CREW_PROFILES[name];
+  if (profile?.sex) return profile.sex;
+  if (/amara|lewis|cho|silva|park/i.test(name)) return "female";
+  return "male";
+}
 
 export function describeProfile(name: string): string | null {
   const p = CREW_PROFILES[name];

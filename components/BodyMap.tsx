@@ -15,6 +15,7 @@ import { InjuryDetail, NewInjuryPanel } from "./InjuryPanel";
 import { PeriodPanel } from "./PeriodPanel";
 import dynamic from "next/dynamic";
 import { canUseWebGL } from "./BodyMap3D";
+import { defaultSexFor } from "@/lib/crewProfiles";
 
 // three.js is large, so the 3D figure loads only when the body map is shown.
 const BodyMap3D = dynamic(() => import("./BodyMap3D").then((m) => m.BodyMap3D), {
@@ -34,7 +35,6 @@ const TONE: Record<RiskLevel, { text: string; fill: string; ring: string; bg: st
   RED: { text: "text-mc-red", fill: "#d63c3c", ring: "border-mc-red/70", bg: "bg-mc-red/10" },
 };
 
-const FIGURE_KEY = "aahms_body_figure";
 type Figure = "male" | "female";
 
 const noopSubscribe = () => () => {};
@@ -66,12 +66,14 @@ export function BodyMap({
   userId,
   name,
   callsign,
+  userSex,
   vitals,
   onOpenSelfCheck,
 }: {
   userId: string;
   name: string;
   callsign?: string;
+  userSex?: "male" | "female";
   vitals: { heartRate: number; hrv: number; spo2: number; radiation: number };
   onOpenSelfCheck: () => void;
 }) {
@@ -80,26 +82,10 @@ export function BodyMap({
   const sw = useSpaceWeather();
   useEffect(() => markBodyMapSeen(userId), [userId]);
   const client = useClientInputs(userId);
-  // Body figure per crew member, chosen by the crew and remembered in this browser.
-  const [figures, setFigures] = useState<Record<string, Figure>>({});
-  useEffect(() => {
-    try {
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time load from storage
-      setFigures(JSON.parse(localStorage.getItem(FIGURE_KEY) ?? "{}"));
-    } catch {
-      /* unavailable */
-    }
-  }, []);
-  const figure: Figure = figures[name] ?? "male";
-  const chooseFigure = (f: Figure) => {
-    const next = { ...figures, [name]: f };
-    setFigures(next);
-    try {
-      localStorage.setItem(FIGURE_KEY, JSON.stringify(next));
-    } catch {
-      /* unavailable */
-    }
-  };
+
+  // Body scan figure strictly matches the astronaut account's biological sex:
+  // Male accounts exclusively show the male body scan, and female accounts exclusively show the female scan.
+  const figure: Figure = userSex ?? defaultSexFor(name);
 
   const inputs = useMemo(
     () => ({
@@ -186,33 +172,32 @@ export function BodyMap({
         )}
       </div>
       <div className="mb-3 flex flex-wrap items-center gap-2">
-        <div className="flex overflow-hidden rounded-md border border-mc-line-strong text-xs" role="group" aria-label="Body figure">
-          {(["male", "female"] as const).map((f) => (
-            <button
-              key={f}
-              type="button"
-              aria-pressed={figure === f}
-              onClick={() => chooseFigure(f)}
-              className={`px-3 py-1.5 transition ${figure === f ? "bg-mc-select text-mc-on-select" : "text-mc-muted hover:bg-mc-raised"}`}
-            >
-              {f === "male" ? "♂ Male" : "♀ Female"}
-            </button>
-          ))}
-        </div>
-        {webgl && (
-          <button
-            type="button"
-            onClick={() => {
+        <span
+          className="inline-flex items-center gap-1.5 rounded-md border border-mc-line-strong bg-mc-inset px-3 py-1.5 text-xs font-mono text-mc-soft"
+          title={`Body scan figure matched to ${name}'s account (${figure})`}
+        >
+          <span className={figure === "female" ? "text-pink-400 font-semibold" : "text-cyan-400 font-semibold"}>
+            {figure === "female" ? "♀" : "♂"}
+          </span>
+          <span className="capitalize">{figure} scan</span>
+        </span>
+        <button
+          type="button"
+          onClick={() => {
+            if (!webgl && !reporting && !draft) {
+              setDraft({ x: 0, y: 25, area: "Chest" });
+              setReporting(false);
+            } else {
               setReporting((r) => !r);
               setDraft(null);
-            }}
-            className={`rounded-md border px-3 py-1.5 text-xs font-medium transition ${
-              reporting ? "border-mc-cyan bg-mc-raised text-foreground" : "border-mc-line-strong text-mc-soft hover:bg-mc-raised"
-            }`}
-          >
-            {reporting ? "Tap the body where it hurts… (cancel)" : "🩹 Report injury"}
-          </button>
-        )}
+            }
+          }}
+          className={`rounded-md border px-3 py-1.5 text-xs font-medium transition ${
+            reporting || draft ? "border-mc-cyan bg-mc-raised text-foreground" : "border-mc-line-strong text-mc-soft hover:bg-mc-raised"
+          }`}
+        >
+          {reporting || draft ? "Cancel report" : "🩹 Report injury"}
+        </button>
         {activeInjuries.length > 0 && (
           <span className="text-xs text-mc-amber">
             {activeInjuries.length} active injur{activeInjuries.length === 1 ? "y" : "ies"}:{" "}
@@ -261,8 +246,21 @@ export function BodyMap({
           />
         ) : (
           <div className="rounded-xl border border-mc-line bg-mc-inset p-4">
-            <p className="text-xs text-mc-label">This browser can&apos;t show the 3D body. Pick a body system:</p>
-            <ul className="mt-3 grid gap-2">
+            <div className="mb-4 rounded-lg border border-mc-amber/50 bg-mc-amber/10 p-3.5 text-xs leading-relaxed text-mc-soft">
+              <p className="font-semibold text-mc-amber mb-1">WebGL / 3D Graphics Unavailable in This Browser</p>
+              <p>
+                Your browser reported <span className="font-mono text-mc-amber text-[11px]">Failed to create WebGPU / WebGL context</span>.
+                This occurs when hardware graphics acceleration is disabled.
+              </p>
+              <p className="mt-2 text-foreground font-medium">To restore the 3D body map and co-pilot GPU features:</p>
+              <ol className="mt-1 list-decimal list-inside space-y-1 text-mc-muted text-[11px]">
+                <li>Open browser settings (<code className="text-mc-cyan font-mono">chrome://settings/system</code> or <code className="text-mc-cyan font-mono">edge://settings/system</code>)</li>
+                <li>Turn ON <strong className="text-foreground">&ldquo;Use graphics acceleration when available&rdquo;</strong></li>
+                <li>Relaunch the browser</li>
+              </ol>
+            </div>
+            <p className="text-xs text-mc-label mb-2">You can still inspect all body systems and log injuries below:</p>
+            <ul className="grid gap-2">
               {regions.map((r) => (
                 <li key={r.id}>
                   <button

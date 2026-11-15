@@ -35,6 +35,7 @@ import { FloatingCat } from "./spacecat/FloatingCat";
 import { CrewHotline } from "./hotline/CrewHotline";
 import { useHotlineUnread } from "./hotline/useHotlineUnread";
 import { useMissionTelemetry } from "@/components/MissionTelemetryProvider";
+import { defaultSexFor } from "@/lib/crewProfiles";
 
 type DashboardResponse = {
   group: { code: string; name: string; destination: string | null } | null;
@@ -48,6 +49,7 @@ type DashboardResponse = {
         email: string;
         callsign: string;
         crewId: string;
+        sex?: "male" | "female";
       };
       latest: {
         heartRate: number;
@@ -127,11 +129,12 @@ export function SuperAdminDashboard({ user }: { user: SessionUser }) {
       id: m.user.id,
       name: m.user.name,
       callsign: m.user.callsign,
+      sex: m.user.sex || defaultSexFor(m.user.name),
       heartRate: m.latest?.heartRate ?? 70,
       hrv: m.latest?.hrv ?? 60,
       risk: m.risk,
     }));
-  }, [data, user]);
+  }, [data, user, isCrewCommander]);
 
   useEffect(() => {
     if (!members.length) return;
@@ -171,7 +174,7 @@ export function SuperAdminDashboard({ user }: { user: SessionUser }) {
           usualHr: m.baseline?.heartRate != null ? Math.round(m.baseline.heartRate) : null,
           usualHrv: m.baseline?.hrv != null ? Math.round(m.baseline.hrv) : null,
         })),
-    [data, user]
+    [data, user, isCrewCommander]
   );
   const canWrite =
     user.role === "ASTRONAUT" && selectedId === user.userId;
@@ -195,12 +198,13 @@ export function SuperAdminDashboard({ user }: { user: SessionUser }) {
   // The crew shown first: the astronaut's own group, or MTV-1 for the commander.
   const homeCrew = user.role === "COMMANDER" ? "MTV-1" : user.crewId;
 
-  const crewCards = (list: DashboardResponse["crews"][number]["members"], hrvDefault: number) =>
+  const crewCards = (list: DashboardResponse["crews"][number]["members"], hrvDefault: number): CrewMemberView[] =>
     list.map((m) => {
-      const card = {
+      const card: CrewMemberView = {
         id: m.user.id,
         name: m.user.name,
         callsign: m.user.callsign,
+        sex: m.user.sex || defaultSexFor(m.user.name),
         heartRate: m.latest?.heartRate ?? 70,
         hrv: m.latest?.hrv ?? hrvDefault,
         risk: m.risk,
@@ -307,9 +311,10 @@ export function SuperAdminDashboard({ user }: { user: SessionUser }) {
 
                 {tab === "body" && (
                   <BodyMap
-                    userId={user.userId}
+                    userId={selectedMember?.id ?? user.userId}
                     name={selectedMember?.name ?? user.name}
                     callsign={selectedMember?.callsign ?? user.callsign}
+                    userSex={selectedMember?.sex ?? (selectedMember ? defaultSexFor(selectedMember.name) : undefined) ?? user.sex ?? defaultSexFor(user.name)}
                     vitals={{
                       heartRate: selectedMember?.heartRate ?? selectedServer?.heartRate ?? 72,
                       hrv: selectedMember?.hrv ?? selectedServer?.hrv ?? 60,

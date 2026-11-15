@@ -189,14 +189,26 @@ function RegionIcon({ id }: { id: RegionId }) {
   }
 }
 
-/** True when this browser can draw WebGL. */
+let cachedWebGL: boolean | null = null;
+
+/** True when this browser can draw WebGL (cached and cleans up test context to prevent context limits). */
 export function canUseWebGL(): boolean {
+  if (typeof window === "undefined") return false;
+  if (cachedWebGL !== null) return cachedWebGL;
   try {
     const c = document.createElement("canvas");
-    return !!(c.getContext("webgl2") || c.getContext("webgl"));
+    const gl =
+      c.getContext("webgl2", { failIfMajorPerformanceCaveat: false }) ||
+      c.getContext("webgl", { failIfMajorPerformanceCaveat: false }) ||
+      c.getContext("experimental-webgl", { failIfMajorPerformanceCaveat: false });
+    cachedWebGL = !!gl;
+    if (gl && "getExtension" in gl) {
+      (gl as WebGLRenderingContext).getExtension("WEBGL_lose_context")?.loseContext();
+    }
   } catch {
-    return false;
+    cachedWebGL = false;
   }
+  return cachedWebGL;
 }
 
 /** Rim-lit translucent "hologram" surface. */
@@ -309,7 +321,12 @@ export function BodyMap3D({ figure, regions, activeId, dimmed, onPick, placing, 
     const wrap = wrapRef.current;
     if (!host || !wrap) return;
 
-    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+    const renderer = new THREE.WebGLRenderer({
+      antialias: true,
+      alpha: true,
+      failIfMajorPerformanceCaveat: false,
+      powerPreference: "default",
+    });
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     host.appendChild(renderer.domElement);
     renderer.domElement.style.display = "block";
@@ -796,6 +813,7 @@ export function BodyMap3D({ figure, regions, activeId, dimmed, onPick, placing, 
       controls.dispose();
       for (const d of disposables) d.dispose();
       renderer.dispose();
+      renderer.forceContextLoss();
       renderer.domElement.remove();
     };
   }, [figure]);
