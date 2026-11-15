@@ -29,7 +29,6 @@ import { getCycleLog } from "@/lib/periods";
 import { getLatestCheck } from "@/lib/selfCheck";
 import { reportRoutineDay } from "@/lib/routineLog";
 import { MonitoringView } from "./monitoring/MonitoringView";
-import { NasaOsdrPanel } from "./NasaOsdrPanel";
 import { SpaceCatView } from "./spacecat/SpaceCatView";
 import { FloatingCat } from "./spacecat/FloatingCat";
 import { CrewHotline } from "./hotline/CrewHotline";
@@ -289,13 +288,6 @@ export function SuperAdminDashboard({ user }: { user: SessionUser }) {
                             }
                           : undefined
                       }
-                    />
-                    <NasaOsdrPanel
-                      name={selectedMember?.name ?? user.name}
-                      hrv={selectedHrv}
-                      exerciseMinutes={telemetry.exerciseMinutes}
-                      exerciseTarget={telemetry.exerciseTarget}
-                      doseRate={telemetry.radiation}
                     />
                     <LabPanel
                       name={selectedMember?.name ?? user.name}
