@@ -65,7 +65,7 @@ Results turn green, amber or red as they're typed, with follow-up guidance.
 - A rotatable **3D body** built from the MakeHuman base mesh (CC0), baked into `public/models/body.bin` by `scripts/bake-body-model.py`. The male or female build follows the astronaut's account.
 - A clickable status point per body system.
 - Each system shows its readings, what it does, how spaceflight affects it, and what to do now.
-- Injury and period tracking are built in. **Report injury** places a marker by tapping the 3D body. Without WebGL (or if 3D can't start), you pick the body area from a list, and **Try 3D again** retries the scan.
+- Injury and period tracking are built in. **Report injury** places a marker by tapping the 3D body. Without WebGL, **Report injury** opens the report form directly and you choose the body area from a list.
 - The **RIDGE** strip shows a live status for each hazard. Picking one highlights the body systems it affects.
 
 ### My vitals / Crew vitals
@@ -263,6 +263,100 @@ Never commit `.env` or the database URL: secrets live only in `.env` and in Verc
 - **Sidebar navigation** grouped into Clinical Telemetry, Habitat & Protocols, Operations & Sync and Crew Morale, with **My vitals** as the main screen.
 - **Light and dark themes:** a soft white-and-yellow light theme and a black-and-lime dark theme (toggle in the header).
 - Deployed to Vercel with a Neon database (see above).
+
+## Architecture
+
+```mermaid
+flowchart LR
+  subgraph Browser["Browser (crew and ground)"]
+    UI["Next.js pages + React components<br/>crew console · /admin · /oversight"]
+    G3D["three.js<br/>3D body map · space cat"]
+    AI["On-device co-pilot<br/>WebLLM worker, Llama 3.2 1B"]
+    IDB[("IndexedDB<br/>vitals + offline outbox")]
+    UI --- G3D
+    UI --- AI
+    UI <--> IDB
+  end
+  subgraph Server["Vercel: Next.js API routes"]
+    MW["middleware.ts<br/>session cookie"]
+    API["/api/* routes<br/>auth · dashboard · sync · health · hotline · monitoring · admin · oversight"]
+    ENG["Monitoring engine<br/>Hotline rules"]
+    MW --> API --> ENG
+  end
+  DB[("Neon PostgreSQL<br/>Prisma")]
+  EXT["NASA DONKI · NOAA SWPC<br/>NASA Images · NASA OSDR"]
+  IDB -- "Sync to Earth" --> MW
+  UI -- "fetch" --> MW
+  API --> DB
+  API --> EXT
+```
+
+```mermaid
+flowchart LR
+  A["Reading entered"] --> B{"Valid?"}
+  B -- no --> B1["Re-enter, no medical warning"]
+  B -- yes --> C["Instant result + advice"] --> D[("Offline outbox")]
+  D -- "online" --> E["/api sync"] --> F[("Postgres")] --> G["Monitoring rules"] --> H["Alerts → My monitoring and Oversight"]
+  CREW["Astronaut hotline message"] -- "20 m link delay" --> EARTH["Flight surgeon inbox"] -- "reply, same delay" --> CREW
+```
+
+**Roles**
+
+```mermaid
+flowchart LR
+  SA["Super admin"] -->|"groups, accounts, alert rules, audit log"| ALL["Every group"]
+  OV["Oversight / flight surgeon"] -->|"read assigned groups, answer hotline, resolve alerts"| ASG["Assigned groups"]
+  CMD["Commander (ground)"] -->|"sees every crew"| CON["Crew console"]
+  CDR["Crew commander (CDR)"] -->|"own data + own crew"| CON
+  AST["Astronaut / guest"] -->|"own data, own hotline thread"| CON
+```
+
+**Data model**
+
+```mermaid
+erDiagram
+  MissionGroup ||--o{ User : "members"
+  MissionGroup }o--o{ User : "overseen by"
+  User ||--o{ BiometricRecord : "vitals"
+  User ||--o{ HealthReport : "checks and logs"
+  User ||--o{ ChatMessage : "co-pilot chats"
+  User ||--o{ MetricSample : "samples"
+  User ||--o{ Alert : "alerts"
+  AlertRule ||--o{ Alert : "fires"
+  Alert ||--o{ AlertNote : "notes"
+  User ||--o{ HotlineMessage : "hotline"
+```
+
+More detail (folders, security, offline sync, the hotline sequence with the link delay): **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)**.
+
+## How we build it
+
+```mermaid
+flowchart LR
+  R["Research<br/>Gemini NotebookLM"] --> D["Rules, thresholds<br/>and demo data"]
+  D --> C["Claude (Claude Code)<br/>main coding agent"]
+  D --> X["Codex · Cursor<br/>sub coding agents"]
+  C --> PR["Feature branch → PR"]
+  X --> PR
+  PR --> RV["Human review and merge"] --> V["main → Vercel deploy"]
+  RV -. "migrations" .-> M["prisma migrate deploy (manual)"]
+```
+
+- **Research:** the team used **Gemini NotebookLM** to research space medicine and astronaut health. Its findings and data informed the Daily Check ranges, monitoring rules, co-pilot protocols, flight-rule limits and demo data (see [docs/WORKFLOW.md](docs/WORKFLOW.md) for where each lives in the code).
+- **Coding:** **Claude (Claude Code)** is the main coding agent. **Codex** and **Cursor** are sub coding agents. Every change goes through a pull request that a team member reviews and merges.
+- **Shipping:** merges to `main` deploy to Vercel automatically. Database migrations are applied by hand with `prisma migrate deploy`.
+
+## Documentation
+
+| Document | What's in it |
+| --- | --- |
+| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | System diagram, folders, roles and access, data model, data flows, hotline sequence, offline parts |
+| [docs/FEATURES.md](docs/FEATURES.md) | Every feature: what it does, where the code is, how to try it |
+| [docs/API.md](docs/API.md) | Every API route with methods, roles and purpose |
+| [docs/WORKFLOW.md](docs/WORKFLOW.md) | Research → build → review → deploy, AI tooling, branches, migrations, testing |
+| [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) | Environment variables (names), Vercel, Neon, migration and seeding cautions |
+| [docs/METRICS.md](docs/METRICS.md) | Monitoring metrics, thresholds and NASA sources |
+| [docs/COPILOT.md](docs/COPILOT.md) | Co-pilot prompt, knowledge base and benchmark |
 
 ## Tech stack
 
