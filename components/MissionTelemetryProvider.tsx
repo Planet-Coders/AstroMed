@@ -41,13 +41,13 @@ type MissionTelemetryContextValue = MissionTelemetryState & {
 const MissionTelemetryContext =
   createContext<MissionTelemetryContextValue | null>(null);
 
-export function MissionTelemetryProvider({ children }: { children: ReactNode }) {
+export function MissionTelemetryProvider({ children, userId }: { children: ReactNode; userId: string }) {
   const [scenarioId, setScenarioId] = useState<DemoScenarioId>("nominal");
   const [shieldingBoost, setShieldingBoost] = useState(false);
   const [simulationEnabled, setSimulationEnabled] = useState(true);
 
   const scenario = getScenario(scenarioId);
-  const routine = useRoutineLog();
+  const routine = useRoutineLog(userId);
 
   const setScenario = useCallback((id: DemoScenarioId) => {
     setScenarioId(id);

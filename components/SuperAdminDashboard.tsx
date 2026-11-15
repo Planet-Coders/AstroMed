@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { SessionUser } from "@/lib/auth";
-import { assessRisk, type RiskLevel } from "@/lib/risk";
+import type { RiskLevel } from "@/lib/risk";
 import { MissionHeader } from "./MissionHeader";
 import { OfflineAICopilot } from "./OfflineAICopilot";
 import { CrewOverview, type CrewMemberView } from "./CrewOverview";
@@ -56,6 +56,7 @@ type DashboardResponse = {
         hrv: number | null;
         spo2: number;
         radiation: number | null;
+        timestamp: string;
       } | null;
       baseline: { heartRate: number | null; hrv: number | null; spo2: number | null; samples: number } | null;
       risk: RiskLevel;
@@ -71,7 +72,7 @@ export function SuperAdminDashboard({ user }: { user: SessionUser }) {
   // The server enforces this too: /api/dashboard only returns what this user may see.
   const isCrewCommander = user.role === "ASTRONAUT" && user.callsign === "CDR";
   const seesCrew = user.role === "COMMANDER" || isCrewCommander;
-  const [selectedId, setSelectedId] = useState(
+  const [requestedId, setSelectedId] = useState(
     user.role === "ASTRONAUT" ? user.userId : ""
   );
   const { unsyncedCount } = useSync();
@@ -91,7 +92,7 @@ export function SuperAdminDashboard({ user }: { user: SessionUser }) {
       const check = getLatestCheck(user.userId);
       // A merged summary isn't re-sent: each of its readings already went out on its own.
       if (check && !check.merged) void queueHealth("selfCheck", String(check.at), check);
-      reportRoutineDay();
+      reportRoutineDay(user.userId);
     }
     return () => setOutboxUser(null);
   }, [user.userId, user.name, user.role]);
@@ -112,6 +113,7 @@ export function SuperAdminDashboard({ user }: { user: SessionUser }) {
   }, []);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- update from the awaited dashboard response
     void load();
     const id = setInterval(() => void load(), 8000);
     return () => clearInterval(id);
@@ -137,14 +139,8 @@ export function SuperAdminDashboard({ user }: { user: SessionUser }) {
     }));
   }, [data, user, isCrewCommander]);
 
-  useEffect(() => {
-    if (!members.length) return;
-    if (!selectedId || !members.find((m) => m.id === selectedId)) {
-      setSelectedId(members[0].id);
-    }
-  }, [members, selectedId]);
-
-  const selectedMember = members.find((m) => m.id === selectedId);
+  const selectedMember = members.find((m) => m.id === requestedId) ?? members[0];
+  const selectedId = selectedMember?.id ?? requestedId;
   const selectedServer = data?.crews
     .flatMap((c) => c.members)
     .find((m) => m.user.id === selectedId)?.latest;
@@ -169,14 +165,7 @@ export function SuperAdminDashboard({ user }: { user: SessionUser }) {
           name: m.user.name,
           callsign: m.user.callsign,
           risk: m.risk,
-          vitals: m.latest
-            ? {
-                heartRate: m.latest.heartRate,
-                hrv: m.latest.hrv ?? 60,
-                spo2: m.latest.spo2,
-                radiation: m.latest.radiation ?? 0.075,
-              }
-            : null,
+          vitals: m.latest,
           usualHr: m.baseline?.heartRate != null ? Math.round(m.baseline.heartRate) : null,
           usualHrv: m.baseline?.hrv != null ? Math.round(m.baseline.hrv) : null,
         })),
@@ -228,7 +217,7 @@ export function SuperAdminDashboard({ user }: { user: SessionUser }) {
       : `${user.crewId} · Mars transit`;
 
   return (
-    <CopilotProvider>
+    <CopilotProvider key={user.userId} userId={user.userId}>
       <div className="flex min-h-screen w-full bg-mc-bg font-sans text-foreground">
         <SyncEngine />
 
@@ -331,7 +320,7 @@ export function SuperAdminDashboard({ user }: { user: SessionUser }) {
                   />
                 )}
 
-                {tab === "monitoring" && <MonitoringView url="/api/monitoring/me" show="both" canResolve={false} />}
+                {tab === "monitoring" && <MonitoringView url="/api/monitoring/me" show="both" canResolve={false} userId={user.userId} />}
 
                 {tab === "missions" && <HealthMissions userId={user.userId} onGo={setTab} />}
 
@@ -356,7 +345,7 @@ export function SuperAdminDashboard({ user }: { user: SessionUser }) {
                     </div>
                   </div>
                 )}
-                {tab === "pvt" && <PVTTest />}
+                {tab === "pvt" && <PVTTest userId={user.userId} />}
                 {tab === "queue" && <StoreForwardQueue />}
                 {tab === "hotline" && (
                   <CrewHotline
@@ -384,17 +373,8 @@ export function SuperAdminDashboard({ user }: { user: SessionUser }) {
                   patientName={selectedMember?.name}
                   patientCallsign={selectedMember?.callsign ?? user.callsign}
                   crew={crewBriefs}
-                  displayVitals={
-                    selectedMember
-                      ? {
-                          heartRate: selectedHr,
-                          hrv: selectedHrv,
-                          spo2: selectedServer?.spo2 ?? 98,
-                          radiation: selectedServer?.radiation ?? 0.075,
-                          arrhythmia: telemetry.arrhythmia,
-                        }
-                      : undefined
-                  }
+                  displayVitals={selectedServer ?? undefined}
+                  simulatedArrhythmia={canWrite && telemetry.simulationEnabled && telemetry.arrhythmia}
                 />
               </div>
             </div>

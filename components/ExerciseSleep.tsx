@@ -18,6 +18,7 @@ import {
   EXERCISE_PLAN,
   formatHours,
   sleepDuration,
+  type EntrySource,
   type ExerciseType,
 } from "@/lib/routineLog";
 
@@ -146,11 +147,11 @@ export function ExerciseSleep() {
   );
 }
 
-function SourceTag({ source }: { source: "sensor" | "manual" }) {
+function SourceTag({ source }: { source: EntrySource }) {
   return source === "sensor" ? (
     <span className="rounded border border-mc-line-strong px-1.5 py-0.5 font-mono text-[10px] text-mc-link">✓ ACCEL + HRV</span>
   ) : (
-    <span className="rounded border border-mc-line-strong px-1.5 py-0.5 font-mono text-[10px] text-mc-label">MANUAL</span>
+    <span className="rounded border border-mc-line-strong px-1.5 py-0.5 font-mono text-[10px] text-mc-label">{source === "demo" ? "DEMO" : "MANUAL"}</span>
   );
 }
 

@@ -327,6 +327,8 @@ export function overallLevel(items: ItemResult[]): RiskLevel {
 
 const KEY = "aahms_selfcheck_latest";
 
+type RecordedItem = Pick<ItemResult, "display" | "level"> & { at: number; context?: string };
+
 export type StoredCheck = {
   userId: string;
   at: number;
@@ -337,11 +339,28 @@ export type StoredCheck = {
   partial?: boolean;
   /** Device-side summary combining today's saves; each save was already sent on its own. */
   merged?: boolean;
+  /** The latest actual capture for each step, independent of the merged summary's time and values. */
+  recordedItems?: Partial<Record<StepId, RecordedItem>>;
   values?: Partial<SelfCheckValues> & {
     /** Additional fluid recorded by the previous version of Daily Check. */
     fluidAddedMl?: number | null;
   };
 };
+
+export function recordedCheckItem(check: StoredCheck | null, step: StepId): RecordedItem | undefined {
+  if (!check) return;
+  if (check.merged) return check.recordedItems?.[step];
+  const item = check.items.find((entry) => entry.id === step);
+  if (!item) return;
+  let context: string | undefined;
+  if (step === "glucose" && check.values?.fasting != null) {
+    context = check.values.fasting ? "fasting" : "non-fasting";
+  }
+  if (step === "hydration" && check.values) {
+    context = [check.values.fluidMl != null ? "fluid" : "", check.values.urineColor != null ? "colour" : ""].join("/");
+  }
+  return { at: check.at, display: item.display, level: item.level, context };
+}
 
 export function saveLatestCheck(check: StoredCheck) {
   try {
@@ -382,14 +401,19 @@ export function singleReadingCheck(userId: string, at: number, step: StepId, val
  * (e.g. a high blood pressure re-tested as normal now shows normal).
  */
 export function mergeIntoLatest(prev: StoredCheck | null, single: StoredCheck): StoredCheck {
-  if (!prev || !isToday(prev.at)) return { ...single, merged: true };
-  const values = { ...BLANK, ...(prev.values ?? {}) } as SelfCheckValues;
+  const prior = prev && isToday(prev.at) ? prev : null;
+  const recordedItems = Object.fromEntries(STEPS.flatMap(({ id }) => {
+    const reading = recordedCheckItem(single, id) ?? recordedCheckItem(prior, id);
+    return reading ? [[id, reading]] : [];
+  }));
+  if (!prior) return { ...single, merged: true, recordedItems };
+  const values = { ...BLANK, ...(prior.values ?? {}) } as SelfCheckValues;
   for (const [k, v] of Object.entries(single.values ?? {})) {
     if (v !== null && v !== undefined) (values as Record<string, unknown>)[k] = v;
   }
   const done = new Set(Object.keys(single.values ?? {}).filter((k) => (single.values as Record<string, unknown>)[k] != null));
-  const skipped = (prev.skipped ?? []).filter((id) => !STEP_KEYS[id].some((k) => done.has(k)));
-  return { userId: prev.userId, at: single.at, items: assessAll(values), values, skipped, partial: prev.partial, merged: true };
+  const skipped = (prior.skipped ?? []).filter((id) => !STEP_KEYS[id].some((k) => done.has(k)));
+  return { userId: prior.userId, at: single.at, items: assessAll(values), values, skipped, partial: prior.partial, merged: true, recordedItems };
 }
 
 /** Saves one tab's reading now: sent to Earth as its own record, and today's summary updated. */

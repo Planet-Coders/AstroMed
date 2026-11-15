@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { queueHealth } from "@/lib/outbox";
+import { getOutboxUser, queueHealth } from "@/lib/outbox";
 
 /**
  * Daily exercise and sleep log for the crew routine panel. Sessions come either from
@@ -10,7 +10,7 @@ import { queueHealth } from "@/lib/outbox";
  */
 
 export type ExerciseType = "resistance" | "treadmill" | "cycle";
-export type EntrySource = "sensor" | "manual";
+export type EntrySource = "sensor" | "manual" | "demo";
 
 export type ExerciseSession = {
   id: string;
@@ -38,32 +38,45 @@ export const EXERCISE_TARGET = 150;
 export const SLEEP_TARGET = 8.5;
 
 export type DayLog = { exercise: ExerciseSession[]; sleep: SleepEntry };
+export type RoutineReport = Partial<DayLog> & { sleepHours?: number };
 
 const DEFAULT_DAY: DayLog = {
   exercise: [
-    { id: "s1", type: "resistance", minutes: 52, at: "07:10", source: "sensor" },
-    { id: "s2", type: "treadmill", minutes: 32, at: "13:05", source: "sensor" },
-    { id: "s3", type: "cycle", minutes: 20, at: "16:40", source: "sensor" },
+    { id: "s1", type: "resistance", minutes: 52, at: "07:10", source: "demo" },
+    { id: "s2", type: "treadmill", minutes: 32, at: "13:05", source: "demo" },
+    { id: "s3", type: "cycle", minutes: 20, at: "16:40", source: "demo" },
   ],
-  sleep: { bed: "22:54", wake: "05:30", source: "sensor" },
+  sleep: { bed: "22:54", wake: "05:30", source: "demo" },
 };
 
 const today = () => new Date().toISOString().slice(0, 10);
-const storageKey = () => `aahms_routine_${today()}`;
+const storageKey = (userId: string) => `aahms_routine:${userId}:${today()}`;
 
-/** Today's exercise and sleep as the console shows them (wearable defaults until edited). */
-export function getRoutineDay(): DayLog {
+/** Today's log for this member, with examples until they save their own readings. */
+export function getRoutineDay(userId: string): DayLog {
   try {
-    const raw = localStorage.getItem(storageKey());
+    const raw = localStorage.getItem(storageKey(userId));
     return raw ? (JSON.parse(raw) as DayLog) : DEFAULT_DAY;
   } catch {
     return DEFAULT_DAY;
   }
 }
 
-/** Mirror a day's log to the server for mission oversight. */
-export function reportRoutineDay(day: DayLog = getRoutineDay()) {
-  void queueHealth("routine", today(), { ...day, sleepHours: sleepDuration(day.sleep) });
+export function recordedRoutine(day: DayLog): RoutineReport {
+  const exercise = day.exercise.filter((session) => session.source !== "demo");
+  const sleep = day.sleep.source === "demo" ? undefined : day.sleep;
+  return {
+    exercise: day.exercise.length > 0 && exercise.length === 0 ? undefined : exercise,
+    sleep,
+    sleepHours: sleep && sleepDuration(sleep),
+  };
+}
+
+/** Mirror the crew member's recorded entries to the server. */
+export function reportRoutineDay(userId: string, day = getRoutineDay(userId)) {
+  if (getOutboxUser()?.userId !== userId) return;
+  const report = recordedRoutine(day);
+  if (report.sleep || report.exercise) void queueHealth("routine", today(), report);
 }
 
 /** Hours between bedtime and wake time, crossing midnight when needed. */
@@ -81,38 +94,33 @@ export function formatHours(h: number): string {
   return `${Math.floor(total / 60)}h ${String(total % 60).padStart(2, "0")}m`;
 }
 
-export function useRoutineLog() {
+export function useRoutineLog(userId: string) {
   const [day, setDay] = useState<DayLog>(DEFAULT_DAY);
 
   // Read after mount so the server render and first client render match.
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem(storageKey());
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time load from storage
-      if (raw) setDay(JSON.parse(raw));
-    } catch {
-      /* storage unavailable: keep defaults */
-    }
-  }, []);
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- load this member's device log
+    setDay(getRoutineDay(userId));
+  }, [userId]);
 
   const save = useCallback((update: (d: DayLog) => DayLog) => {
     setDay((d) => {
       const next = update(d);
       try {
-        localStorage.setItem(storageKey(), JSON.stringify(next));
+        localStorage.setItem(storageKey(userId), JSON.stringify(next));
       } catch {
         /* ignore */
       }
-      reportRoutineDay(next);
+      reportRoutineDay(userId, next);
       return next;
     });
-  }, []);
+  }, [userId]);
 
   const addExercise = useCallback(
     (type: ExerciseType, minutes: number, at: string) =>
       save((d) => ({
         ...d,
-        exercise: [...d.exercise, { id: crypto.randomUUID(), type, minutes, at, source: "manual" as const }].sort((a, b) =>
+        exercise: [...d.exercise.filter((session) => session.source !== "demo"), { id: crypto.randomUUID(), type, minutes, at, source: "manual" as const }].sort((a, b) =>
           a.at.localeCompare(b.at)
         ),
       })),
@@ -130,6 +138,7 @@ export function useRoutineLog() {
   );
 
   const exerciseMinutes = day.exercise.reduce((sum, s) => sum + s.minutes, 0);
+  const recorded = recordedRoutine(day);
   const byType = (Object.keys(EXERCISE_PLAN) as ExerciseType[]).map((type) => ({
     type,
     ...EXERCISE_PLAN[type],
@@ -141,6 +150,8 @@ export function useRoutineLog() {
     sleep: day.sleep,
     exerciseMinutes,
     sleepHours: sleepDuration(day.sleep),
+    recordedSleepHours: recorded.sleepHours,
+    recordedExerciseMinutes: recorded.exercise?.reduce((sum, session) => sum + session.minutes, 0),
     byType,
     addExercise,
     removeExercise,

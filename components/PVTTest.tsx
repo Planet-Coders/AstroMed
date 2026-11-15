@@ -3,9 +3,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Card } from "./ui/Card";
 import { useMissionTelemetry } from "@/components/MissionTelemetryProvider";
+import { savePvtResult } from "@/lib/pvtLog";
 
-const PVT_STORAGE_KEY = "aahms_pvt_summary";
-const BEST_KEY = "aahms_pvt_best";
 const DURATIONS = [1, 3, 5] as const;
 const LEVEL_SECONDS = 30;
 const LAPSE_MS = 500;
@@ -63,7 +62,7 @@ function beaconFor(level: number, focusMode: boolean, id: number): Beacon {
 function verdict(mean: number, lapses: number, n: number) {
   if (n === 0) return { label: "No data", tone: "text-mc-muted", advice: "Lock at least a few beacons to get a reading." };
   if (mean < 350 && lapses <= 2)
-    return { label: "Alert · mission ready", tone: "text-mc-green", advice: "Reaction times are in the normal range. Cleared for demanding tasks." };
+    return { label: "In range", tone: "text-mc-green", advice: "Reaction times and lapses were within the demo test limits." };
   if (mean < 450 && lapses <= 5)
     return {
       label: "Mild fatigue",
@@ -103,8 +102,9 @@ function useBlips(enabled: boolean) {
   );
 }
 
-export function PVTTest() {
+export function PVTTest({ userId }: { userId: string }) {
   const { pvtSlowdown } = useMissionTelemetry();
+  const bestKey = `aahms_pvt_best:${userId}`;
   const [minutes, setMinutes] = useState<(typeof DURATIONS)[number]>(1);
   const [focusMode, setFocusMode] = useState(true);
   const [sound, setSound] = useState(true);
@@ -135,11 +135,11 @@ export function PVTTest() {
   useEffect(() => {
     try {
       // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time load from storage
-      setBest(Number(localStorage.getItem(BEST_KEY)) || 0);
+      setBest(Number(localStorage.getItem(bestKey)) || 0);
     } catch {
       /* unavailable */
     }
-  }, []);
+  }, [bestKey]);
 
   const later = (fn: () => void, ms: number) => {
     timers.current.push(setTimeout(fn, ms));
@@ -268,10 +268,10 @@ export function PVTTest() {
   // Save the result for the co-pilot, body map and daily missions, and track the best score.
   useEffect(() => {
     if (phase !== "done" || n === 0) return;
+    savePvtResult(userId, { mean, lapses, at: Date.now() });
     try {
-      localStorage.setItem(PVT_STORAGE_KEY, JSON.stringify({ mean, lapses, at: Date.now() }));
       if (stats.score > best) {
-        localStorage.setItem(BEST_KEY, String(stats.score));
+        localStorage.setItem(bestKey, String(stats.score));
         // eslint-disable-next-line react-hooks/set-state-in-effect -- record a new high score once per run
         setBest(stats.score);
       }
@@ -483,15 +483,4 @@ function RtChart({ hits }: { hits: number[] }) {
       </svg>
     </div>
   );
-}
-
-export function getPvtSummary(): string {
-  try {
-    const raw = localStorage.getItem(PVT_STORAGE_KEY);
-    if (!raw) return "No PVT data";
-    const { mean, lapses } = JSON.parse(raw);
-    return `PVT mean ${Math.round(mean)} ms, ${lapses} lapses`;
-  } catch {
-    return "No PVT data";
-  }
 }
