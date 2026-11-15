@@ -108,8 +108,6 @@ describe("co-pilot grounding", () => {
       userName: "Vance",
       vitalsSummary: "HRV 71 ms",
       risk: "GREEN" as const,
-      pvtSummary: "PVT nominal",
-      webLlmReady: true,
       osdrStudies: studies,
     };
     expect(generateCopilotFallback("How is HRV?", ctx)).toMatch(/OSD-751 .+\(n=\d+\)/);

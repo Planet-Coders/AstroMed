@@ -14,11 +14,13 @@ test("the low fluid intake alert accepts presets and a custom amount", async ({ 
   await hydrated;
   await openCheck(page);
 
+  const next = page.getByRole("button", { name: "Next →" });
   await page.getByLabel("Diastolic (bottom)").fill("102");
-  await expect(page.getByText("102 mmHg diastolic · WARNING")).toBeVisible();
+  await expect(page.getByText("Enter both the top and bottom numbers to continue.")).toBeVisible();
+  await expect(next).toBeDisabled();
   await page.getByLabel("Systolic (top)").fill("118");
   await expect(page.getByText("118/102 mmHg · WARNING")).toBeVisible();
-  await page.getByRole("button", { name: "Next →" }).click();
+  await next.click();
   await page.getByLabel("Blood sugar (mg/dL)").fill("127");
   await page.getByRole("button", { name: "Next →" }).click();
   await page.getByLabel("Temperature (°C)").fill("39");

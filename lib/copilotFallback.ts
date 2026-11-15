@@ -1,68 +1,54 @@
 import { riskLabel, type RiskLevel } from "@/lib/risk";
 import { osdrFallbackCitation, type OsdrStudy } from "@/lib/osdr";
+import { findEvidence, type EvidenceCard } from "./copilotEvidence";
+import { emergencyGuidance, medicationGuidance } from "./copilotGuidance";
+import { findProtocols } from "./copilotKnowledge";
 
 export type CopilotContext = {
   userName: string;
   vitalsSummary: string;
-  risk: RiskLevel;
-  pvtSummary: string;
-  webLlmReady: boolean;
+  risk: RiskLevel | null;
+  dailyCheck?: string;
   osdrStudies?: Pick<OsdrStudy, "id" | "metrics" | "gapNote">[];
 };
 
-/** On-device rules when WebLLM is loading or WebGPU is unavailable (demo-safe triage text). */
+const suggestions: Record<string, string> = {
+  dizziness: "Pause the task, get into a safe position, and ask a crewmate or the CMO for help if the dizziness persists or worsens.",
+  headache: "Review cabin CO₂, hydration, and recent sleep. Report a persistent or worsening headache to the CMO.",
+  sleep: "Review your last sleep period and schedule with the crew medical officer before safety-critical work if you are fatigued.",
+  arrhythmia: "Pause strenuous activity and report a new irregular rhythm to the onboard CMO. Record the time and any symptoms.",
+  eva: "Ask the onboard CMO and commander to review EVA readiness with the current mission checklist.",
+  nausea: "Record when nausea began and any other symptoms. Ask the onboard CMO for help if symptoms persist, worsen, or you cannot keep fluids down.",
+  hydration: "Review your last 24-hour report and follow your hydration plan. You can record new intake with Log water on your Low fluid intake alert in My monitoring.",
+  glucose: "Check when the reading was taken and whether you were fasting. Ask the onboard CMO to review an out-of-range reading or symptoms.",
+};
+
+/** An evidence-backed answer for the questions the offline rules can match. */
 export function generateCopilotFallback(
-  userMessage: string,
-  ctx: CopilotContext
+  question: string,
+  ctx: CopilotContext,
+  evidence: EvidenceCard[] = findEvidence(question),
 ): string {
-  const reply = fallbackReply(userMessage, ctx);
-  const cite = osdrFallbackCitation(userMessage, ctx.osdrStudies ?? []);
-  return cite ? `${reply} ${cite}` : reply;
-}
-
-function fallbackReply(userMessage: string, ctx: CopilotContext): string {
-  const q = userMessage.toLowerCase();
-  const prefix = ctx.webLlmReady
-    ? ""
-    : "[Basic mode · built-in triage rules] ";
-
-  if (/dizz|vertigo|lightheaded|feel dizzy/.test(q)) {
-    return (
-      prefix +
-      `${ctx.userName}, dizziness with current vitals (${ctx.vitalsSummary}) is often linked to fluid shift, dehydration, or orthostatic change in microgravity. Sit, secure restraint, check SpO₂ and HR for 5 min. Hydrate per protocol; avoid sudden head movement. Risk tier: ${riskLabel(ctx.risk)}. If syncope, vomiting, or neuro deficits → escalate to CDR and ground surgeon. ${ctx.pvtSummary}.`
-    );
+  const safety = emergencyGuidance(question) ?? medicationGuidance(question);
+  if (safety) return safety;
+  if (/\b(?:daily (?:self-)?check|last check)\b/i.test(question)) {
+    return ctx.dailyCheck ?? `I don’t have a Daily Check available for ${ctx.userName}.`;
   }
 
-  if (/headache|head ache|migraine/.test(q)) {
-    return (
-      prefix +
-      `Headache report logged for ${ctx.userName}. Correlate with ppCO₂, hydration, and sleep debt; review cabin atmosphere. Current vitals: ${ctx.vitalsSummary}. Consider analgesia per formulary if no red flags (focal neuro, worst-ever, fever). Monitor 30 min; ${ctx.pvtSummary}. Risk: ${riskLabel(ctx.risk)}.`
-    );
+  const research = evidence[0];
+  const osdr = osdrFallbackCitation(question, ctx.osdrStudies ?? []);
+  const readingQuestion = /\b(?:my|current|latest|show|check|reading|readings|vitals|how is|is .* okay)\b/i.test(question);
+  const vitalTopic = /\b(?:vitals|heart rate|pulse|hrv|spo2|oxygen saturation|radiation|dosimeter|okay)\b/i.test(question);
+  if (readingQuestion && vitalTopic) {
+    const status = ctx.risk ? ` Console status: ${riskLabel(ctx.risk)}.` : "";
+    return [`${ctx.userName}: ${ctx.vitalsSummary}.${status}`, osdr].filter(Boolean).join(" ");
   }
-
-  if (/chest|heart|palpitation|arrhythm/.test(q)) {
-    return (
-      prefix +
-      `Cardiac symptom flagged. HR context: ${ctx.vitalsSummary}. Obtain rhythm strip if available; hold strenuous activity. If HR sustained >120, SpO₂ <92%, or chest pain radiating → emergency protocol. Otherwise continue telemetry and voice check-in.`
-    );
+  if (research && /\b(?:why|research|study|nasa|evidence|explain|risk)\b/i.test(question)) {
+    return `${research.finding} ${research.limit} [${research.id}]`;
   }
-
-  if (/nausea|vomit|sick/.test(q)) {
-    return (
-      prefix +
-      `GI symptom — assess hydration, last meal, and motion. Anti-emetic per CMO protocol if no bowel obstruction signs. Vitals: ${ctx.vitalsSummary}.`
-    );
-  }
-
-  if (/emergency|help|urgent|sos/.test(q)) {
-    return (
-      prefix +
-      `Acknowledged urgency for ${ctx.userName}. Vitals: ${ctx.vitalsSummary}; risk ${riskLabel(ctx.risk)}. Notify CDR, begin time-stamped log, prepare for ground consult when link available.`
-    );
-  }
-
-  return (
-    prefix +
-    `Flight Surgeon Co-Pilot (${ctx.userName}): vitals ${ctx.vitalsSummary}; assessment ${riskLabel(ctx.risk)}. ${ctx.pvtSummary}. For your question — maintain hydration, sleep hygiene, and exercise quota; recheck vitals in 15 min. ${ctx.webLlmReady ? "" : "For free-form questions, the full on-device AI needs a WebGPU-capable browser and GPU."}`
-  );
+  const protocol = findProtocols(question, [], 1)[0]?.id;
+  return [
+    protocol ? suggestions[protocol] : undefined,
+    research ? `${research.finding} [${research.id}]` : osdr,
+  ].filter(Boolean).join(" ") || "I don’t have enough relevant onboard information to answer that. Try naming the symptom, reading, or NASA study you want to review.";
 }
