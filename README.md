@@ -13,6 +13,9 @@ On the ground, a **super admin** sets up mission groups and crew accounts, and *
 ## What's new (2026-11-15)
 
 - **Hotline to Earth:** a direct line from each astronaut to the Earth medical team, with Routine / Urgent / Emergency levels, the 20 m link delay and an offline queue. Flight surgeons answer from `/oversight`.
+- **Sleep and fluid add up:** a 5 h sleep entry plus a 2 h nap counts as 7 h and resolves the short-sleep alert ("Today's total 7.0 h · back to safe"). Fluid works the same way. The Sleep and Hydration tabs offer **Add to today's total** (default) or **Replace today's value**, and the server keeps the running total, so it works across devices.
+- **Crew grid without guests:** demo sign-ins with an unknown email (callsign GUEST, e.g. "Admin" or "Flight Surgeon") no longer appear as crew cards for the commander or ground control. A guest still sees their own dashboard.
+- **Hotline offline notice:** a hotline message written with no link now says **Queued** (it goes out first when the link returns, then reaches Earth after the delay) instead of "Sent". An emergency also tells the crew to follow the emergency checklist now.
 - **Daily check:** every reading is a clickable tab. Save a single reading (e.g. water) or re-test one: the newest value updates your status and monitoring, and the alert log notes it ("Re-test 118/76 mmHg · back to safe").
 - **Input checks:** a swapped blood pressure (e.g. 80/120) asks you to re-enter instead of giving a medical warning. Super admins can't save impossible blood pressure alert rules, and monitoring ignores swapped readings.
 - **3D body map:** a realistic body made from the MakeHuman CC0 base mesh, matched to the account's sex, with injuries reported by tapping the 3D body. Browsers without WebGL get a list instead, and **Report injury** always works.
@@ -56,7 +59,8 @@ Results turn green, amber or red as they're typed, with follow-up guidance.
 - **Next** needs a valid value; **Skip** leaves the step out and records it as not measured.
 - A reading that can't be right (e.g. blood pressure 80/120 with the numbers swapped) asks you to re-enter instead of giving a medical warning.
 - **Save just this reading** logs one tab on its own, with its own time (e.g. water after a drink). It doesn't count as the full daily check.
-- **Re-tests:** the newest reading replaces the older one in today's status (a high blood pressure re-tested as normal shows normal), syncs to monitoring, and clears the alert with a note naming the re-test.
+- **Sleep and fluid are daily totals:** once a value is saved today, the Sleep and Hydration tabs ask whether to **Add to today's total** (default, e.g. a nap or another drink) or **Replace today's value**. A live preview shows the sum ("Today's total: 5.0 + 2 = 7.0 h"), and reaching the safe level resolves the alert.
+- **Re-tests:** for blood pressure, sugar, temperature and mood, the newest reading replaces the older one in today's status (a high blood pressure re-tested as normal shows normal), syncs to monitoring, and clears the alert with a note naming the re-test.
 - An unfinished check resumes where you left it (kept on the device for 12 hours), and the results page confirms it was saved.
  Open **My monitoring** from flagged results to follow synced alerts. On a **Low fluid intake** alert, use **Log water** to add 250 mL, 500 mL or a custom amount after the last check. A fresh 24-hour reading replaces the prior total.
 
@@ -73,7 +77,7 @@ Results turn green, amber or red as they're typed, with follow-up guidance.
 - Each astronaut sees **only their own** vitals (tab **My vitals**). The crew commander (callsign CDR) sees their whole crew, and ground control sees every crew (tab **Crew vitals**). This is enforced on the server: `/api/dashboard` only returns the records the signed-in user may see.
 - Big heart rate, SpO₂ and HRV tiles.
 - A realistic Lead II ECG: PQRST beats, HRV-driven rhythm and a monitor sweep. It turns irregular in the arrhythmia scenario.
-- 24 h HRV trend, plus per-crew baselines (and a crew overview for the commander and ground control).
+- 24 h HRV trend, plus per-crew baselines (and a crew overview for the commander and ground control). Demo guest accounts (callsign GUEST) are left out of the crew overview.
 - An irregular rhythm always shows **WARNING**, on the card, in the header and in the assessment. The header pill is based on vitals only; the Medical assessment says what it is based on.
 - When the wearable stops sending, the tiles freeze on the **last valid reading** with its age (e.g. "last valid reading · 2 min ago"), and the ECG shows no signal. Nothing is invented.
 
@@ -82,7 +86,7 @@ Results turn green, amber or red as they're typed, with follow-up guidance.
 - A red **Hotline to Earth** button and a **Hotline** sidebar item (with an unread badge) for astronauts.
 - Quick messages (Medical emergency, Need a consult, Medication question) and **Routine / Urgent / Emergency** levels. An emergency asks for confirmation first, and the latest vitals can be attached.
 - Messages arrive after the Earth link delay (20 m 04 s; a demo switch shortens it to 20 s; instant in ground mode). The crew sees a countdown, then Delivered, Seen, Acknowledged and Resolved.
-- Written offline, a message waits in the sync queue and goes out first when the link returns.
+- Written offline, a message waits in the sync queue and goes out first when the link returns. The notice says **Queued** (not "Sent") and the message shows "Waiting to send" until it leaves.
 - **Earth side** (`/oversight`): a banner and chime for urgent messages, conversations sorted by urgency, the thread with vitals, replies (sent back with the same delay), **Acknowledge** and **Mark resolved**.
 - Astronauts only reach their own thread; oversight only reaches astronauts in groups assigned to them.
 
@@ -398,4 +402,5 @@ docs/METRICS.md      Metric definitions, thresholds and citations (generated fro
 - Missions and the PVT result stay in the browser. Vitals, self-checks, exercise and sleep, injuries and period logs sync to the database through the offline queue so mission oversight can read them.
 - **Privacy:** every AI co-pilot message (the astronaut's questions and the replies) is stored on the server and readable by the oversight users assigned to that astronaut's group and by the super admin. The co-pilot shows the crew a note saying so.
 - Hotline delivery is checked by polling every few seconds; nothing is paged or sent outside the app.
+- **Neon cold starts:** an idle Neon database can take 6–9 s to wake, longer than Prisma's default 5 s connection timeout. The first request after a quiet spell can then fail (e.g. "Hotline server unavailable"). Adding `connect_timeout=15` to `DATABASE_URL` avoids this.
 - The first co-pilot load downloads about 0.7 GB of model weights once. After that they're cached in the browser.
