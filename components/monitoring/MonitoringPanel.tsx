@@ -119,15 +119,43 @@ export function MonitoringPanel({ data, onDays, loading }: { data: MonitoringDat
           const chartRules = rules.some((r) => r.kind === "latest") ? rules.filter((r) => r.kind === "latest") : rules;
           return (
             <section key={def.id} data-metric={def.id} className="flex flex-col gap-3 rounded-lg border border-mc-line bg-mc-panel px-4 py-3.5">
-              <header className="flex items-start gap-2">
+              <header className="flex items-start justify-between gap-2">
                 <div className="min-w-0 flex-1">
                   <h3 className="text-sm font-semibold">{def.label}</h3>
-                  <p className="font-mono text-xl">
+                  <p className="mt-0.5 font-mono text-2xl font-bold tracking-tight text-foreground">
                     {latest?.value != null ? formatValue(def.id, latest.value) : "—"}
-                    {latest && <span className="ml-2 text-[11px] text-mc-label">{latest.date === mm.series[mm.series.length - 1].date ? "today" : latest.date}</span>}
+                    {latest && (
+                      <span className="ml-2 text-[11px] font-normal text-mc-label">
+                        {latest.date === mm.series[mm.series.length - 1].date ? "today" : latest.date}
+                      </span>
+                    )}
                   </p>
                 </div>
-                <MissingBadge status={mm.missing} />
+                <div className="flex flex-col items-end gap-1.5">
+                  <MissingBadge status={mm.missing} />
+                  {mm.trend.pct != null && (
+                    <div
+                      className={`flex items-center gap-1 rounded-full px-2 py-0.5 font-mono text-[11px] font-semibold tracking-tight transition-colors ${
+                        Math.abs(mm.trend.pct) < 2
+                          ? "border border-mc-line-strong bg-mc-inset text-mc-muted"
+                          : mm.trend.pct > 0
+                          ? "border border-mc-green/40 bg-mc-green/10 text-mc-green"
+                          : "border border-mc-amber/40 bg-mc-amber/10 text-mc-amber"
+                      }`}
+                      title={describeTrend(def.id, mm.trend)}
+                    >
+                      <span className="text-[10px]">
+                        {Math.abs(mm.trend.pct) < 2 ? "→" : mm.trend.pct > 0 ? "↑" : "↓"}
+                      </span>
+                      <span>
+                        {Math.abs(mm.trend.pct) < 2 ? "steady" : `${Math.abs(mm.trend.pct).toFixed(0)}%`}
+                      </span>
+                      <span className="text-[9px] font-normal opacity-70">
+                        {data.days === 7 ? "vs last wk" : `vs ${data.days}d`}
+                      </span>
+                    </div>
+                  )}
+                </div>
               </header>
               <MetricChart metric={def.id} series={mm.series} rules={chartRules} />
               <p className="text-xs text-mc-soft" data-testid={`trend-${def.id}`}>

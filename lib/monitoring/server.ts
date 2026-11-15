@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { DEFAULT_RULES, METRICS, ruleKind, type MetricId } from "./catalog";
 import { dayKey } from "./days";
 import { addLoggedWater, selfCheckSamples } from "./selfCheckSamples";
+import { ensureCrewBaseline } from "./crewBaseline";
 import {
   awaitingReading,
   dailySeries,
@@ -176,10 +177,11 @@ async function refreshMonitoring(userId: string, rules: Rule[], days: number) {
     // Crew and oversight can poll the same account at once. Serialize alert transitions.
     await db.$queryRaw`SELECT "id" FROM "User" WHERE "id" = ${userId} FOR NO KEY UPDATE`;
     const now = Date.now();
+    await ensureCrewBaseline(db, userId, now);
     const samples = await loadSamples(db, userId, days, now);
     const awaiting = await syncAlerts(db, userId, rules, samples, now);
     return { samples, now, awaiting };
-  }, { timeout: 15_000 });
+  }, { timeout: 30_000 });
 }
 
 export const ALERT_INCLUDE = {
