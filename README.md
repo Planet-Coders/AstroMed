@@ -48,6 +48,21 @@ On the ground, a **super admin** sets up mission groups and crew accounts, and *
 | Colour coding                                                                 | Green / amber / red everywhere, following NASA-STD-3001 caution & warning colours                                                                            |
 | Simple instructions                                                           | Each measurement has numbered "how to measure" steps and a "why this matters in space" note                                                                  |
 
+## NASA data we use
+
+Every threshold and every lab value in the app points back to a NASA source. The full list, per metric, is in [docs/METRICS.md](docs/METRICS.md).
+
+| Source | What it is | Where it shows in AstroMed |
+| --- | --- | --- |
+| [OSDR OSD-569](https://osdr.nasa.gov/bio/repo/data/studies/OSD-569) | SpaceX Inspiration4 whole-blood measurements (complete blood count) | **Blood labs** on My vitals and the body map: real post-flight values for crew C003, compared with normal ranges and their own pre-flight baseline |
+| [OSDR OSD-575](https://osdr.nasa.gov/bio/repo/data/studies/OSD-575) | Inspiration4 serum metabolic panel and cytokine arrays | **Blood labs** (glucose, potassium, sodium) and the hydration and heart metrics |
+| [OSDR OSD-195](https://osdr.nasa.gov/bio/repo/data/studies/OSD-195) | 21-day bed-rest study of human skeletal muscle | Research context for the exercise metric |
+| OSDR OSD-751, OSD-661, OSD-489 | Mouse studies on brain cytokines, muscle and bone loss, and bone structure in microgravity | Co-pilot research answers, clearly labelled as animal analogs |
+| HRP evidence reports on [NTRS](https://ntrs.nasa.gov) (sleep, cardiac rhythm, renal stones, acute radiation, muscle and aerobic capacity, behavioural health and more) | NASA Human Research Program risk evidence | Daily Check ranges, monitoring alert thresholds and "Why we monitor this" notes |
+| [NASA-STD-3001 Vol. 1 Rev C](https://standards.nasa.gov/sites/default/files/standards/NASA/C//nasa-std-3001-vol-1-rev-c-signature.pdf) | NASA crew health standard | The 600 mSv career radiation limit |
+| NASA DONKI (solar flares, solar energetic particles) and NOAA SWPC | Live space weather | **Habitat & routine** space-weather card (falls back to a saved real reading when offline) |
+| NASA Image and Video Library | Public NASA imagery | Login and loading screens |
+
 ## Features
 
 ### Daily self-check
@@ -249,11 +264,12 @@ For the full AI co-pilot, use Chrome or Edge 113+ on a computer with a WebGPU-ca
 
 1. Sign in as `john@aahms.demo`.
 2. **My vitals:** follow the "Morning self-check due" banner and do the check. Try BP `118/102` to see a red diastolic result, then open **My monitoring** to see the alert.
+   - **Running totals:** on the **Sleep** tab save 5 h (a short-sleep alert opens), then add 2 h. Today's total becomes 7.0 h and the alert resolves with "Today's total 7.0 h · back to safe".
 3. **Body map:** click the regions, then pick **G** (Gravity) in the hazards strip to see which systems it affects.
 4. **Missions:** use the **Go** buttons to finish the exercise plan (log 46 min), sleep (22:30 → 06:00) and **Beacon Lock**. The ring hits 4/4 and the patches unlock.
 5. Switch **Demo → Solar particle event** and watch radiation, the body map and the assessment react.
 6. **Ask the co-pilot** a question, e.g. "I feel dizzy, what should I do?"
-7. **Offline:** in DevTools set Network → Offline, record vitals, go back online, then click **Sync to Earth**.
+7. **Offline:** in DevTools set Network → Offline, record vitals, go back online, then click **Sync to Earth**. While offline, send a **Hotline** message too: it says **Queued** and goes out first when the link returns.
 8. **Ground side:** sign out and sign in as `admin@aahms.demo`. Create a mission group and an astronaut in it, and tick the group for the flight surgeon on **Oversight accounts**.
 9. Sign in as that astronaut and ask the co-pilot something, then sign in as `surgeon@aahms.demo`. Open the group, click the astronaut and check **AI conversations** and **Health logs**. MTV-2 isn't listed, because the surgeon isn't assigned to it.
 10. **Monitoring:** still as the surgeon, open **SIM-1**. Sim Dropout shows missing data; open Sim Rising HR's **Monitoring** tab for the trend, then **Alerts** on Sim Dehydrated: open **Why this alerted**, add a note and **Acknowledge**, then **Resolve**. As `admin@aahms.demo`, change a threshold in **Alert rules** and see it in the audit log.
