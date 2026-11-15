@@ -1,4 +1,7 @@
 import { defineConfig } from "@playwright/test";
+import dotenv from "dotenv";
+
+dotenv.config();
 
 /**
  * UI tests against the dev server and its database. `globalSetup` re-seeds the synthetic

@@ -41,9 +41,19 @@ export async function ensureCrewBaseline(
 ) {
   const user = await db.user.findUnique({
     where: { id: userId },
-    select: { id: true, name: true, callsign: true, synthetic: true },
+    select: { id: true, name: true, email: true, callsign: true, synthetic: true },
   });
   if (!user || user.synthetic) return;
+
+  // Never backfill transient test accounts created by automated test runs
+  if (
+    user.email.startsWith("check-") ||
+    user.email.startsWith("replay-") ||
+    user.email.startsWith("water-") ||
+    user.email.includes("test")
+  ) {
+    return;
+  }
 
   // Check how many metric samples exist for this user over the last 30 days
   const recentSampleCount = await db.metricSample.count({
