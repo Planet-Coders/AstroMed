@@ -19,11 +19,13 @@ export async function GET() {
   const users = await prisma.user.findMany({
     // Ground control sees every crew, a crew commander (CDR) sees their own crew,
     // and every other astronaut only ever gets their own record.
+    // Guest accounts (made by demo sign-in with an unknown email) never appear in a
+    // crew view; a guest still sees their own record.
     where:
       session.role === "COMMANDER"
-        ? { role: "ASTRONAUT" }
+        ? { role: "ASTRONAUT", NOT: { callsign: "GUEST" } }
         : isCrewCommander && meRow
-          ? { role: "ASTRONAUT", crewId: meRow.crewId }
+          ? { role: "ASTRONAUT", crewId: meRow.crewId, NOT: { callsign: "GUEST" } }
           : { role: "ASTRONAUT", id: session.userId },
     orderBy: [{ crewId: "asc" }, { name: "asc" }],
   });
