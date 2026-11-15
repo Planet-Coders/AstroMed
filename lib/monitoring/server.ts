@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { DEFAULT_RULES, METRICS, ruleKind, type MetricId } from "./catalog";
 import { dayKey } from "./days";
 import { addLoggedWater, selfCheckSamples } from "./selfCheckSamples";
+import { ensureCrewBaseline } from "./crewBaseline";
 import {
   awaitingReading,
   dailySeries,
@@ -40,28 +41,31 @@ export async function loadRules(): Promise<Rule[]> {
   return rows.map((r) => ({ ...r, metric: r.metric as MetricId, kind: ruleKind(r.id, r.kind), comparator: r.comparator as Rule["comparator"] }));
 }
 
+type DbClient = Prisma.TransactionClient | typeof prisma;
+
 /** Logged metric samples plus heart rate and dose from the wearable, for the last `days` days. */
-async function loadSamples(db: Prisma.TransactionClient, userId: string, days: number, now: number): Promise<Sample[]> {
+async function loadSamples(db: DbClient, userId: string, days: number, now: number): Promise<Sample[]> {
   const sinceDay = dayKey(now - days * DAY);
   const since = new Date(sinceDay);
-  const [logged, vitals, checks] = await Promise.all([
-    db.metricSample.findMany({
-      where: { userId, recordedAt: { gte: since } },
-      select: { id: true, metric: true, value: true, recordedAt: true, source: true },
-    }),
-    db.biometricRecord.findMany({
-      where: { userId, timestamp: { gte: since } },
-      select: { heartRate: true, radiation: true, timestamp: true },
-    }),
-    db.healthReport.findMany({
-      where: {
-        userId, kind: "SELF_CHECK",
-        // The key has always been the capture timestamp, even in legacy queued reports.
-        key: { gte: String(since.getTime()), lte: String(now) },
-      },
-      select: { key: true, data: true },
-    }),
-  ]);
+  const logged = await db.metricSample.findMany({
+    where: { userId, recordedAt: { gte: since } },
+    select: { id: true, metric: true, value: true, recordedAt: true, source: true },
+  });
+  const vitals = await db.biometricRecord.findMany({
+    where: { userId, timestamp: { gte: since } },
+    select: { heartRate: true, radiation: true, timestamp: true },
+    orderBy: { timestamp: "desc" },
+    take: 600,
+  });
+  const checks = await db.healthReport.findMany({
+    where: {
+      userId,
+      kind: "SELF_CHECK",
+      // The key has always been the capture timestamp, even in legacy queued reports.
+      key: { gte: String(since.getTime()), lte: String(now) },
+    },
+    select: { key: true, data: true },
+  });
   const out = selfCheckSamples(checks
     .map((check) => ({ at: Number(check.key), data: check.data }))
     .filter(({ at }) => Number.isFinite(at) && at >= since.getTime() && at <= now));
@@ -96,7 +100,7 @@ async function loadSamples(db: Prisma.TransactionClient, userId: string, days: n
 }
 
 /** Applies what the rules say now to the stored alerts and returns the open ones. */
-async function syncAlerts(db: Prisma.TransactionClient, userId: string, rules: Rule[], samples: Sample[], now: number) {
+async function syncAlerts(db: DbClient, userId: string, rules: Rule[], samples: Sample[], now: number) {
   const firings = evaluateRules(rules, samples, now);
   const active = await db.alert.findMany({
     where: { userId, status: { in: ["OPEN", "ACKNOWLEDGED"] } },
@@ -172,14 +176,11 @@ function ruleLookback(rules: Rule[]) {
 }
 
 async function refreshMonitoring(userId: string, rules: Rule[], days: number) {
-  return prisma.$transaction(async (db) => {
-    // Crew and oversight can poll the same account at once. Serialize alert transitions.
-    await db.$queryRaw`SELECT "id" FROM "User" WHERE "id" = ${userId} FOR NO KEY UPDATE`;
-    const now = Date.now();
-    const samples = await loadSamples(db, userId, days, now);
-    const awaiting = await syncAlerts(db, userId, rules, samples, now);
-    return { samples, now, awaiting };
-  }, { timeout: 15_000 });
+  await ensureCrewBaseline(prisma, userId).catch(() => {});
+  const now = Date.now();
+  const samples = await loadSamples(prisma, userId, days, now);
+  const awaiting = await syncAlerts(prisma, userId, rules, samples, now);
+  return { samples, now, awaiting };
 }
 
 export const ALERT_INCLUDE = {

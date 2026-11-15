@@ -29,17 +29,21 @@ export async function GET() {
   });
 
   const userIds = users.map((u) => u.id);
-  // Only the newest record per crew member is needed. Fetching the whole history
-  // (thousands of rows once vitals have been syncing a while) made this route take
-  // 5-10 s; one indexed (userId, timestamp) lookup per user runs in parallel instead.
+  // Batch queries in small chunks of 4 to avoid overwhelming database connection poolers.
+  async function chunked<T, R>(items: T[], size: number, fn: (item: T) => Promise<R>): Promise<R[]> {
+    const out: R[] = [];
+    for (let i = 0; i < items.length; i += size) {
+      out.push(...(await Promise.all(items.slice(i, i + size).map(fn))));
+    }
+    return out;
+  }
+
   const records = (
-    await Promise.all(
-      userIds.map((userId) =>
-        prisma.biometricRecord.findFirst({
-          where: { userId },
-          orderBy: { timestamp: "desc" },
-        })
-      )
+    await chunked(userIds, 4, (userId) =>
+      prisma.biometricRecord.findFirst({
+        where: { userId },
+        orderBy: { timestamp: "desc" },
+      })
     )
   )
     .filter((r): r is NonNullable<typeof r> => r !== null)
@@ -48,24 +52,22 @@ export async function GET() {
   // Each person's own normal: the average of their previous readings (excluding the
   // newest), so the co-pilot can say "128 bpm, well above Cho's usual 72".
   const baselines = new Map(
-    await Promise.all(
-      userIds.map(async (userId) => {
-        const agg = await prisma.biometricRecord.aggregate({
-          where: { userId },
-          orderBy: { timestamp: "desc" },
-          skip: 1,
-          take: 300,
-          _avg: { heartRate: true, hrv: true, spo2: true },
-          _count: true,
-        });
-        return [
-          userId,
-          agg._count >= 5
-            ? { heartRate: agg._avg.heartRate, hrv: agg._avg.hrv, spo2: agg._avg.spo2, samples: agg._count }
-            : null,
-        ] as const;
-      })
-    )
+    await chunked(userIds, 4, async (userId) => {
+      const agg = await prisma.biometricRecord.aggregate({
+        where: { userId },
+        orderBy: { timestamp: "desc" },
+        skip: 1,
+        take: 300,
+        _avg: { heartRate: true, hrv: true, spo2: true },
+        _count: true,
+      });
+      return [
+        userId,
+        agg._count >= 5
+          ? { heartRate: agg._avg.heartRate, hrv: agg._avg.hrv, spo2: agg._avg.spo2, samples: agg._count }
+          : null,
+      ] as const;
+    })
   );
 
   const latestByUser = new Map<string, (typeof records)[0]>();

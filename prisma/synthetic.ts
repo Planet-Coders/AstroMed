@@ -1,3 +1,6 @@
+import dotenv from "dotenv";
+dotenv.config();
+
 import { PrismaClient, Role } from "@prisma/client";
 import bcrypt from "bcryptjs";
 import { PROFILES, generate } from "../lib/monitoring/synthetic";
