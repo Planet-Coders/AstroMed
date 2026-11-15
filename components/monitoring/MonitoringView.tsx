@@ -5,7 +5,12 @@ import { MonitoringPanel } from "./MonitoringPanel";
 import { useMonitoring } from "./useMonitoring";
 
 /** Time series or alerts for one crew member, from the given monitoring endpoint. */
-export function MonitoringView({ url, show, canResolve }: { url: string; show: "series" | "alerts" | "both"; canResolve: boolean }) {
+export function MonitoringView({ url, show, canResolve, userId }: {
+  url: string;
+  show: "series" | "alerts" | "both";
+  canResolve: boolean;
+  userId?: string;
+}) {
   const { data, setDays, reload, loading, error } = useMonitoring(url);
   if (error && !data) return <p className="text-sm text-mc-red">{error}</p>;
   if (!data) return <p className="text-sm text-mc-label">Loading monitoring data…</p>;
@@ -15,7 +20,14 @@ export function MonitoringView({ url, show, canResolve }: { url: string; show: "
       {show !== "series" && (
         <section className="flex flex-col gap-2">
           {show === "both" && <h3 className="mc-label">Health alerts</h3>}
-          <AlertsPanel alerts={data.alerts} rules={data.rules} canResolve={canResolve} canLogWater={url === "/api/monitoring/me"} onChanged={reload} />
+          <AlertsPanel
+            alerts={data.alerts}
+            rules={data.rules}
+            canResolve={canResolve}
+            canLogWater={url === "/api/monitoring/me"}
+            insights={userId ? { userId, metrics: data.metrics } : undefined}
+            onChanged={reload}
+          />
         </section>
       )}
       {show !== "alerts" && (

@@ -1,10 +1,14 @@
 "use client";
 
 import { useRef, useState } from "react";
+import { CopilotInsight } from "@/components/CopilotInsight";
+import { monitoringInsight } from "@/lib/copilotInsight";
 import { METRIC, formatValue } from "@/lib/monitoring/catalog";
 import type { Rule } from "@/lib/monitoring/engine";
 import { ruleText } from "./MonitoringPanel";
-import type { AlertView } from "./types";
+import type { AlertView, MonitoringData } from "./types";
+
+type InsightContext = { userId: string; metrics: MonitoringData["metrics"] };
 
 const STATUS: Record<AlertView["status"], string> = {
   OPEN: "border-mc-red/60 bg-mc-red/10 text-mc-red",
@@ -37,12 +41,14 @@ export function AlertsPanel({
   rules,
   canResolve,
   canLogWater,
+  insights,
   onChanged,
 }: {
   alerts: AlertView[];
   rules: Rule[];
   canResolve: boolean;
   canLogWater: boolean;
+  insights?: InsightContext;
   onChanged: () => void;
 }) {
   const [show, setShow] = useState<"active" | "resolved">("active");
@@ -79,6 +85,7 @@ export function AlertsPanel({
           rule={rules.find((r) => r.id === a.ruleId)}
           canResolve={canResolve}
           canLogWater={canLogWater && a.ruleId === "hydration_low" && a.status !== "RESOLVED"}
+          insights={insights}
           onChanged={(waterResolved) => {
             if (waterResolved) setShow("resolved");
             onChanged();
@@ -89,11 +96,12 @@ export function AlertsPanel({
   );
 }
 
-function AlertCard({ alert: a, rule, canResolve, canLogWater, onChanged }: {
+function AlertCard({ alert: a, rule, canResolve, canLogWater, insights, onChanged }: {
   alert: AlertView;
   rule?: Rule;
   canResolve: boolean;
   canLogWater: boolean;
+  insights?: InsightContext;
   onChanged: (waterResolved?: boolean) => void;
 }) {
   const [note, setNote] = useState("");
@@ -105,6 +113,9 @@ function AlertCard({ alert: a, rule, canResolve, canLogWater, onChanged }: {
   const m = METRIC[a.metric];
   const customAmount = Number(water);
   const validAmount = Number.isInteger(customAmount) && customAmount >= 1 && customAmount <= 8000;
+  const snapshot = insights && rule
+    ? monitoringInsight(insights.userId, a, rule, insights.metrics.find((metric) => metric.id === a.metric))
+    : null;
   const actionButton = "min-h-9 rounded-md border border-mc-line-strong px-3 text-xs font-medium text-mc-soft hover:text-foreground disabled:opacity-40";
 
   const act = async (action: "note" | "acknowledge" | "resolve" | "log-water", amountMl?: number) => {
@@ -187,6 +198,7 @@ function AlertCard({ alert: a, rule, canResolve, canLogWater, onChanged }: {
           </dd>
         </dl>
       </details>
+      {snapshot && <CopilotInsight snapshot={snapshot} label="Explain this alert" />}
 
       {a.notes.length > 0 && (
         <ol className="mt-3 space-y-1.5 border-l border-mc-line pl-3">

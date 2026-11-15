@@ -10,6 +10,7 @@ import { useSpaceWeather } from "@/lib/useSpaceWeather";
 import { labsFor } from "@/lib/labs";
 import { markBodyMapSeen } from "@/lib/missions";
 import { getLatestCheck, type StoredCheck } from "@/lib/selfCheck";
+import { getPvtResult } from "@/lib/pvtLog";
 import { INJURY_TYPES, areaFor, injuryLevel, useInjuries } from "@/lib/injuries";
 import { InjuryDetail, NewInjuryPanel } from "./InjuryPanel";
 import { PeriodPanel } from "./PeriodPanel";
@@ -44,13 +45,7 @@ function useClientInputs(userId: string) {
   const raw = useSyncExternalStore(
     noopSubscribe,
     () => {
-      let pvt: { mean: number; lapses: number } | null = null;
-      try {
-        const s = localStorage.getItem("aahms_pvt_summary");
-        if (s) pvt = JSON.parse(s);
-      } catch {
-        /* unavailable */
-      }
+      const pvt = getPvtResult(userId);
       const day = Math.floor((Date.now() - MISSION_EPOCH) / 86_400_000) + 1;
       return JSON.stringify({ check: getLatestCheck(userId), pvt, day });
     },

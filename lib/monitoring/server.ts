@@ -111,7 +111,8 @@ async function syncAlerts(db: Prisma.TransactionClient, userId: string, rules: R
     },
     select: { ruleId: true },
   });
-  const changes = planAlertChanges(active as ActiveAlert[], firings, quiet.map((q) => q.ruleId), awaitingReading(rules, samples, now));
+  const awaiting = awaitingReading(rules, samples, now);
+  const changes = planAlertChanges(active as ActiveAlert[], firings, quiet.map((q) => q.ruleId), awaiting);
   for (const c of changes) {
     if (c.type === "open") {
       await db.alert.create({
@@ -163,6 +164,7 @@ async function syncAlerts(db: Prisma.TransactionClient, userId: string, rules: R
       });
     }
   }
+  return awaiting;
 }
 
 function ruleLookback(rules: Rule[]) {
@@ -175,8 +177,8 @@ async function refreshMonitoring(userId: string, rules: Rule[], days: number) {
     await db.$queryRaw`SELECT "id" FROM "User" WHERE "id" = ${userId} FOR NO KEY UPDATE`;
     const now = Date.now();
     const samples = await loadSamples(db, userId, days, now);
-    await syncAlerts(db, userId, rules, samples, now);
-    return { samples, now };
+    const awaiting = await syncAlerts(db, userId, rules, samples, now);
+    return { samples, now, awaiting };
   }, { timeout: 15_000 });
 }
 
@@ -222,7 +224,7 @@ export async function logAlertWater(user: { id: string; name: string; role: stri
 /** Everything a monitoring view needs for one crew member. */
 export async function monitoringFor(userId: string, days: number) {
   const rules = await loadRules();
-  const { samples, now } = await refreshMonitoring(userId, rules, Math.max(days * 2, ruleLookback(rules)));
+  const { samples, now, awaiting } = await refreshMonitoring(userId, rules, Math.max(days * 2, ruleLookback(rules)));
 
   const metrics = METRICS.map((m) => {
     const trend = trendOf(samples, m.id, days, now);
@@ -238,7 +240,13 @@ export async function monitoringFor(userId: string, days: number) {
     orderBy: [{ status: "asc" }, { openedAt: "desc" }],
     include: ALERT_INCLUDE,
   });
-  return { now, days, rules, metrics, alerts };
+  return {
+    now, days, rules, metrics,
+    alerts: alerts.map((alert) => ({
+      ...alert,
+      awaitingReading: alert.status !== "RESOLVED" && awaiting.has(alert.ruleId),
+    })),
+  };
 }
 
 /** At-a-glance monitoring status for a group card: missing data and open alert counts. */

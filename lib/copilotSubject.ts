@@ -1,12 +1,14 @@
 import { assessRisk, describeVitals, type RiskLevel, type VitalSignals } from "./risk";
 import { keywordScore } from "./copilotEvidence";
 
+export type CopilotVitals = VitalSignals & { timestamp?: string | number };
+
 /** A crew member's latest reading and personal baseline. */
 export type CrewBrief = {
   name: string;
   callsign: string;
   risk: RiskLevel;
-  vitals: { heartRate: number; hrv: number; spo2: number; radiation: number; arrhythmia?: boolean } | null;
+  vitals: CopilotVitals | null;
   usualHr: number | null;
   usualHrv: number | null;
 };
@@ -16,7 +18,8 @@ export type CopilotSession = {
   userName: string;
   patientName?: string;
   crew?: CrewBrief[];
-  displayVitals?: NonNullable<CrewBrief["vitals"]>;
+  displayVitals?: CopilotVitals;
+  simulatedArrhythmia?: boolean;
 };
 
 export function selectSubject(question: string, session: CopilotSession, previousName?: string) {
@@ -42,10 +45,14 @@ export function selectSubject(question: string, session: CopilotSession, previou
   };
 }
 
-export function describeSubjectVitals(vitals?: VitalSignals | null) {
-  const summary = vitals ? describeVitals(vitals) : "no vitals available";
+export function describeSubjectVitals(vitals?: CopilotVitals | null) {
+  const at = vitals?.timestamp == null ? NaN : new Date(vitals.timestamp).getTime();
   return {
-    summary: vitals?.arrhythmia ? summary + ", irregular heart rhythm on ECG" : summary,
+    summary: [
+      vitals ? describeVitals(vitals) : "no vitals available",
+      vitals?.arrhythmia ? "irregular heart rhythm on ECG" : "",
+      Number.isFinite(at) ? `recorded ${new Date(at).toISOString()}` : "",
+    ].filter(Boolean).join(", "),
     risk: vitals ? assessRisk(vitals) : null,
   };
 }

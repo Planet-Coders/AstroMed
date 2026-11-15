@@ -20,6 +20,7 @@ export type AlertView = {
   value: number | null;
   threshold: number | null;
   explanation: string;
+  awaitingReading?: boolean;
   openedAt: string;
   updatedAt: string;
   acknowledgedAt: string | null;

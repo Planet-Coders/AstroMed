@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import { Card } from "./ui/Card";
 import { useMissionTelemetry } from "@/components/MissionTelemetryProvider";
 import { useCopilot } from "./CopilotProvider";
+import { CopilotInsight } from "./CopilotInsight";
+import { dailyCheckInsight, type InsightSnapshot } from "@/lib/copilotInsight";
 import { riskLabel, type RiskLevel } from "@/lib/risk";
 import {
   MOODS,
@@ -19,6 +21,7 @@ import {
   saveLatestCheck,
   type Mood,
   type SelfCheckValues,
+  type StoredCheck,
 } from "@/lib/selfCheck";
 import { reading, READING_RANGES as RANGE } from "@/lib/selfCheckThresholds";
 
@@ -78,21 +81,22 @@ export function DailySelfCheck({ userId, userName, onDone, onReviewAlerts }: {
   onDone?: () => void;
   onReviewAlerts?: () => void;
 }) {
-  const { sleepHours } = useMissionTelemetry();
+  const { routine } = useMissionTelemetry();
+  const startingSleep = routine.recordedSleepHours?.toFixed(1) ?? "";
   const { setChatOpen, setInput } = useCopilot();
   const [step, setStep] = useState(-1); // -1 intro, 0..n-1 steps, n summary
   const [raw, setRaw] = useState({ sys: "", dia: "", glucose: "", temp: "" });
   const [fasting, setFasting] = useState(true);
   const [mood, setMood] = useState<Mood | null>(null);
-  const [sleep, setSleep] = useState(sleepHours.toFixed(1));
+  const [sleep, setSleep] = useState(startingSleep);
   const [fluid, setFluid] = useState("");
   const [urine, setUrine] = useState<number | null>(null);
-  const [savedResults, setSavedResults] = useState<ReturnType<typeof assessAll>>([]);
+  const [savedCheck, setSavedCheck] = useState<StoredCheck | null>(null);
+  const [savedInsight, setSavedInsight] = useState<InsightSnapshot | null>(null);
   const [skipped, setSkipped] = useState<StepId[]>([]);
-  const [savedAt, setSavedAt] = useState<number | null>(null);
   const [resumed, setResumed] = useState(false);
   // Confirmation after saving a single tab (e.g. a hydration log or a blood pressure re-test).
-  const [singleSaved, setSingleSaved] = useState<{ step: StepId; text: string } | null>(null);
+  const [singleSaved, setSingleSaved] = useState<{ step: StepId; text: string; insight: InsightSnapshot | null } | null>(null);
 
   // Resume an unfinished check (e.g. after leaving at step 2 for another page).
   useEffect(() => {
@@ -132,7 +136,7 @@ export function DailySelfCheck({ userId, userName, onDone, onReviewAlerts }: {
     fluidMl: num(fluid, RANGE.fluidMl),
     urineColor: urine,
   };
-  const results = step === STEPS.length ? savedResults : assessAll(values);
+  const results = step === STEPS.length ? savedCheck?.items ?? [] : assessAll(values);
   const overall = overallLevel(results);
   const n = STEPS.length;
 
@@ -146,14 +150,17 @@ export function DailySelfCheck({ userId, userName, onDone, onReviewAlerts }: {
     };
     const items = assessAll(completed);
     if (Object.values(completed).some((value) => typeof value === "number")) {
-      saveLatestCheck({ userId, at, items, values: completed, skipped: skippedSteps });
-      setSavedAt(at);
+      const check = { userId, at, items, values: completed, skipped: skippedSteps };
+      const previous = getLatestCheck(userId);
+      saveLatestCheck(check);
+      setSavedCheck(check);
+      setSavedInsight(dailyCheckInsight(check, previous));
     } else {
-      setSavedAt(null);
+      setSavedCheck(null);
+      setSavedInsight(null);
     }
     clearDraft(userId);
     setSkipped(skippedSteps);
-    setSavedResults(items);
     setStep(n);
   };
 
@@ -187,7 +194,7 @@ export function DailySelfCheck({ userId, userName, onDone, onReviewAlerts }: {
                     setRaw({ sys: "", dia: "", glucose: "", temp: "" });
                     setFasting(true);
                     setMood(null);
-                    setSleep(sleepHours.toFixed(1));
+                    setSleep(startingSleep);
                     setFluid("");
                     setUrine(null);
                     setSingleSaved(null);
@@ -206,7 +213,7 @@ export function DailySelfCheck({ userId, userName, onDone, onReviewAlerts }: {
               setRaw({ sys: "", dia: "", glucose: "", temp: "" });
               setFasting(true);
               setMood(null);
-              setSleep(sleepHours.toFixed(1));
+              setSleep(startingSleep);
               setFluid("");
               setUrine(null);
               setStep(0);
@@ -239,9 +246,9 @@ export function DailySelfCheck({ userId, userName, onDone, onReviewAlerts }: {
                 : "Review the flagged readings and follow the guidance below."}
           </p>
         </div>
-        {savedAt && (
+        {savedCheck && (
           <p className="mt-3 rounded-md border border-mc-green/40 bg-mc-green/10 px-3 py-2 text-sm text-mc-green" role="status">
-            ✓ Saved at {new Date(savedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}. Kept on this device and queued to sync to Earth.
+            ✓ Saved at {new Date(savedCheck.at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}. Kept on this device and queued to sync to Earth.
           </p>
         )}
         {skipped.length > 0 && (
@@ -265,6 +272,7 @@ export function DailySelfCheck({ userId, userName, onDone, onReviewAlerts }: {
             </li>
           ))}
         </ul>
+        {savedInsight && <CopilotInsight snapshot={savedInsight} label="Explain my results" />}
         <div className="mt-4 flex flex-wrap gap-2">
           {overall !== "GREEN" && onReviewAlerts && (
             <button
@@ -514,17 +522,22 @@ export function DailySelfCheck({ userId, userName, onDone, onReviewAlerts }: {
               {singleSaved.text}
             </p>
           )}
+          {singleSaved?.step === info.id && singleSaved.insight && (
+            <CopilotInsight snapshot={singleSaved.insight} label="Explain this reading" />
+          )}
           <button
             type="button"
             disabled={status !== "ready"}
             onClick={() => {
-              const before = getLatestCheck(userId)?.items.find((x) => x.id === info.id);
+              const previous = getLatestCheck(userId);
+              const before = previous?.items.find((x) => x.id === info.id);
               const { single } = saveSingleReading(userId, info.id, values);
               const now = single.items.find((x) => x.id === info.id);
               const time = new Date(single.at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
               setSkipped((list) => list.filter((id) => id !== info.id));
               setSingleSaved({
                 step: info.id,
+                insight: dailyCheckInsight(single, previous),
                 text: now
                   ? `✓ Saved ${info.title.toLowerCase()} ${now.display} at ${time} and queued to sync to Earth.${
                       before && before.level !== now.level ? ` Status ${riskLabel(before.level)} → ${riskLabel(now.level)}; My monitoring updates with this re-test.` : ""

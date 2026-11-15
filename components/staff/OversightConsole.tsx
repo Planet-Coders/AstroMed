@@ -8,7 +8,7 @@ import { Card } from "@/components/ui/Card";
 import { TabBar } from "@/components/ui/TabBar";
 import { INJURY_TYPES, injuryLevel, type Injury } from "@/lib/injuries";
 import type { CycleLog } from "@/lib/periods";
-import type { DayLog } from "@/lib/routineLog";
+import type { RoutineReport } from "@/lib/routineLog";
 import type { StoredCheck } from "@/lib/selfCheck";
 import {
   LEVEL_DOT,
@@ -195,12 +195,12 @@ function MemberCard({ m, summary, onOpen }: { m: GroupMember; summary: HealthSum
       <span className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-xs text-mc-muted">
         <span>
           Sleep{" "}
-          <b className={summary.routine ? LEVEL_TEXT[summary.routine.sleepHours < 5 ? "RED" : summary.routine.sleepHours < 6 ? "YELLOW" : "GREEN"] : ""}>
-            {summary.routine ? `${summary.routine.sleepHours.toFixed(1)} h` : "–"}
+          <b className={summary.routine?.sleepHours != null ? LEVEL_TEXT[summary.routine.sleepHours < 5 ? "RED" : summary.routine.sleepHours < 6 ? "YELLOW" : "GREEN"] : ""}>
+            {summary.routine?.sleepHours != null ? `${summary.routine.sleepHours.toFixed(1)} h` : "–"}
           </b>
         </span>
         <span>
-          Exercise <b className="text-foreground">{summary.routine ? `${summary.routine.exerciseMinutes} min` : "–"}</b>
+          Exercise <b className="text-foreground">{summary.routine?.exerciseMinutes != null ? `${summary.routine.exerciseMinutes} min` : "–"}</b>
         </span>
         <span>
           Self-check{" "}
@@ -350,9 +350,9 @@ function Overview({ summary, latest, risk }: { summary: HealthSummary; latest: V
             )}
           </dd>
           <dt className="text-mc-label">Sleep</dt>
-          <dd>{summary.routine ? `${summary.routine.sleepHours.toFixed(1)} h (${summary.routine.date})` : "–"}</dd>
+          <dd>{summary.routine?.sleepHours != null ? `${summary.routine.sleepHours.toFixed(1)} h (${summary.routine.date})` : "–"}</dd>
           <dt className="text-mc-label">Exercise</dt>
-          <dd>{summary.routine ? `${summary.routine.exerciseMinutes} / 150 min` : "–"}</dd>
+          <dd>{summary.routine?.exerciseMinutes != null ? `${summary.routine.exerciseMinutes} / 150 min` : "–"}</dd>
           <dt className="text-mc-label">Self-check</dt>
           <dd>{summary.selfCheck ? <LevelPill level={summary.selfCheck.level}>{fmt(new Date(summary.selfCheck.at).toISOString())}</LevelPill> : "not done"}</dd>
           <dt className="text-mc-label">Open injuries</dt>
@@ -446,16 +446,16 @@ function HealthLogs({ reports }: { reports: HealthReportRow[] }) {
         {days.length === 0 && <p className="text-sm text-mc-label">None reported.</p>}
         <ul className="divide-y divide-mc-line text-xs">
           {days.map((r) => {
-            const d = r.data as DayLog & { sleepHours?: number };
+            const d = r.data as RoutineReport;
             return (
               <li key={r.key} className="py-2">
                 <p className="font-mono text-mc-link">{r.key}</p>
                 <p className="text-mc-muted">
-                  Sleep {d.sleep?.bed}–{d.sleep?.wake}
-                  {typeof d.sleepHours === "number" ? ` (${d.sleepHours.toFixed(1)} h)` : ""} · {d.sleep?.source}
+                  {d.sleep ? `Sleep ${d.sleep.bed}–${d.sleep.wake} · ${d.sleep.source}` : "Sleep unreported"}
+                  {typeof d.sleepHours === "number" ? ` (${d.sleepHours.toFixed(1)} h)` : ""}
                 </p>
                 <p className="text-mc-muted">
-                  Exercise: {(d.exercise ?? []).map((s) => `${s.type} ${s.minutes} min at ${s.at}`).join(", ") || "none"}
+                  Exercise: {d.exercise ? d.exercise.map((s) => `${s.type} ${s.minutes} min at ${s.at}`).join(", ") || "none" : "unreported"}
                 </p>
               </li>
             );

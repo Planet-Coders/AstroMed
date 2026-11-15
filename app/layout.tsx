@@ -4,7 +4,6 @@ import { Inter, IBM_Plex_Mono, Playfair_Display } from "next/font/google";
 import "./globals.css";
 import { MissionModeProvider } from "@/components/MissionModeContext";
 import { SyncProvider } from "@/components/SyncContext";
-import { MissionTelemetryProvider } from "@/components/MissionTelemetryProvider";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 const plexMono = IBM_Plex_Mono({
@@ -39,9 +38,7 @@ export default function RootLayout({
           {themeBoot}
         </Script>
         <MissionModeProvider>
-          <MissionTelemetryProvider>
-            <SyncProvider>{children}</SyncProvider>
-          </MissionTelemetryProvider>
+          <SyncProvider>{children}</SyncProvider>
         </MissionModeProvider>
       </body>
     </html>

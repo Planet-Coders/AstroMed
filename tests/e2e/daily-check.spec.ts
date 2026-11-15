@@ -7,6 +7,7 @@ async function openCheck(page: Page) {
 }
 
 test("the low fluid intake alert accepts presets and a custom amount", async ({ page }) => {
+  await page.addInitScript(() => Object.defineProperty(navigator, "gpu", { value: undefined }));
   const email = testEmail("check");
   const login = await page.request.post("/api/auth/login", { data: { email, password: "local-demo" } });
   expect(login.ok()).toBeTruthy();
@@ -19,6 +20,7 @@ test("the low fluid intake alert accepts presets and a custom amount", async ({ 
   await page.getByLabel("Diastolic (bottom)").fill("102");
   await expect(page.getByText("Enter both the top and bottom numbers to continue.")).toBeVisible();
   await expect(next).toBeDisabled();
+  await expect(page.getByRole("button", { name: "Explain this reading" })).toHaveCount(0);
   await page.getByLabel("Systolic (top)").fill("118");
   await expect(page.getByText("118/102 mmHg · WARNING")).toBeVisible();
   await next.click();
@@ -34,6 +36,12 @@ test("the low fluid intake alert accepts presets and a custom amount", async ({ 
   await expect(page.getByRole("button", { name: /250 mL|500 mL/ })).toHaveCount(0);
   await page.getByRole("radio", { name: "Shade 6 of 8" }).click();
   await page.getByRole("button", { name: "See results" }).click();
+  const explanation = page.locator("[data-insight-mode]");
+  await expect(explanation).toHaveCount(0);
+  await page.getByRole("button", { name: "Explain my results" }).click();
+  await expect(explanation).toHaveAttribute("data-insight-mode", "basic");
+  await expect(explanation).toHaveAttribute("data-insight-duration-ms", /^\d+$/);
+  await expect(explanation).toContainText("118/102 mmHg · WARNING");
   await page.getByRole("button", { name: "Review in My monitoring" }).click();
 
   const alert = (id: string) => page.locator(`article[data-alert="${id}"]`);
@@ -47,9 +55,17 @@ test("the low fluid intake alert accepts presets and a custom amount", async ({ 
 
   const hydration = alert("hydration_low");
   const hydrationChart = page.locator('section[data-metric="hydration"]');
+  const explainHydration = hydration.getByRole("button", { name: "Explain this alert" });
+  await explainHydration.click();
+  await expect(hydration.locator("[data-insight-mode]")).toContainText("1200 mL");
+  await hydration.getByText("NASA research context").click();
+  await expect(hydration.getByRole("link", { name: /NTRS 20240012429/ }).last()).toBeVisible();
   await hydration.getByRole("button", { name: "Log water" }).click();
   await hydration.getByRole("button", { name: "Add 250 mL" }).click();
   await expect(hydrationChart).toContainText("1450 mL");
+  await expect(hydration.locator("[data-insight-mode]")).toHaveCount(0);
+  await explainHydration.click();
+  await expect(hydration.locator("[data-insight-mode]")).toContainText("1450 mL");
   await hydration.getByRole("button", { name: "Acknowledge" }).click();
   await expect(hydration.getByTestId("alert-status")).toHaveText("ACKNOWLEDGED");
   await hydration.getByRole("button", { name: "Log water" }).click();
@@ -63,9 +79,26 @@ test("the low fluid intake alert accepts presets and a custom amount", async ({ 
   await expect(hydration.getByTestId("alert-status")).toHaveText("RESOLVED");
   await expect(hydration).toContainText("Added 150 mL of water.");
   await expect(hydration.getByRole("button", { name: "Log water" })).toHaveCount(0);
+  await expect(explainHydration).toHaveCount(0);
   await page.getByRole("button", { name: /^Active \(/ }).click();
   await expect(alert("diastolic_high").getByTestId("alert-status")).toHaveText("OPEN");
   await expect(alert("urine_color_dark").getByTestId("alert-status")).toHaveText("OPEN");
+
+  await page.getByRole("button", { name: "Daily check", exact: true }).click();
+  await page.getByRole("button", { name: "Blood pressure", exact: true }).click();
+  await page.getByLabel("Systolic (top)").fill("118");
+  await page.getByLabel("Diastolic (bottom)").fill("76");
+  await page.getByRole("button", { name: "Save just this reading" }).click();
+  await page.getByRole("button", { name: "Explain this reading" }).click();
+  await expect(explanation).toContainText("118/76 mmHg · NOMINAL");
+  await expect(explanation).toContainText("Previous saved reading · 118/102 mmHg · WARNING");
+
+  await page.getByLabel("Diastolic (bottom)").fill("78");
+  await page.getByRole("button", { name: "Save just this reading" }).click();
+  await expect(explanation).toHaveCount(0);
+  await page.getByRole("button", { name: "Explain this reading" }).click();
+  await expect(explanation).toContainText("118/78 mmHg · NOMINAL");
+  await expect(explanation).toContainText("Previous saved reading · 118/76 mmHg · NOMINAL");
 });
 
 test("replayed and out-of-order snapshots use the latest capture time for each day", async ({ request }) => {

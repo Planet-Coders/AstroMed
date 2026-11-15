@@ -24,6 +24,14 @@ The current static instructions live in [copilotPrompt.ts](../lib/copilotPrompt.
 
 NASA research provides background. Demo procedures, current crew readings, cohort measurements, and animal research each have different uses. Review [copilotGuidance.ts](../lib/copilotGuidance.ts) for examples of symptom and medication questions handled by built-in guidance before the model runs.
 
+## Inline explanations
+
+**Daily Check** offers an explanation after a full save or a single retest. **My Monitoring** offers one on each active alert. The saved result, trigger, and alert controls appear immediately. The model selects a finding, a follow-up, and an optional comparison and NASA reference from the supplied record. The app displays the original values and approved text.
+
+Explanations share the chat's worker. A request can take up to 12 seconds including queue time, with Basic guidance available if the model is busy, unavailable, or returns an invalid selection. Model explanations are reused for the same record within the signed-in session. The explanation element includes `data-insight-mode` and `data-insight-duration-ms` for browser testing.
+
+Routine and cognitive-test logs on shared devices are stored by crew member. Older device-only rows without an owner stay in their original storage. The demo routine remains visible as an example until the crew member records entries.
+
 ## Benchmark
 
 Start the app locally against a demo database with its seed accounts. Then run:
