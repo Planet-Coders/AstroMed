@@ -4,10 +4,12 @@ import { Card } from "./ui/Card";
 import { formatLab, labsFor } from "@/lib/labs";
 import { riskLabel, type RiskLevel } from "@/lib/risk";
 
+import { STATUS_TONE } from "@/lib/statusColors";
+
 const TONE: Record<RiskLevel, string> = {
-  GREEN: "text-mc-green",
-  YELLOW: "text-mc-amber",
-  RED: "text-mc-red",
+  GREEN: STATUS_TONE.GREEN.text,
+  YELLOW: STATUS_TONE.YELLOW.text,
+  RED: STATUS_TONE.RED.text,
 };
 
 const fmt = (v: number) => (v >= 100 ? Math.round(v).toLocaleString() : v >= 10 ? v.toFixed(1) : v.toFixed(2));
@@ -38,8 +40,8 @@ export function LabPanel({ name, callsign }: { name: string; callsign?: string }
         average.
       </p>
       {labs.flagged.length > 0 && (
-        <p className="mb-3 rounded-md border border-mc-amber/40 bg-mc-amber/10 px-3 py-2 text-sm text-mc-soft">
-          <span className="font-semibold text-mc-amber">Flagged: </span>
+        <p className={`mb-3 rounded-md border px-3 py-2 text-sm text-mc-soft ${STATUS_TONE[labs.level].border} ${STATUS_TONE[labs.level].bg}`}>
+          <span className={`font-semibold ${STATUS_TONE[labs.level].text}`}>Flagged: </span>
           {labs.flagged.map((r) => `${r.label} ${formatLab(r)} (${r.note})`).join(" · ")}
         </p>
       )}

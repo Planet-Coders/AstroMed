@@ -89,7 +89,8 @@ export function SuperAdminDashboard({ user }: { user: SessionUser }) {
       const cycle = getCycleLog(user.name);
       if (cycle.days.length || cycle.suppressed) void queueHealth("periods", "current", cycle, user.name);
       const check = getLatestCheck(user.userId);
-      if (check) void queueHealth("selfCheck", String(check.at), check);
+      // A merged summary isn't re-sent: each of its readings already went out on its own.
+      if (check && !check.merged) void queueHealth("selfCheck", String(check.at), check);
       reportRoutineDay();
     }
     return () => setOutboxUser(null);

@@ -229,3 +229,23 @@ export function planAlertChanges(active: ActiveAlert[], firings: Firing[], quiet
   }
   return changes;
 }
+
+/**
+ * Alert-log note when an alert clears, naming the reading that cleared it,
+ * e.g. "Re-test 118/76 mmHg · back to safe." for a blood pressure re-check.
+ */
+export function resolveNote(metric: MetricId | undefined, samples: Sample[]): string {
+  const generic = "Back within the rule's limits, or the rule was switched off.";
+  if (!metric) return generic;
+  const latest = samples.filter((s) => s.metric === metric).sort((a, b) => b.at - a.at)[0];
+  if (!latest) return generic;
+  let reading = formatValue(metric, latest.value);
+  if (metric === "systolic" || metric === "diastolic") {
+    const other = samples.find((s) => s.metric === (metric === "systolic" ? "diastolic" : "systolic") && s.at === latest.at);
+    if (other) {
+      const [sys, dia] = metric === "systolic" ? [latest.value, other.value] : [other.value, latest.value];
+      reading = `${sys}/${dia} mmHg`;
+    }
+  }
+  return `${latest.fromSelfCheck ? "Re-test" : "Latest reading"} ${reading} · back to safe.`;
+}

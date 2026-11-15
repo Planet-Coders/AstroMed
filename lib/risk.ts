@@ -92,3 +92,32 @@ export function worstRisk(levels: RiskLevel[]): RiskLevel {
   if (levels.includes("YELLOW")) return "YELLOW";
   return "GREEN";
 }
+
+export type TimedVitals = { heartRate: number; hrv: number; spo2: number; radiation: number; timestamp: number };
+
+/** A reading a wearable could really produce; glitches (0, NaN, out of range) are not "stable". */
+export function isValidReading(v: Partial<TimedVitals> | null | undefined): v is TimedVitals {
+  return (
+    !!v &&
+    Number.isFinite(v.heartRate) && v.heartRate! >= 25 && v.heartRate! <= 230 &&
+    Number.isFinite(v.spo2) && v.spo2! >= 50 && v.spo2! <= 100 &&
+    Number.isFinite(v.hrv) && v.hrv! > 0 && v.hrv! <= 300 &&
+    Number.isFinite(v.timestamp)
+  );
+}
+
+/** Newest valid reading, used while the sensor is silent; never an invented value. */
+export function lastValidReading<T extends Partial<TimedVitals>>(rows: T[]): (T & TimedVitals) | null {
+  const valid = rows.filter(isValidReading) as (T & TimedVitals)[];
+  return valid.sort((a, b) => b.timestamp - a.timestamp)[0] ?? null;
+}
+
+/** "just now", "45 s ago", "12 min ago", "2 h ago". */
+export function agoLabel(ms: number) {
+  const s = Math.max(0, Math.round(ms / 1000));
+  if (s < 10) return "just now";
+  if (s < 60) return `${s} s ago`;
+  const m = Math.round(s / 60);
+  if (m < 60) return `${m} min ago`;
+  return `${Math.round(m / 60)} h ago`;
+}

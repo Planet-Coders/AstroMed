@@ -5,7 +5,7 @@ import { Card } from "./ui/Card";
 import { EcgMonitor } from "./EcgMonitor";
 import { HrvTrend } from "./HrvTrend";
 import { addVital, getRecentForUser } from "@/lib/db";
-import { assessRisk, riskLabel, type RiskLevel } from "@/lib/risk";
+import { agoLabel, assessRisk, lastValidReading, riskLabel, type RiskLevel } from "@/lib/risk";
 import { useMissionTelemetry } from "@/components/MissionTelemetryProvider";
 import { useSync } from "./SyncContext";
 
@@ -102,12 +102,28 @@ export function VitalsMonitor({
 
   const dropout = !!scenario.sensorDropout;
   const [lostFor, setLostFor] = useState(0); // seconds without a reading
+  // Sensor silent: show the newest valid stored reading, frozen, with its age. Never invented.
+  const [lastValid, setLastValid] = useState<{ heartRate: number; hrv: number; spo2: number; radiation: number; timestamp: number; ageMs: number } | null>(null);
   if (!dropout && lostFor) setLostFor(0);
+  if (!dropout && lastValid) setLastValid(null);
   useEffect(() => {
     if (!dropout) return;
     const id = setInterval(() => setLostFor((s) => s + 1), 1000);
-    return () => clearInterval(id);
-  }, [dropout]);
+    let alive = true;
+    void getRecentForUser(userId, 50).then((rows) => {
+      if (!alive) return;
+      const v = lastValidReading(rows);
+      if (!v) return;
+      const frozen = { heartRate: Math.round(v.heartRate), hrv: v.hrv, spo2: v.spo2, radiation: v.radiation };
+      setLastValid({ ...frozen, timestamp: v.timestamp, ageMs: Date.now() - v.timestamp });
+      setDisplay(frozen);
+      setLive(frozen);
+    });
+    return () => {
+      alive = false;
+      clearInterval(id);
+    };
+  }, [dropout, userId]);
 
   useEffect(() => {
     // Sensor dropout: nothing new is recorded, so the server sees the gap.
@@ -148,6 +164,7 @@ export function VitalsMonitor({
   }, [userId, display.hrv]);
 
   useEffect(() => {
+    if (dropout) return; // no signal: the readout stays frozen on the last valid values
     const id = setInterval(() => {
       setLive((prev) => {
         const pull = (cur: number, target: number, jitter: number) =>
@@ -161,7 +178,7 @@ export function VitalsMonitor({
       });
     }, 1000);
     return () => clearInterval(id);
-  }, [display, arrhythmia]);
+  }, [display, arrhythmia, dropout]);
 
   const risk = assessRisk({ ...display, arrhythmia });
 
@@ -197,17 +214,25 @@ export function VitalsMonitor({
     >
       {dropout && (
         <p className="mb-3 rounded-md border border-mc-red/50 bg-mc-red/10 px-3 py-2 text-xs text-mc-soft">
-          No reading for {lostFor} s. The numbers below are the last values
-          received. Check the strap and battery; mission oversight sees this as missing data once the gap passes the expected cadence.
+          No reading for {lostFor} s. Showing the <strong>last valid reading</strong>
+          {lastValid ? ` · ${agoLabel(lastValid.ageMs + lostFor * 1000)} (${new Date(lastValid.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })})` : " received before the dropout"}.
+          Check the strap and battery; mission oversight sees this as missing data once the gap passes the expected cadence.
         </p>
       )}
-      <div className={`grid grid-cols-3 gap-3 ${dropout ? "opacity-40" : ""}`}>
+      {dropout && <p className="mb-1 font-mono text-[11px] text-mc-label">Last valid reading (not live)</p>}
+      <div className={`grid grid-cols-3 gap-3 ${dropout ? "opacity-75" : ""}`}>
         <Metric label="Heart rate" value={live.heartRate} unit="bpm" big pulse={!dropout} />
         <Metric label="SpO₂" value={Math.round(live.spo2)} unit="%" big />
         <Metric label="HRV" value={Math.round(live.hrv)} unit="ms" big />
       </div>
       <div className="mt-4">
-        <EcgMonitor heartRate={live.heartRate} hrv={live.hrv} irregular={arrhythmia} className="h-[130px]" />
+        {dropout ? (
+          <div className="flex h-[130px] items-center justify-center rounded-md border border-dashed border-mc-line-strong text-xs text-mc-label">
+            No live ECG signal · wearable offline
+          </div>
+        ) : (
+          <EcgMonitor heartRate={live.heartRate} hrv={live.hrv} irregular={arrhythmia} className="h-[130px]" />
+        )}
       </div>
 
       <details className="group mt-4 border-t border-mc-line pt-3">

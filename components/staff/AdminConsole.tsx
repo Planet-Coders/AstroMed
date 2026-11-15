@@ -1,5 +1,6 @@
 "use client";
 
+import { bpRuleError } from "@/lib/selfCheckThresholds";
 import { useCallback, useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import type { Role } from "@prisma/client";
 import { Card } from "@/components/ui/Card";
@@ -953,6 +954,10 @@ function RulesTab({ run }: { run: Run }) {
               const d = drafts[r.id] ?? { amber: "", red: "", windowDays: "" };
               const unit = r.kind === "missing" ? "h" : r.kind === "trend" ? "%" : METRIC[r.metric as MetricId].unit;
               const dirty = d.amber !== String(r.amber) || d.red !== String(r.red) || d.windowDays !== String(r.windowDays);
+              const bpError =
+                dirty && r.kind !== "missing" && r.kind !== "trend"
+                  ? bpRuleError({ id: r.id, metric: r.metric, amber: Number(d.amber), red: Number(d.red) }, rules ?? [])
+                  : null;
               const set = (k: keyof typeof d, v: string) => setDrafts((all) => ({ ...all, [r.id]: { ...d, [k]: v } }));
               return (
                 <tr key={r.id} data-rule={r.id} className={r.enabled ? undefined : "opacity-60"}>
@@ -960,6 +965,11 @@ function RulesTab({ run }: { run: Run }) {
                   <td className="py-2 pr-3">
                     <p className="font-medium">{r.label}</p>
                     <p className="text-[11px] text-mc-label">{ruleText(r)}</p>
+                    {bpError && (
+                      <p className="mt-1 text-[11px] font-semibold text-mc-red" role="alert">
+                        {bpError}
+                      </p>
+                    )}
                   </td>
                   <td className="py-2 pr-3">
                     <input aria-label={`${r.label} amber`} className={cell} value={d.amber} onChange={(e) => set("amber", e.target.value)} />{" "}
@@ -988,7 +998,7 @@ function RulesTab({ run }: { run: Run }) {
                   <td className="py-2 text-right">
                     <button
                       type="button"
-                      disabled={!dirty}
+                      disabled={!dirty || Boolean(bpError)}
                       className={primary.replace("min-h-10", "min-h-9")}
                       onClick={() =>
                         void save(r, { amber: Number(d.amber), red: Number(d.red), windowDays: Number(d.windowDays) }, `${r.label} saved`)
