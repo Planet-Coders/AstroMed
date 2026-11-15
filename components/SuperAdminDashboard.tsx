@@ -345,14 +345,16 @@ export function SuperAdminDashboard({ user }: { user: SessionUser }) {
                 )}
 
                 {tab === "habitat" && (
-                  // Radiation (cabin dose + space weather) and exercise & sleep side by side, both from the top.
-                  <div className="grid items-start gap-5 lg:grid-cols-2">
-                    <div className="flex min-w-0 flex-col gap-5">
-                      <CabinEnvironment />
-                      <SpaceWeatherCard />
-                    </div>
-                    <div className="min-w-0">
-                      <ExerciseSleep />
+                  // Cabin environment & radiation across the full width, then space weather and exercise & sleep side by side.
+                  <div className="flex min-w-0 flex-col gap-5">
+                    <CabinEnvironment />
+                    <div className="grid items-start gap-5 lg:grid-cols-2">
+                      <div className="min-w-0">
+                        <SpaceWeatherCard />
+                      </div>
+                      <div className="min-w-0">
+                        <ExerciseSleep />
+                      </div>
                     </div>
                   </div>
                 )}
