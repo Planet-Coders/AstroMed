@@ -1,5 +1,6 @@
 "use client";
 
+import { STATUS_TONE } from "@/lib/statusColors";
 import { useCallback, useEffect } from "react";
 import { useVoiceCheckIn } from "./useVoiceCheckIn";
 import { riskLabel } from "@/lib/risk";
@@ -27,9 +28,9 @@ type OfflineAICopilotProps = {
 };
 
 const RISK_TONE = {
-  GREEN: { text: "text-mc-green", bg: "bg-mc-green/10 border-mc-green/30" },
-  YELLOW: { text: "text-mc-amber", bg: "bg-mc-amber/10 border-mc-amber/40" },
-  RED: { text: "text-mc-red", bg: "bg-mc-red/10 border-mc-red/50" },
+  GREEN: { text: STATUS_TONE.GREEN.text, bg: `${STATUS_TONE.GREEN.bg} ${STATUS_TONE.GREEN.border}` },
+  YELLOW: { text: STATUS_TONE.YELLOW.text, bg: `${STATUS_TONE.YELLOW.bg} ${STATUS_TONE.YELLOW.border}` },
+  RED: { text: STATUS_TONE.RED.text, bg: `${STATUS_TONE.RED.bg} ${STATUS_TONE.RED.border}` },
 } as const;
 
 export function OfflineAICopilot({
@@ -40,7 +41,7 @@ export function OfflineAICopilot({
   crew,
   displayVitals,
 }: OfflineAICopilotProps) {
-  const { voiceStress } = useMissionTelemetry();
+  const { voiceStress, scenario } = useMissionTelemetry();
   const { unsyncedCount, syncNow, isSyncing, isOnline, lastSyncAt } = useSync();
   const {
     setSession,
@@ -103,10 +104,10 @@ export function OfflineAICopilot({
           Stress {stressIndex}/100 · {stressLabel}
         </p>
         <p className="mt-1 font-mono text-[11px] text-mc-label">
-          Based on: live vitals ({riskLabel(risk)}){patientLabs ? ` + latest blood labs (${riskLabel(labLevel)})` : ""}. The header pill shows vitals only.
+          Based on: {scenario.sensorDropout ? "last valid vitals, sensor offline" : "live vitals"} ({riskLabel(risk)}){patientLabs ? ` + latest blood labs (${riskLabel(labLevel)})` : ""}. The header pill shows vitals only.
         </p>
         {patientLabs && patientLabs.flagged.length > 0 && (
-          <p className="mt-2 text-xs leading-relaxed text-mc-amber">
+          <p className={`mt-2 text-xs leading-relaxed ${RISK_TONE[labLevel].text}`}>
             Lab flags ({patientName ?? userName}):{" "}
             {patientLabs.flagged.map((r) => `${r.label} ${formatLab(r)} ${r.note}`).join(" · ")}
           </p>
