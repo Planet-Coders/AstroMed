@@ -8,6 +8,8 @@ import { defineConfig } from "@playwright/test";
 export default defineConfig({
   testDir: "tests/e2e",
   globalSetup: "./tests/e2e/global-setup.ts",
+  // Removes the throwaway guest accounts the tests sign up with (see tests/e2e/testAccounts.ts).
+  globalTeardown: "./tests/e2e/global-teardown.ts",
   timeout: 90_000,
   expect: { timeout: 20_000 },
   fullyParallel: false,

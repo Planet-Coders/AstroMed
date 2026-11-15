@@ -105,3 +105,13 @@ describe("Talk to me quiets the reminder voice", () => {
     vi.unstubAllGlobals();
   });
 });
+
+describe("e2e test accounts", () => {
+  it("cleanup matches only the throwaway test emails", async () => {
+    const { TEST_ACCOUNT, testEmail } = await import("../e2e/testAccounts");
+    expect(TEST_ACCOUNT.test(testEmail("replay"))).toBe(true);
+    expect(TEST_ACCOUNT.test(testEmail("water-retry"))).toBe(true);
+    expect(TEST_ACCOUNT.test("john@aahms.demo")).toBe(false);
+    expect(TEST_ACCOUNT.test("replay-team@aahms.demo")).toBe(false);
+  });
+});
