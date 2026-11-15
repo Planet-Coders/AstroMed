@@ -1,6 +1,7 @@
 # AstroMed · Astronaut Health Monitoring Console
 
-**Live demo:** https://astro-med-ashy.vercel.app
+**Live demo:** https://astro-med-ashy.vercel.app  
+**Video & Presentation Slides:** https://drive.google.com/drive/folders/1JcQ1hzmjY0dVzByZCnoeY9x9yhl3UeHp
 
 A NASA Space Apps Challenge prototype: a self-assessment health console for astronauts on long missions. Our scenario is the MTV-1 Mars transit, 20 light-minutes from Earth.
 
@@ -117,11 +118,14 @@ Results turn green, amber or red as they're typed, with follow-up guidance.
 
 See [the co-pilot guide](docs/COPILOT.md) for prompt instructions, NASA sources, and how to run the benchmark.
 
-- Runs **Llama 3.2 1B** fully in the browser with [WebLLM](https://github.com/mlc-ai/web-llm), so answers don't depend on the link to Earth.
+- **Dual-model on-device WebLLM architecture**: runs client-side inside the browser using [@mlc-ai/web-llm](https://github.com/mlc-ai/web-llm) offloaded to a Web Worker, ensuring responses never depend on the 20-minute Earth communication link:
+  - **Primary model:** **Llama 3.2 1B Instruct** (`Llama-3.2-1B-Instruct-q4f16_1-MLC` with f32 fallback for GPUs without `shader-f16`).
+  - **Compact / low-resource model:** **SmolLM2 360M Instruct** (`SmolLM2-360M-Instruct-q4f16_1-MLC` / `q4f32_1`), automatically selected on mobile devices, systems with ≤4 GB RAM, or when toggled in the UI to minimize download and memory footprint.
+  - **Configurable:** Override with `NEXT_PUBLIC_WEBLLM_MODEL` to pin any custom MLC model.
+- **Persistent browser caching:** Model weights (~350 MB–800 MB) download only on the first visit and are permanently cached via the browser Cache API for instant offline cold starts.
 - Every question and reply is saved for mission oversight (queued offline, sent when the link is back). The chat panel tells the crew so.
-- It gets the crew's vitals, baselines, protocols, medicine kit, today's self-check and habitat data.
-- **Basic mode:** without WebGPU, or when the model can't load, it falls back to built-in triage rules with no errors.
-- On GPUs without `shader-f16` it uses f32 builds, and it tries a smaller model before giving up.
+- It is dynamically grounded on the crew member's live vitals, personal baselines, ISS-style clinical protocols, onboard medicine kit, today's self-check, and habitat data.
+- **Basic mode (WebGPU fallback):** Without WebGPU support or if model loading fails, it gracefully falls back to built-in deterministic clinical triage rules grounded with bundled NASA research excerpts, ensuring zero downtime.
 
 ### Offline first
 
@@ -182,6 +186,48 @@ The header's **Demo** dropdown switches between:
 - ppCO₂ + PVT slowdown
 - Solar particle event
 - Missing data · sensor dropout (the wearable stops sending: the console shows the last valid reading with its age, and oversight sees the gap)
+
+## NASA Datasets, Evidence Reports & Space Agency Resources
+
+AstroMed grounds its self-assessment thresholds, monitoring baselines, clinical triage guidance and habitat environmental models on open NASA datasets, peer-reviewed human research evidence reports, and operational spaceflight standards.
+
+### 1. NASA Datasets & Studies (NASA OSDR / GeneLab / RadLab)
+- **[OSD-575 · Inspiration4 Serum Metabolic Panel & Cytokines](https://osdr.nasa.gov/bio/repo/data/studies/OSD-575)**: Real human astronaut orbital flight data (4 crew members, pre-flight, in-flight, and post-flight blood chemistry: fasting glucose, BUN, creatinine, sodium, electrolytes).
+- **[OSD-569 · Inspiration4 Complete Blood Count (CBC)](https://osdr.nasa.gov/bio/repo/data/studies/OSD-569)**: Real human astronaut hematology data (hematocrit, hemoglobin, WBC, RBC, and platelets tracking fluid shifts and plasma volume changes in microgravity).
+- **[OSD-195 · Human 21-Day Bedrest Skeletal Muscle Gene Expression](https://osdr.nasa.gov/bio/repo/data/studies/OSD-195)**: Human microgravity-analog ground study tracking muscle disuse and gene expression changes.
+- **[OSD-751 · Rodent Research-1: Brain Inflammasome Activation (SpaceX CRS-4)](https://osdr.nasa.gov/bio/repo/data/studies/OSD-751)**: Spaceflight immune and inflammatory signaling assays in brain tissue.
+- **[OSD-661 · Rodent Research-1: Bone and Muscle Loss / GSK3](https://osdr.nasa.gov/bio/repo/data/studies/OSD-661)**: Micro-CT and DXA bone mineral density assays of lumbar spine in spaceflight.
+- **[OSD-489 · Rodent Research-1: Cancellous Bone Micro-Structure](https://osdr.nasa.gov/bio/repo/data/studies/OSD-489)**: Micro-computed tomography assay quantifying microgravity cancellous bone structural degradation.
+- **[NASA RadLab Space Radiation Database (NTRS 20240012790)](https://ntrs.nasa.gov/citations/20240012790)**: Measured spacecraft dose-rates and galactic cosmic ray background across space vehicles.
+
+### 2. NASA Human Research Program (HRP) Evidence Reports (NTRS)
+- **[NTRS 20240012429 · Risk of Renal Stone Formation (Hydration & Dehydration)](https://ntrs.nasa.gov/citations/20240012429)**: Evidence report on fluid intake, microgravity calcium loss, and renal stone risk.
+- **[NTRS 20000020539 · Renal Stone Risk During Space Flight](https://ntrs.nasa.gov/citations/20000020539)**: Clinical finding that long-duration crew producing >2.5 L/day urine volume minimized stone formation risk.
+- **[NTRS 20160003864 · Sleep Loss, Circadian Desynchronization & Crew Performance](https://ntrs.nasa.gov/citations/20160003864)**: Crew sleep degradation, circadian misalignment, and performance decrements in flight.
+- **[NTRS 20220014774 · Continuous vs. Intermittent Actigraphy During Space Missions](https://ntrs.nasa.gov/citations/20220014774)**: Rationale for continuous daily sleep tracking over occasional blocks.
+- **[NTRS 20170005625 · Risk of Cardiac Rhythm Problems During Spaceflight](https://ntrs.nasa.gov/citations/20170005625)**: Microgravity fluid shifts, cardiovascular autonomic regulation, and arrhythmia risks.
+- **[NTRS 20220019338 · Muscle Mass, Strength & Aerobic Performance Risks](https://ntrs.nasa.gov/citations/20220019338)**: Prescription and monitoring for ~2.5 h daily countermeasure exercise (resistance, cycle, treadmill).
+- **[NTRS 20160003870 · Acute Radiation Syndromes and Solar Particle Events](https://ntrs.nasa.gov/citations/20160003870)**: Emergency storm shelter protocols and acute dose rate limits for solar particle events.
+- **[NTRS 20250001454 · Behavioral Health and Performance Risks](https://ntrs.nasa.gov/citations/20250001454)**: Behavioral and cognitive performance under isolation, confinement, and long transit.
+- **[NTRS 20160004365 · Risk of Adverse Cognitive or Behavioral Conditions](https://ntrs.nasa.gov/citations/20160004365)**: Psychiatric monitoring and behavioral health risk framework.
+- **[NTRS 20000104233 · Temperature Regulation in Crewmembers After Space Flight](https://ntrs.nasa.gov/citations/20000104233)**: Altered thermoregulation and core body temperature shifts post-spaceflight.
+
+### 3. NASA Standards, Frameworks & APIs
+- **[NASA Human Research Program (HRP) & RIDGE Framework](https://www.nasa.gov/hrp/)**: The 5 human spaceflight hazards (**R**adiation, **I**solation, **D**istance from Earth, **G**ravity transitions, **E**nvironment) linked to organ systems in the 3D Body Map.
+- **[NASA-STD-3001 Vol. 1 Rev C · Crew Health Standard](https://standards.nasa.gov/standard/NASA/NASA-STD-3001-Vol-1)**: Space Flight Human-System Standard specifying the 600 mSv career effective dose limit and Caution & Warning color specifications.
+- **[NASA DONKI Space Weather API (Heliophysics)](https://kauai.ccmc.gsfc.nasa.gov/DONKI/)** ([api.nasa.gov](https://api.nasa.gov/)): Live Solar Flare (`/DONKI/FLR`) and Solar Energetic Particle (`/DONKI/SEP`) notifications.
+- **[NASA Image and Video Library](https://images.nasa.gov/)**: High-resolution public-domain mission photography (Artemis I, Artemis II, ISS Expedition 40, Viking Mars Orbiter).
+
+### 4. Other Space Agency & Scientific Agency Resources
+- **[NOAA Space Weather Prediction Center (SWPC)](https://www.swpc.noaa.gov/)** *(US NOAA in partnership with NASA Heliophysics)*:
+  - **[NOAA Space Weather Scales (R, S, G)](https://services.swpc.noaa.gov/products/noaa-scales.json)**
+  - **[GOES Primary Satellite Protons (6-hour feed)](https://services.swpc.noaa.gov/json/goes/primary/integral-protons-6-hour.json)** (≥10 MeV proton flux for radiation storm level S1–S5)
+  - **[GOES Primary Satellite Solar X-rays (6-hour feed)](https://services.swpc.noaa.gov/json/goes/primary/xrays-6-hour.json)** (real-time solar flare detection and radio blackout level R1–R5)
+  - **[Planetary K-index](https://services.swpc.noaa.gov/json/planetary_k_index_1m.json)** (geomagnetic storm tracking level G1–G5)
+  - **[NOAA Operational Space Weather Alerts](https://services.swpc.noaa.gov/products/alerts.json)**
+- **[ISS Psychomotor Vigilance Task (PVT-B)](https://www.nasa.gov/mission/station/research-explorer/investigation/?#id=449)** *(International Space Station Multilateral Medical Operations: NASA, ESA, JAXA, CSA)*:
+  - **[PVT-B Clinical Validation Paper (Basner, Dinges et al. - PubMed)](https://pubmed.ncbi.nlm.nih.gov/22464761/)**: Standardized brief reaction-time vigilance protocol used across ISS astronaut operations to evaluate acute fatigue.
+- **[MakeHuman Community 3D Mesh (CC0)](http://www.makehumancommunity.org/)**: Public-domain anatomical 3D geometry used in Three.js for the interactive crew 3D Body Map.
 
 ## Getting started
 
@@ -367,7 +413,7 @@ flowchart LR
 - **Next.js 16** (App Router, built with webpack), **React 19**, TypeScript, **Tailwind CSS v4**
 - **Prisma 6** + **PostgreSQL** (Neon) with migrations, including an admin audit log; JWT session cookie (`jose`); role checks against the database for admin and oversight APIs
 - **Dexie** (IndexedDB) store-and-forward queue
-- **@mlc-ai/web-llm** in a Web Worker: idle preload, warmup, streaming replies, cached weights
+- **@mlc-ai/web-llm** in a Web Worker (Llama 3.2 1B Instruct primary, SmolLM2 360M compact fallback): idle preload, warmup, streaming replies, cached weights
 
 ## Project structure
 
