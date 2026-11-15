@@ -15,7 +15,7 @@ import { describeCheck, getLatestCheck, type StepId } from "@/lib/selfCheck";
 import { describeSpaceWeather, useSpaceWeather } from "@/lib/useSpaceWeather";
 import { evaRecommendation, findProtocols, protocolsForReadings } from "@/lib/copilotKnowledge";
 import { findEvidence, type EvidenceCard } from "@/lib/copilotEvidence";
-import { insightMessages, INSIGHT_FORMAT, selectInsight, type Insight, type InsightSnapshot } from "@/lib/copilotInsight";
+import { insightFormat, insightMessages, selectInsight, type Insight, type InsightSnapshot } from "@/lib/copilotInsight";
 import { copilotMessages, repeatsPreviousReply, retrievalQuestion, MAX_COPILOT_INPUT, type CopilotTurn } from "@/lib/copilotPrompt";
 import { emergencyGuidance, medicationGuidance } from "@/lib/copilotGuidance";
 import { describePersonalBaseline, describeSubjectVitals, selectSubject, type CopilotSession, type CopilotVitals } from "@/lib/copilotSubject";
@@ -55,7 +55,6 @@ type CopilotContextValue = {
   engineStatus: EngineStatus;
   loadProgress: string;
   loadPercent: number | null;
-  modelCached: boolean | null;
   modelId: string | null;
   basicReason: string | null;
   replyMetrics: ReplyMetrics | null;
@@ -125,7 +124,6 @@ export function CopilotProvider({ userId, children }: { userId: string; children
 
   const stopReply = useCallback(() => {
     active.current?.abort();
-    setMessages((m) => m.filter((message) => !message.streaming));
   }, []);
 
   const clearChat = useCallback(() => {
@@ -148,7 +146,7 @@ export function CopilotProvider({ userId, children }: { userId: string; children
 
     const start = performance.now();
     const result = await generateReply(insightMessages(snapshot), {
-      signal, timeoutMs: INSIGHT_TIMEOUT_MS, maxTokens: 96, format: INSIGHT_FORMAT,
+      signal, timeoutMs: INSIGHT_TIMEOUT_MS, maxTokens: 96, format: insightFormat(snapshot),
     });
     if (signal.aborted) return null;
     const insight = selectInsight(snapshot, result?.text, Math.round(performance.now() - start));
@@ -186,15 +184,9 @@ export function CopilotProvider({ userId, children }: { userId: string; children
     let sources: EvidenceCard[] = [];
     const personalContext: { label: string; value: string }[] = [];
     let reply = "";
+    let fallbackReason = canGenerate ? undefined : "The on-device model is loading or unavailable.";
     let metrics: ReplyMetrics | undefined;
     const started = performance.now();
-    const showPartial = (content: string) => {
-      if (run.signal.aborted) return;
-      setMessages((m) => [
-        ...m.filter((message) => !message.streaming),
-        { role: "assistant", content, streaming: true },
-      ]);
-    };
 
     try {
       if (guidance) {
@@ -297,7 +289,7 @@ export function CopilotProvider({ userId, children }: { userId: string; children
             ...protocols.map((p) => p.title + ": " + p.text),
           ].filter(Boolean).join("\n");
           const result = await generateReply(copilotMessages(question, context, sources, followUp), {
-            signal: run.signal, timeoutMs: GENERATION_TIMEOUT_MS, onText: showPartial,
+            signal: run.signal, timeoutMs: GENERATION_TIMEOUT_MS, stop: ["\n\n"],
           });
           if (run.signal.aborted) return;
           const text = result?.text ?? "";
@@ -306,6 +298,12 @@ export function CopilotProvider({ userId, children }: { userId: string; children
             reply = text;
             metrics = result.metrics;
             mode = "webllm";
+          } else if (result?.finishReason === "length") {
+            fallbackReason = "The model reached its reply limit before finishing.";
+          } else if (text) {
+            fallbackReason = "The generated reply did not pass the co-pilot’s checks.";
+          } else {
+            fallbackReason = "The on-device model could not complete this reply.";
           }
         }
         if (!reply) {
@@ -323,9 +321,10 @@ export function CopilotProvider({ userId, children }: { userId: string; children
       const timing = metrics ?? { totalMs: Math.round(performance.now() - started), firstTokenMs: null, promptTokens: null, completionTokens: null };
       setReplyMetrics(timing);
       setMessages((m) => [
-        ...m.filter((message) => !message.streaming),
+        ...m,
         {
           role: "assistant", content: reply, mode,
+          fallbackReason: mode === "basic" ? fallbackReason : undefined,
           subject: guidance ? undefined : subject?.name,
           personalContext, sources: sources.map(({ id, title, url }) => ({ id, title, url })),
           timing, model: mode === "webllm" ? llm.model : null,
@@ -335,7 +334,7 @@ export function CopilotProvider({ userId, children }: { userId: string; children
       console.warn("Co-pilot could not prepare the reply", err);
       if (!run.signal.aborted) {
         setMessages((m) => [
-          ...m.filter((message) => !message.streaming),
+          ...m,
           { role: "assistant", mode: "basic", content: "I couldn’t load the onboard data for this reply. Try again." },
         ]);
       }
@@ -362,7 +361,6 @@ export function CopilotProvider({ userId, children }: { userId: string; children
     engineStatus,
     loadProgress: llm.text,
     loadPercent: llm.progress,
-    modelCached: llm.cached,
     modelId: llm.model,
     basicReason: llm.reason,
     replyMetrics,

@@ -11,20 +11,42 @@ import { COPILOT_SYSTEM_PROMPT } from "@/lib/copilotPrompt";
 const PINNED_MODEL = process.env.NEXT_PUBLIC_WEBLLM_MODEL || null;
 const LOAD_STALL_MS = 120_000;
 const CONTEXT_WINDOW = 1536;
+const COMPACT_PREFERENCE = "astromed_copilot_compact";
 
 /**
  * Models to try, best first. GPUs without the `shader-f16` feature (common on older
  * Intel/AMD integrated graphics) need the f32 builds; the small SmolLM2 model is the
  * fallback when the larger one cannot fit in GPU memory.
  */
-function candidateModels(hasF16: boolean): string[] {
+function preferCompact() {
+  const mobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)
+    || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+  const memory = (navigator as Navigator & { deviceMemory?: number }).deviceMemory;
+  try {
+    return mobile || (memory != null && memory <= 4) || localStorage.getItem(COMPACT_PREFERENCE) === "1";
+  } catch {
+    return mobile || (memory != null && memory <= 4);
+  }
+}
+
+function rememberCompact() {
+  if (PINNED_MODEL) return;
+  try {
+    localStorage.setItem(COMPACT_PREFERENCE, "1");
+  } catch {
+    /* Storage may be unavailable. The current retry still uses the compact model. */
+  }
+}
+
+function candidateModels(hasF16: boolean, compact: boolean): string[] {
   if (PINNED_MODEL) return [PINNED_MODEL];
-  return hasF16
-    ? ["Llama-3.2-1B-Instruct-q4f16_1-MLC", "SmolLM2-360M-Instruct-q4f16_1-MLC"]
-    : ["Llama-3.2-1B-Instruct-q4f32_1-MLC", "SmolLM2-360M-Instruct-q4f32_1-MLC"];
+  const quantization = hasF16 ? "q4f16_1" : "q4f32_1";
+  const small = `SmolLM2-360M-Instruct-${quantization}-MLC`;
+  return compact ? [small] : [`Llama-3.2-1B-Instruct-${quantization}-MLC`, small];
 }
 
 export const WEBLLM_MODEL_ID = PINNED_MODEL ?? "Llama-3.2-1B-Instruct-q4f16_1-MLC";
+export const CAN_CHOOSE_COMPACT = !PINNED_MODEL;
 
 /** "basic" = no usable WebGPU (or every model failed): the rule-based triage answers. */
 export type EngineStatus = "idle" | "loading" | "ready" | "basic";
@@ -36,8 +58,6 @@ export type EngineState = {
   text: string;
   /** Why the co-pilot is in basic mode, in plain words. */
   reason: string | null;
-  /** Whether weights were already in the browser cache when loading began. */
-  cached: boolean | null;
   /** The model actually loaded (may be a smaller fallback). */
   model: string | null;
 };
@@ -47,16 +67,21 @@ const IDLE: EngineState = {
   progress: null,
   text: "",
   reason: null,
-  cached: null,
   model: null,
 };
 
 // Module-level singleton: survives client-side navigation and React remounts,
 // so the model loads once per tab instead of once per mount.
 let state: EngineState = IDLE;
-let engine: MLCEngineInterface | null = null;
-let worker: Worker | null = null;
+type LoadedEngine = {
+  engine: MLCEngineInterface;
+  stopped: Promise<null>;
+  retire: () => void;
+};
+let loaded: LoadedEngine | null = null;
 let loading: Promise<MLCEngineInterface | null> | null = null;
+let recoveryUsed = false;
+let useCompactAfterFailure = false;
 const listeners = new Set<() => void>();
 
 function setState(patch: Partial<EngineState>) {
@@ -70,14 +95,43 @@ function subscribe(listener: () => void) {
 }
 
 export function getEngine(): MLCEngineInterface | null {
-  return engine;
+  return loaded?.engine ?? null;
 }
 
-/** A timed-out worker cannot safely serve another completion. */
-export function discardEngine(stalled: MLCEngineInterface, reason: string) {
-  if (engine !== stalled) return;
-  enterBasicMode(reason);
-  loading = null;
+/** A worker can stop while a request is waiting for its next stream chunk. */
+export function engineStopped(engine: MLCEngineInterface): Promise<null> {
+  return loaded?.engine === engine ? loaded.stopped : Promise.resolve(null);
+}
+
+export type RuntimeFailure = "gpu" | "worker" | "stalled";
+
+const FAILURE_MESSAGE: Record<RuntimeFailure, string> = {
+  gpu: "WebGPU stopped while running the on-device model.",
+  worker: "The on-device AI worker stopped responding.",
+  stalled: "The on-device model stopped responding.",
+};
+
+export function runtimeFailure(error: unknown): RuntimeFailure | null {
+  const message = String(error);
+  if (/device.?lost|device (?:was )?lost|device has been lost|already been disposed|out of memory|compatible GPU|GPU validation|shader-f16|WebGPU is not available/i.test(message)) return "gpu";
+  if (/model (?:is )?not loaded|ModelNotLoadedError|AI worker stopped/i.test(message)) return "worker";
+  return null;
+}
+
+/** Retire a broken worker and try one fresh runtime before staying in Basic mode. */
+export function discardEngine(engine: MLCEngineInterface, failure: RuntimeFailure) {
+  if (loaded?.engine !== engine) return;
+  loaded.retire();
+  loaded = null;
+  const reason = FAILURE_MESSAGE[failure];
+  if (recoveryUsed) {
+    loading = Promise.resolve(enterBasicMode(reason + " Retry the model, or reload the page if the browser keeps losing its GPU."));
+    return;
+  }
+  recoveryUsed = true;
+  useCompactAfterFailure = true;
+  rememberCompact();
+  loading = load(reason + " Restarting on-device AI…");
 }
 
 /** Short model name for UI chips, e.g. "LLAMA-3.2-1B-Q4". */
@@ -100,14 +154,14 @@ async function probeGpu(): Promise<{ adapter: GpuAdapter } | { reason: string }>
   }
   const gpu = (navigator as Navigator & { gpu?: GpuLike }).gpu;
   if (!gpu) {
-    return { reason: "This browser has no WebGPU. Chrome or Edge 113+ on a supported GPU can run the full model." };
+    return { reason: "This browser does not expose WebGPU. Try an up-to-date Chrome, Edge, or Safari on a supported device." };
   }
   try {
     const adapter =
-      (await gpu.requestAdapter({ powerPreference: "high-performance" })) ??
+      (await gpu.requestAdapter({ powerPreference: "high-performance" }).catch(() => null)) ??
       (await gpu.requestAdapter());
     if (!adapter) {
-      return { reason: "WebGPU is present but this computer's graphics driver doesn't expose a usable GPU." };
+      return { reason: "The browser could not get a usable WebGPU adapter. Check graphics acceleration or restart the browser." };
     }
     return { adapter };
   } catch {
@@ -116,15 +170,12 @@ async function probeGpu(): Promise<{ adapter: GpuAdapter } | { reason: string }>
 }
 
 function enterBasicMode(reason: string) {
-  worker?.terminate();
-  worker = null;
-  engine = null;
   setState({ status: "basic", progress: null, text: "", reason, model: null });
   return null;
 }
 
-async function load(): Promise<MLCEngineInterface | null> {
-  setState({ status: "loading", progress: null, reason: null, text: "Checking WebGPU…" });
+async function load(text = "Checking WebGPU…"): Promise<MLCEngineInterface | null> {
+  setState({ status: "loading", progress: null, reason: null, text, model: null });
 
   const probe = await probeGpu();
   if ("reason" in probe) return enterBasicMode(probe.reason);
@@ -139,47 +190,56 @@ async function load(): Promise<MLCEngineInterface | null> {
     return enterBasicMode("The on-device AI library could not be loaded.");
   }
 
-  const models = candidateModels(probe.adapter.features.has("shader-f16"));
-  for (const [i, model] of models.entries()) {
-    const fallback = i > 0;
+  const models = candidateModels(probe.adapter.features.has("shader-f16"), useCompactAfterFailure || preferCompact());
+  let failure = "The on-device model could not start. Retry the model to run its startup checks again.";
+  for (const model of models) {
+    const compact = model.startsWith("SmolLM2-360M");
     let stallTimer: ReturnType<typeof setTimeout> | undefined;
+    let worker: Worker | undefined;
+    let installedEngine: MLCEngineInterface | undefined;
+    let warming = false;
     try {
       const cached = await webllm.hasModelInCache(model).catch(() => false);
       setState({
-        cached,
         model,
         progress: 0,
-        text: `${fallback ? "Trying a smaller model. " : ""}${
-          cached ? "Loading cached model into GPU…" : "Downloading model weights (first run only)…"
-        }`,
+        text: cached
+          ? `Loading cached ${compact ? "compact " : ""}model files…`
+          : `Downloading ${compact ? "compact " : ""}model files…`,
       });
 
-      const candidate = new Worker(new URL("./worker.ts", import.meta.url), { type: "module" });
-      worker = candidate;
+      const candidate = worker = new Worker(new URL("./worker.ts", import.meta.url), { type: "module" });
       let rejectLoad: (reason: Error) => void = () => {};
       const loadFailed = new Promise<never>((_, reject) => { rejectLoad = reject; });
+      const workerFailed = () => {
+        if (installedEngine) discardEngine(installedEngine, "worker");
+        else rejectLoad(new Error("The AI worker stopped during startup."));
+      };
       const restartTimer = () => {
         clearTimeout(stallTimer);
         stallTimer = setTimeout(() => rejectLoad(new Error("Model load stopped making progress")), LOAD_STALL_MS);
       };
-      candidate.addEventListener("error", () => rejectLoad(new Error("WebLLM worker failed to load")), { once: true });
+      candidate.addEventListener("error", workerFailed);
+      candidate.addEventListener("messageerror", workerFailed);
       restartTimer();
       let lastProgress = -1;
       let lastReport = "";
       const e = await Promise.race([webllm.CreateWebWorkerMLCEngine(candidate, model, {
         initProgressCallback: (report) => {
-          if (worker !== candidate) return;
+          if (worker !== candidate || installedEngine) return;
           if (report.progress !== lastProgress || report.text !== lastReport) {
             restartTimer();
             lastProgress = report.progress;
             lastReport = report.text;
           }
-          setState({ progress: report.progress, text: report.text });
+          if (report.progress < 1) setState({ progress: report.progress });
+          else setState({ progress: null, text: "Model files loaded. Starting WebGPU…" });
         },
       }, PINNED_MODEL ? undefined : { context_window_size: CONTEXT_WINDOW }), loadFailed]);
 
       // Preflight a realistic prompt so a device that cannot sustain prefill can try a smaller model.
-      setState({ progress: 1, text: "Warming up GPU kernels…" });
+      warming = true;
+      setState({ progress: null, text: "Testing the model on your GPU…" });
       restartTimer();
       await Promise.race([
         e.chat.completions.create({
@@ -192,26 +252,60 @@ async function load(): Promise<MLCEngineInterface | null> {
         loadFailed,
       ]);
 
-      engine = e;
+      let notifyStopped!: (value: null) => void;
+      const stopped = new Promise<null>((resolve) => { notifyStopped = resolve; });
+      installedEngine = e;
+      loaded = {
+        engine: e, stopped,
+        retire: () => {
+          candidate.terminate();
+          notifyStopped(null);
+        },
+      };
       setState({ status: "ready", text: "On-device inference active" });
       return e;
     } catch (err) {
       console.warn(`WebLLM: ${model} failed to load`, err);
       worker?.terminate();
-      worker = null;
+      worker = undefined;
+      const runtime = runtimeFailure(err);
+      if (runtime === "gpu" || warming) {
+        if (!compact) {
+          useCompactAfterFailure = true;
+          rememberCompact();
+        }
+        failure = "The browser could not initialize or run the model on its GPU. Restart the browser and retry.";
+      } else if (/fetch|network|Cache.*Request failed|HTTP|quota/i.test(String(err))) {
+        failure = "The browser could not fetch or store the model files. Check the connection and available browser storage, then retry.";
+      } else if (/stopped making progress/i.test(String(err))) {
+        failure = "Model startup stopped making progress. Retry to reuse model files already cached by this browser.";
+      }
     } finally {
       clearTimeout(stallTimer);
     }
   }
-  return enterBasicMode("The on-device model could not load. Check the model download connection or WebGPU support, then retry.");
+  return enterBasicMode(failure);
 }
 
 /** Start (or join) the model load. Safe to call from any page, any number of times. */
 export function preloadEngine(force = false): Promise<MLCEngineInterface | null> {
   if (typeof window === "undefined") return Promise.resolve(null);
-  if (force && state.status === "basic") loading = null;
+  if (force && state.status === "basic") {
+    recoveryUsed = false;
+    loading = null;
+  }
   loading ??= load();
   return loading;
+}
+
+export function startCompactEngine() {
+  if (PINNED_MODEL || state.status === "loading" || state.model?.startsWith("SmolLM2-360M")) return;
+  useCompactAfterFailure = true;
+  rememberCompact();
+  loaded?.retire();
+  loaded = null;
+  recoveryUsed = false;
+  loading = load("Starting the compact model…");
 }
 
 export function useWebLLM(): EngineState {

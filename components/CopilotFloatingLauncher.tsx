@@ -16,7 +16,7 @@ export function CopilotFloatingLauncher() {
     stopReply,
     isSending,
     engineStatus,
-    loadPercent,
+    loadProgress,
     session,
   } = useCopilot();
 
@@ -50,7 +50,7 @@ export function CopilotFloatingLauncher() {
               className="h-[min(480px,70vh)]"
               placeholder={
                 engineStatus === "loading"
-                  ? `AI loading${loadPercent != null ? ` ${Math.round(loadPercent * 100)}%` : ""}. Basic answers work now…`
+                  ? loadProgress
                   : engineStatus === "basic"
                     ? "Basic mode: ask about symptoms or emergencies…"
                     : "Ask about symptoms, vitals or emergencies…"

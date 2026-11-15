@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { AlertView } from "@/components/monitoring/types";
-import { dailyCheckInsight, insightMessages, monitoringInsight, selectInsight } from "@/lib/copilotInsight";
+import { dailyCheckInsight, insightFormat, insightMessages, monitoringInsight, selectInsight } from "@/lib/copilotInsight";
 import { summarizeHealth } from "@/lib/healthSummary";
 import { METRIC } from "@/lib/monitoring/catalog";
 import { getPvtResult, savePvtResult } from "@/lib/pvtLog";
@@ -25,6 +25,11 @@ describe("saved-check explanations", () => {
     expect(chosen.finding.detail).toContain("1100");
     expect(chosen.followUp).toBe(chosen.finding.followUps[1]);
     expect(JSON.stringify(insightMessages(snapshot))).not.toContain("crew-1");
+    expect(JSON.parse(insightFormat(snapshot).schema!).anyOf[1].properties).toMatchObject({
+      finding: { enum: ["hydration"] },
+      compare: { enum: [false] },
+      reference: { enum: [null, "NTRS 20240012429"] },
+    });
   });
 
   it.each([

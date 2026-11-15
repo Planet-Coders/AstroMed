@@ -7,7 +7,7 @@ import { riskLabel } from "@/lib/risk";
 import { useMissionTelemetry } from "@/components/MissionTelemetryProvider";
 import { useSync } from "./SyncContext";
 import { useCopilot, type CrewBrief } from "./CopilotProvider";
-import { modelLabel } from "@/lib/webllm/engine";
+import { CAN_CHOOSE_COMPACT, modelLabel, startCompactEngine } from "@/lib/webllm/engine";
 import { formatLab, labsFor } from "@/lib/labs";
 import type { CopilotVitals } from "@/lib/copilotSubject";
 
@@ -45,10 +45,11 @@ export function OfflineAICopilot({
     voiceTranscript,
     setVoiceTranscript,
     engineStatus,
+    loadProgress,
     loadPercent,
-    modelCached,
     modelId,
     basicReason,
+    isSending,
     replyMetrics,
     retryEngine,
     risk,
@@ -127,9 +128,10 @@ export function OfflineAICopilot({
                 style={loadPercent == null ? undefined : { width: `${Math.round(loadPercent * 100)}%` }}
               />
             </div>
-            <p className="mt-1.5 text-xs text-mc-label">
-              {modelCached ? "Loading the AI from this device" : "Downloading the AI once"}
-              {loadPercent != null && ` · ${Math.round(loadPercent * 100)}%`}. Basic answers work meanwhile.
+            <p className="mt-1.5 text-xs text-mc-label" role="status">
+              {loadProgress}
+              {loadPercent != null && ` ${Math.floor(loadPercent * 100)}%`}
+              {" "}Basic answers work meanwhile.
             </p>
           </div>
         )}
@@ -140,15 +142,22 @@ export function OfflineAICopilot({
               Answers come from the built-in triage rules. {basicReason}
             </p>
             <button type="button" onClick={retryEngine} className="mt-1.5 text-mc-link underline">
-              Try the full AI again
+              Try on-device AI again
             </button>
           </div>
         )}
         {engineStatus === "ready" && (
-          <p className="text-xs text-mc-label">
-            {modelLabel(modelId)} on this device
-            {replyMetrics?.firstTokenMs != null && ` · first token ${replyMetrics.firstTokenMs} ms · reply ${replyMetrics.totalMs} ms`}
-          </p>
+          <div className="text-xs text-mc-label">
+            <p>
+              {modelLabel(modelId)} on this device
+              {replyMetrics?.firstTokenMs != null && ` · first token ${replyMetrics.firstTokenMs} ms · reply ${replyMetrics.totalMs} ms`}
+            </p>
+            {CAN_CHOOSE_COMPACT && modelId?.startsWith("Llama-") && (
+              <button type="button" onClick={startCompactEngine} disabled={isSending} className="mt-1.5 text-mc-link underline disabled:opacity-50">
+                Use compact model
+              </button>
+            )}
+          </div>
         )}
 
         <button

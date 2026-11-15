@@ -1,8 +1,12 @@
 import { afterEach, expect, it, vi } from "vitest";
 import { generateReply } from "@/lib/webllm/generation";
 
-const { getEngine, discardEngine } = vi.hoisted(() => ({ getEngine: vi.fn(), discardEngine: vi.fn() }));
-vi.mock("@/lib/webllm/engine", () => ({ getEngine, discardEngine }));
+const { getEngine, discardEngine, engineStopped } = vi.hoisted(() => ({
+  getEngine: vi.fn(),
+  discardEngine: vi.fn(),
+  engineStopped: vi.fn(() => new Promise<null>(() => {})),
+}));
+vi.mock("@/lib/webllm/engine", () => ({ getEngine, discardEngine, engineStopped, runtimeFailure: () => null }));
 
 function controlledEngine() {
   let finishFirst!: () => void;
@@ -10,7 +14,7 @@ function controlledEngine() {
   const create = vi.fn(async ({ messages }: { messages: { content: string }[] }) => {
     const topic = messages[0].content;
     return (async function* () {
-      if (topic === "chat") await first;
+      if (topic === "chat" || topic === "slow insight") await first;
       yield { choices: [{ delta: { content: topic } }] };
     })();
   });
@@ -67,4 +71,48 @@ it("returns at the deadline while waiting behind a chat without discarding its e
   await chat;
   expect((await request("follow-up"))?.text).toBe("follow-up");
   expect(create).toHaveBeenCalledTimes(2);
+});
+
+it("interrupts a slow explanation without destroying the worker or interleaving chat", async () => {
+  vi.useFakeTimers();
+  const { finishFirst, create, engine } = controlledEngine();
+  const insight = request("slow insight", undefined, 10);
+  const chat = request("chat after insight");
+  await vi.advanceTimersByTimeAsync(10);
+  expect(await insight).toBeNull();
+  expect(engine.interruptGenerate).toHaveBeenCalledOnce();
+  expect(discardEngine).not.toHaveBeenCalled();
+  expect(create).toHaveBeenCalledTimes(1);
+  finishFirst();
+  expect((await chat)?.text).toBe("chat after insight");
+  expect(getEngine()).toBe(engine);
+});
+
+it("releases the queue promptly when the worker stops mid-response", async () => {
+  const { finishFirst, create } = controlledEngine();
+  let retire!: (value: null) => void;
+  engineStopped.mockReturnValueOnce(new Promise<null>(resolve => { retire = resolve; }));
+  const chat = request("chat");
+  await vi.waitFor(() => expect(create).toHaveBeenCalledTimes(1));
+  retire(null);
+  expect(await chat).toBeNull();
+  expect((await request("after restart"))?.text).toBe("after restart");
+  finishFirst();
+});
+
+it("retires a worker that still fails to settle after an interruption", async () => {
+  vi.useFakeTimers();
+  const { finishFirst, engine } = controlledEngine();
+  let retire!: (value: null) => void;
+  engineStopped.mockReturnValueOnce(new Promise<null>(resolve => { retire = resolve; }));
+  discardEngine.mockImplementationOnce(() => retire(null));
+
+  const stalled = request("slow insight", undefined, 10);
+  await vi.advanceTimersByTimeAsync(10);
+  expect(await stalled).toBeNull();
+  expect(discardEngine).not.toHaveBeenCalled();
+  await vi.advanceTimersByTimeAsync(75_000);
+  expect(discardEngine).toHaveBeenCalledWith(engine, "stalled");
+  expect((await request("after stall"))?.text).toBe("after stall");
+  finishFirst();
 });
