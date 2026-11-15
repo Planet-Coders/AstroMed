@@ -114,12 +114,16 @@ export function CrewHotline({
     // Show it in the conversation at once; the server copy replaces it when it arrives.
     setPending((list) => (list.some((p) => p.clientId === queued.clientId) ? list : [...list, queued]));
     setBody("");
+    // Offline, the message only waits in this device's queue: say so instead of "Sent".
+    const offline = typeof navigator !== "undefined" && !navigator.onLine;
     setNotice(
-      level === "EMERGENCY"
-        ? "Emergency sent. Follow your emergency checklist while Earth receives it."
-        : delaySeconds
-          ? `Sent. It reaches Earth in ${countdown(delaySeconds * 1000)}.`
-          : "Sent."
+      offline
+        ? `${level === "EMERGENCY" ? "Emergency queued. Follow your emergency checklist now. " : "Queued. "}No link right now: it goes out first when the link returns${delaySeconds ? `, then reaches Earth ${countdown(delaySeconds * 1000)} later` : ""}.`
+        : level === "EMERGENCY"
+          ? "Emergency sent. Follow your emergency checklist while Earth receives it."
+          : delaySeconds
+            ? `Sent. It reaches Earth in ${countdown(delaySeconds * 1000)}.`
+            : "Sent."
     );
     void load();
   };
