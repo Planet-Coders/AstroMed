@@ -23,6 +23,13 @@ On the ground, a **super admin** sets up mission groups and crew accounts, and *
 - **Clearer status:** an irregular heart rhythm is always a warning; one shared colour per status level; the header says it is based on vitals only; sync shows Queued / Sent / Confirmed by Earth; the sensor-dropout demo shows the last valid reading and its age.
 - **Look and feel:** sidebar navigation, a new light theme (white cards, sunflower-yellow accent) beside the dark theme, and a compact co-pilot button on phones.
 - **Monitoring and co-pilot:** Daily Check readings feed monitoring alerts, a hydration alert workflow, and an improved onboard co-pilot with personalised grounding.
+- **Explain my results:** saved Daily Checks, single re-tests and active monitoring alerts have an on-demand co-pilot explanation that compares with a prior reading or trend and links the NASA evidence. It falls back to basic guidance within 12 seconds.
+- **Co-pilot recovery:** separate stages for model download, GPU start-up and warm-up; one automatic restart after a GPU or worker failure; a **Use compact model** option that is remembered after a desktop failure and preferred on phones.
+- **Monitoring history and charts:** up to 60 days of continuous crew baseline so 7 / 14 / 30-day views have no empty slots, interactive charts with an average line, hover values and ↑ / ↓ / → trend badges.
+- **Cleaner console:** a one-row top bar with a sync chip ("1 to sync" / "Synced"), a title and one-line description on every page, a tidier right rail, clean SVG icons instead of emoji, and one emergency action ("Hotline to Earth") in the sidebar.
+- **Fairer Beacon Lock (PVT):** median reaction time, a warm-up beacon, false starts counted separately and a lapse at 500 ms or slower; the arena is dark in dark mode.
+- **Smoother chat:** co-pilot and hotline messages appear at once ("Sending…"), never duplicate, and the thread follows new messages unless you scrolled up.
+- **Removed:** the mouse-study NASA OSDR panel (not human data). The human Inspiration4 blood labs stay.
 
 ## How it meets the challenge
 
@@ -111,7 +118,7 @@ Results turn green, amber or red as they're typed, with follow-up guidance.
 
 ### Cognitive test
 
-- **Beacon Lock**: a reaction-time (PVT) game that measures alertness and lapses.
+- **Beacon Lock**: a reaction-time (PVT) game that measures alertness and lapses. Scoring uses the median reaction time; the first beacon is a warm-up, taps under 100 ms are false starts, and a lapse is 500 ms or slower (or a miss). The body map uses the same rules.
 
 ### AI co-pilot
 
@@ -122,6 +129,8 @@ See [the co-pilot guide](docs/COPILOT.md) for prompt instructions, NASA sources,
 - It gets the crew's vitals, baselines, protocols, medicine kit, today's self-check and habitat data.
 - **Basic mode:** without WebGPU, or when the model can't load, it falls back to built-in triage rules with no errors.
 - On GPUs without `shader-f16` it uses f32 builds, and it tries a smaller model before giving up.
+- Start-up shows model files, GPU start-up and warm-up as separate stages. After a GPU or worker failure it restarts once automatically, and **Use compact model** switches to the smaller model (remembered on that device, and preferred on phones).
+- **Explain my results / this reading / this alert:** on-demand explanations in Daily Check and My monitoring. The model only picks from the app's recorded findings, approved follow-ups and NASA references, which are checked before display.
 
 ### Offline first
 
@@ -168,7 +177,8 @@ Every admin and oversight API checks the role on the server, from the database. 
 Full detail, thresholds and NASA sources: **[docs/METRICS.md](docs/METRICS.md)**.
 
 - **Metrics:** all Daily Check readings, exercise, pulse trend and radiation dose. Blood pressure shows both numbers, and blood sugar keeps fasting context. Each metric has a definition, expected cadence and rationale under **Why we monitor this**.
-- **Dashboard:** 7 / 14 / 30-day daily charts per metric with the amber and red lines, a **missing-data badge** per metric (On time / Late / Missing / No data yet, from the expected cadence) and a **trend summary** with % change against the previous period. Oversight sees it per astronaut (**Monitoring** tab); crew see their own under **My monitoring**.
+- **History:** up to 60 days of continuous baseline per crew member (sleep, activity, hydration, pulse, radiation, blood pressure, daily checks), so the charts have no empty slots.
+- **Dashboard:** 7 / 14 / 30-day daily charts per metric (average line, hover or tap for the exact value, weekday labels on 7-day views) with the amber and red lines, a **missing-data badge** per metric (On time / Late / Missing / No data yet, from the expected cadence) and a **trend summary** with % change against the previous period. Oversight sees it per astronaut (**Monitoring** tab); crew see their own under **My monitoring**.
 - **Alerts:** super admins can edit thresholds, windows and enabled status in **Alert rules**. Daily Check rules use the latest applicable value, including the latest daily fluid total. Alerts go **open → acknowledged → resolved** with a note thread. Crew can note and acknowledge their own alerts, and oversight can also resolve alerts. The app resolves an alert when a follow-up value clears its rule, and the note names the reading (e.g. a Daily Check re-test). Blood pressure rules must stay realistic: the systolic limits above the diastolic ones.
 - **Synthetic crew:** `npm run db:synthetic` seeds group **SIM-1** with six SYNTHETIC astronauts (normal, missing data, sleep debt, rising heart rate, dehydration, solar particle event), 14–30 days each, seedable.
 
@@ -199,7 +209,7 @@ npm run dev               # http://localhost:3000
 Tests:
 
 ```bash
-npm test                  # Vitest unit tests (103): alert rules, trends, validation, hotline, sync, space cat
+npm test                  # Vitest unit tests (136): alert rules, trends, validation, hotline, sync, space cat
 npm run test:e2e          # Playwright UI tests (re-seeds SIM-1; uses installed Edge, PW_CHANNEL=chromium to change)
 ```
 
@@ -402,5 +412,6 @@ docs/METRICS.md      Metric definitions, thresholds and citations (generated fro
 - Missions and the PVT result stay in the browser. Vitals, self-checks, exercise and sleep, injuries and period logs sync to the database through the offline queue so mission oversight can read them.
 - **Privacy:** every AI co-pilot message (the astronaut's questions and the replies) is stored on the server and readable by the oversight users assigned to that astronaut's group and by the super admin. The co-pilot shows the crew a note saying so.
 - Hotline delivery is checked by polling every few seconds; nothing is paged or sent outside the app.
+- **Hotline verified (2026-11-15):** an end-to-end run against a local build passed send with vitals, link delay, Earth inbox and banner, Seen, reply with the same delay back, Acknowledged, Resolved, emergency priority, offline re-send without duplicates, input validation, role checks and the rate limit.
 - **Neon cold starts:** an idle Neon database can take 6–9 s to wake, longer than Prisma's default 5 s connection timeout. The first request after a quiet spell can then fail (e.g. "Hotline server unavailable"). Adding `connect_timeout=15` to `DATABASE_URL` avoids this.
 - The first co-pilot load downloads about 0.7 GB of model weights once. After that they're cached in the browser.
