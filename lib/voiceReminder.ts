@@ -180,12 +180,34 @@ export function mew(volume = 0.12) {
 let current: SpeechSynthesisUtterance | null = null;
 let token = 0;
 
+// While the crew member talks to the cat ("Talk to me"), the cat stays quiet.
+let paused = false;
+export function isCatVoicePaused() {
+  return paused;
+}
+/** Stop anything the cat is saying right now (reminder speech, queued or blocked lines). */
+export function stopCatVoice() {
+  token++; // invalidates in-flight retries and queued lines
+  pending = null;
+  current = null;
+  try {
+    if (typeof window !== "undefined" && "speechSynthesis" in window) window.speechSynthesis.cancel();
+  } catch {
+    /* ignore */
+  }
+}
+/** Pause or resume the cat's voice; reminders that come due while paused are skipped, the schedule keeps running. */
+export function setCatVoicePaused(v: boolean) {
+  paused = v;
+  if (v) stopCatVoice();
+}
+
 /**
  * Speak in the cat's voice: a mew, then a high cartoon voice. If a voice errors, or nothing is
  * speaking ~3 s later, retry with an installed voice, then with the browser default.
  */
 export function catSpeak(text: string, onEnd?: () => void) {
-  if (typeof window === "undefined" || !("speechSynthesis" in window)) {
+  if (typeof window === "undefined" || !("speechSynthesis" in window) || paused) {
     onEnd?.();
     return;
   }

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { setCatVoicePaused } from "@/lib/voiceReminder";
 
 const SECONDS = 3;
 const noop = () => () => {};
@@ -17,9 +18,14 @@ export function TalkBack({ onStart }: { onStart?: () => void }) {
   useEffect(
     () => () => {
       if (urlRef.current) URL.revokeObjectURL(urlRef.current);
+      setCatVoicePaused(false);
     },
     []
   );
+  // Quiet the reminder voice while recording and repeating; resume when done.
+  useEffect(() => {
+    setCatVoicePaused(state === "recording" || state === "playing");
+  }, [state]);
 
   const supported = useSyncExternalStore(
     noop,
@@ -29,6 +35,7 @@ export function TalkBack({ onStart }: { onStart?: () => void }) {
 
   const start = async () => {
     setError(null);
+    setCatVoicePaused(true); // stop any reminder speaking right now
     onStart?.();
     let stream: MediaStream;
     try {
