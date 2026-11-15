@@ -14,6 +14,7 @@
     "db:synthetic": "tsx prisma/synthetic.ts",
     "test": "vitest run",
     "test:e2e": "playwright test",
+    "benchmark:copilot": "tsx scripts/copilot-benchmark.ts",
     "docs:metrics": "tsx scripts/metrics-doc.ts"
   },
   "prisma": {

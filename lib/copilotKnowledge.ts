@@ -6,6 +6,7 @@
  */
 
 import { INJURY_TYPES } from "@/lib/injuries";
+import { keywordScore } from "./copilotEvidence";
 
 export type ProtocolCard = {
   id: string;
@@ -31,7 +32,7 @@ export const PROTOCOLS: ProtocolCard[] = [
     id: "hypoxia",
     title: "Low SpO2 (below 95%)",
     keywords: ["spo2", "oxygen", "saturation", "breath", "hypoxia", "short of breath"],
-    text: "First re-seat the finger sensor and recheck. Check cabin O2 and CO2 readings. 90-94%: rest, monitor every 5 minutes, check for cough or chest symptoms. Below 90% or falling: give supplemental oxygen by mask and notify the CDR and ground surgeon.",
+    text: "If the crew member is stable, re-seat the sensor and recheck. Check cabin oxygen and CO2. Notify the onboard CMO promptly if the reading stays low, is falling, or there are symptoms.",
   },
   {
     id: "hrv",
@@ -49,7 +50,7 @@ export const PROTOCOLS: ProtocolCard[] = [
     id: "chest",
     title: "Chest pain",
     keywords: ["chest", "angina", "heart attack", "pressure in chest"],
-    text: "Treat as cardiac until proven otherwise: stop activity, record ECG, give oxygen if SpO2 is low, notify the CDR immediately and prepare for ground consult. Note onset time, character and whether it spreads to the arm or jaw.",
+    text: "Stop activity and contact the onboard CMO and commander immediately for new or ongoing chest pain. Do not delay help to collect measurements.",
   },
   {
     id: "radiation",
@@ -73,7 +74,7 @@ export const PROTOCOLS: ProtocolCard[] = [
     id: "headache",
     title: "Headache",
     keywords: ["headache", "head ache", "migraine", "head hurts"],
-    text: "Check cabin CO2 first, then hydration and sleep debt. Standard analgesic per formulary if there are no red flags. Red flags (worst-ever, sudden, vision change, confusion, weakness) need urgent ground consult.",
+    text: "Review cabin CO2, hydration and recent sleep. A sudden severe headache or one with confusion, weakness or vision changes calls for immediate onboard help.",
   },
   {
     id: "nausea",
@@ -86,6 +87,18 @@ export const PROTOCOLS: ProtocolCard[] = [
     title: "Sleep",
     keywords: ["sleep", "insomnia", "rest", "tired", "fatigue", "melatonin"],
     text: "Target is 8.5 hours per sleep period. Under 6 hours raises error risk: avoid scheduling critical tasks, EVA or robotics for that crew member. Improve sleep with light control, quiet crew quarters and consistent timing.",
+  },
+  {
+    id: "hydration",
+    title: "Hydration follow-up in AstroMed",
+    keywords: ["hydration", "dehydration", "fluid intake", "water intake", "urine colour", "urine color"],
+    text: "Review the crew member's 24-hour fluid report and follow the mission hydration plan. Log additional water on the Low fluid intake alert in My monitoring. The intake alert tracks reported fluid; urine colour is tracked separately.",
+  },
+  {
+    id: "glucose",
+    title: "Blood sugar follow-up in AstroMed",
+    keywords: ["glucose", "blood sugar", "fasting", "insulin"],
+    text: "Check whether the reading was fasting and when it was taken. A single reading is insufficient for a diagnosis. Ask the CMO to review out-of-range or symptomatic readings.",
   },
   {
     id: "exercise",
@@ -101,15 +114,15 @@ export const PROTOCOLS: ProtocolCard[] = [
   },
   {
     id: "medkit",
-    title: "Onboard medical kit (adult doses, given by the CMO)",
+    title: "Onboard medical kit",
     keywords: ["medicine", "medication", "drug", "pill", "dose", "take", "painkiller", "pain", "ibuprofen", "acetaminophen", "paracetamol", "tylenol", "promethazine", "meclizine", "melatonin", "loratadine", "antihistamine", "kit"],
-    text: "Pain/fever: acetaminophen 500-1000 mg every 6 h (max 3 g/day), or ibuprofen 400 mg every 6-8 h with food (never if NSAID allergy, asthma flare or bleeding). Motion sickness: meclizine 25 mg, or promethazine 25 mg for severe cases (causes drowsiness, no EVA for 12 h). Sleep: melatonin 3 mg. Allergy: loratadine 10 mg daily; epinephrine auto-injector for anaphylaxis. Oral rehydration salts for dehydration. Always check the crew member's allergies first.",
+    text: "The onboard CMO checks allergies, current medicines and the mission formulary before choosing any medication.",
   },
   {
     id: "allergy",
     title: "Allergic reaction",
     keywords: ["allerg", "rash", "hives", "swelling", "anaphyla", "itch", "wheez"],
-    text: "Mild (rash, itching): stop the suspected trigger, give loratadine, monitor. Severe (throat or face swelling, wheezing, low blood pressure, falling SpO2): epinephrine auto-injector into the thigh immediately, oxygen, call the CMO and CDR, repeat epinephrine after 5-15 min if no improvement.",
+    text: "Breathing difficulty, throat swelling or fainting during a suspected reaction requires immediate onboard help. Contact the CMO and commander and follow the approved emergency procedure.",
   },
   {
     id: "comms",
@@ -127,7 +140,7 @@ export const PROTOCOLS: ProtocolCard[] = [
     id: "menstrual",
     title: "Periods and menstrual problems",
     keywords: ["period", "menstrua", "cramp", "cycle", "bleeding", "pms", "tampon", "pad", "suppression", "spotting"],
-    text: "Many crew suppress periods with continuous hormonal contraception; breakthrough bleeding is usually harmless but should be logged and reported. For cramps use a heat pack, light cycling and pain relief (acetaminophen, or ibuprofen with food if no NSAID allergy). Heavy flow: eat iron-rich food and watch for tiredness, dizziness or breathlessness (anaemia). Call the CMO for bleeding over 7 days, soaking a product every hour, severe or one-sided pain, fever, or dizziness. Used products go in sealed waste bags.",
+    text: "Record changes in flow, pain and associated symptoms. Contact the CMO for unusually heavy or prolonged bleeding, severe pain, fever, dizziness or breathlessness.",
   },
   // First-aid cards for external injuries, from the same text the body map shows.
   ...Object.entries(INJURY_TYPES)
@@ -146,10 +159,9 @@ export const PROTOCOLS: ProtocolCard[] = [
  * other matches, up to `limit` cards.
  */
 export function findProtocols(question: string, forced: string[] = [], limit = 4): ProtocolCard[] {
-  const q = question.toLowerCase();
   const scored = PROTOCOLS.map((card) => ({
     card,
-    score: card.keywords.reduce((s, k) => (q.includes(k) ? s + k.length : s), 0),
+    score: keywordScore(question, card.keywords),
   }))
     .filter((s) => s.score > 0)
     .sort((a, b) => b.score - a.score)
@@ -185,7 +197,9 @@ export function evaRecommendation(r: {
   if (r.hrv != null && r.hrv <= 30) reasons.push(`low HRV (${Math.round(r.hrv)} ms)`);
   if (r.radiation != null && r.radiation >= 0.1) reasons.push("elevated radiation");
   if (r.sleepHours != null && r.sleepHours < 6) reasons.push(`short sleep (${r.sleepHours.toFixed(1)} h)`);
-  return reasons.length ? `NO-GO, because of ${reasons.join(", ")}` : "GO, all readings in range";
+  return reasons.length
+    ? `Hold EVA and ask the CMO to review ${reasons.join(", ")}.`
+    : "The available readings cannot establish EVA clearance. Check with the CMO.";
 }
 
 /** Protocol ids triggered by a reading, using the same limits as the risk engine. */

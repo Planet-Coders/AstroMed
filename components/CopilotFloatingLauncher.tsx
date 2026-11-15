@@ -12,6 +12,8 @@ export function CopilotFloatingLauncher() {
     input,
     setInput,
     sendMessage,
+    clearChat,
+    stopReply,
     isSending,
     engineStatus,
     loadPercent,
@@ -42,6 +44,8 @@ export function CopilotFloatingLauncher() {
               input={input}
               onInputChange={setInput}
               onSend={() => void sendMessage()}
+              onClear={clearChat}
+              onStop={stopReply}
               isSending={isSending}
               className="h-[min(480px,70vh)]"
               placeholder={
