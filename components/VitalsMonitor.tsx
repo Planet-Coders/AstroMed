@@ -163,7 +163,7 @@ export function VitalsMonitor({
     return () => clearInterval(id);
   }, [display, arrhythmia]);
 
-  const risk = assessRisk(display);
+  const risk = assessRisk({ ...display, arrhythmia });
 
   // Keep the selected crew card in step with this readout.
   useEffect(() => {

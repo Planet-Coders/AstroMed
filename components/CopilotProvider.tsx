@@ -51,6 +51,7 @@ export type CopilotSession = {
     hrv: number;
     spo2: number;
     radiation: number;
+    arrhythmia?: boolean;
   };
 };
 

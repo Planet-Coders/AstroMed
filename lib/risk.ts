@@ -5,6 +5,8 @@ export type VitalSignals = {
   hrv?: number | null;
   spo2: number;
   radiation?: number | null;
+  /** Irregular heart rhythm on the ECG: always a warning, whatever the other numbers say. */
+  arrhythmia?: boolean;
 };
 
 function signalRisk(
@@ -20,6 +22,7 @@ function signalRisk(
 
 export function assessRisk(vitals: VitalSignals): RiskLevel {
   const levels: RiskLevel[] = [];
+  if (vitals.arrhythmia) levels.push("RED");
 
   levels.push(signalRisk(vitals.heartRate, [55, 100], 45, 120));
 

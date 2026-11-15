@@ -91,9 +91,14 @@ export function MissionHeader({
         <span className="font-semibold text-foreground tracking-wide">{activeTabLabel ?? "Dashboard"}</span>
       </div>
 
-      <span className={`flex items-center gap-2 rounded-full border px-3 py-1 text-[12px] font-semibold ${status.cls}`} role="status">
+      <span
+        className={`flex items-center gap-2 rounded-full border px-3 py-1 text-[12px] font-semibold ${status.cls}`}
+        role="status"
+        title="Based on live vitals only: heart rate, HRV, SpO₂, radiation dose and heart rhythm. Blood labs are assessed separately in the Medical assessment panel."
+      >
         <span className={`h-2 w-2 rounded-full ${status.dot}`} />
         {status.text}
+        <span className="font-mono text-[10px] font-normal opacity-70">· vitals</span>
       </span>
 
       <div className="ml-auto flex flex-wrap items-center gap-4">
